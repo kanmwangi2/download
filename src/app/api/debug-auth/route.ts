@@ -1,20 +1,15 @@
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Server-side Supabase client with service role access
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-)
 
 export async function GET(request: NextRequest) {
   try {
+    // Check environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ 
+        error: 'Supabase environment variables not configured' 
+      }, { status: 500 })
+    }
+
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
 
@@ -23,6 +18,9 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 Debugging auth for email:', email)
+
+    // Create admin client inside function
+    const supabaseAdmin = createServiceRoleClient()
 
     // Check if user exists in auth.users
     const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()

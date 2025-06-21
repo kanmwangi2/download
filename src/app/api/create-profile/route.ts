@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Check environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ 
+        error: true,
+        message: 'Supabase environment variables not configured' 
+      }, { status: 500 })
+    }
+
     const { userId, firstName, lastName, email } = await request.json()
 
     console.log('🔄 Creating user profile via API:', {

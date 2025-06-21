@@ -16,13 +16,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
-import { getFromStoreByIndex, STORE_NAMES } from '@/lib/indexedDbUtils';
-import type { User } from '@/components/settings/user-management-tab';
+import { signIn } from '@/lib/supabase';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
-
-const CURRENT_USER_LOCALSTORAGE_KEY = "cheetahPayrollCurrentUser";
 
 type FeedbackMessage = {
   type: 'success' | 'error';
@@ -49,35 +46,41 @@ export function LoginForm() {
     setFeedback(null);
 
     if (!email || !password) {
-      setFeedback({ type: 'error', message: "Login Failed", details: "Email and password are required." });
+      setFeedback({ 
+        type: 'error', 
+        message: "Login Failed", 
+        details: "Email and password are required." 
+      });
       setIsLoading(false);
       return;
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        const user = await getFromStoreByIndex<User>(STORE_NAMES.USERS, 'email', email.trim().toLowerCase());
+    try {
+      const { data, error } = await signIn(email.trim().toLowerCase(), password);
 
-        if (user && user.password === password) {
-          const currentUserData = {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            assignedCompanyIds: user.assignedCompanyIds,
-          };
-          localStorage.setItem(CURRENT_USER_LOCALSTORAGE_KEY, JSON.stringify(currentUserData));
-          setFeedback({ type: 'success', message: "Login Successful", details: `Welcome back, ${user.firstName}!` });
-          setTimeout(() => router.push("/select-company"), 1000);
-        } else {
-          setFeedback({ type: 'error', message: "Login Failed", details: "Invalid email or password." });
-        }
-      } catch (error) {
-        console.error("Login error:", error);
-        setFeedback({ type: 'error', message: "Login Error", details: "An unexpected error occurred during login." });
+      if (error) {
+        setFeedback({ 
+          type: 'error', 
+          message: "Login Failed", 
+          details: error.message || "Invalid email or password." 
+        });
+      } else if (data.user) {
+        setFeedback({ 
+          type: 'success', 
+          message: "Login Successful", 
+          details: "Welcome back!" 
+        });
+        setTimeout(() => router.push("/select-company"), 1000);
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      setFeedback({ 
+        type: 'error', 
+        message: "Login Error", 
+        details: "An unexpected error occurred during login." 
+      });
     }
+
     setIsLoading(false);
   };
 
@@ -172,6 +175,12 @@ export function LoginForm() {
             >
               {isLoading ? "Logging in..." : "Login"}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary hover:underline">
+                Sign up here
+              </Link>
+            </p>
           </CardFooter>
         </form>
       </Card>

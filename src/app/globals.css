@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 98%; /* Slightly darker light mode background */
+    --foreground: 215 28% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    /* PRD Colors: */
+    --primary: 230 79% 66%; /* Soft indigo (#667EEA) */
+    --primary-foreground: 0 0% 100%; /* White for good contrast on soft indigo */
+
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+
+    --accent: 220 89% 81%; /* Pale blue (#A3BFFA) */
+    --accent-foreground: 218 22% 23%; /* Darker text for contrast on pale blue */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 230 79% 66%; /* Ring to match primary */
+
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    /* Sidebar colors for light mode - can derive from main theme or be specific */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 215 28% 17%;
+    --sidebar-primary: 230 79% 66%; /* Match main primary */
+    --sidebar-primary-foreground: 0 0% 100%; /* Match main primary-foreground */
+    --sidebar-accent: 220 89% 81%; /* Match main accent */
+    --sidebar-accent-foreground: 218 22% 23%; /* Match main accent-foreground */
+    --sidebar-border: 0 0% 89.8%;
+    --sidebar-ring: 230 79% 66%;
+  }
+
+  .dark {
+    /* PRD Dark Mode Background: Dark, desaturated indigo (#2D3748) - Made slightly darker */
+    --background: 215 28% 20%; /* hsl(215, 28%, 20%) */
+    --foreground: 210 40% 95%;
+
+    --card: 215 28% 17%;
+    --card-foreground: 210 40% 95%;
+
+    --popover: 215 28% 15%;
+    --popover-foreground: 210 40% 95%;
+
+    /* Adapted PRD Primary for Dark Mode: Lighter Soft Indigo */
+    --primary: 230 79% 75%; /* Lighter version of #667EEA for text/icons */
+    --primary-foreground: 215 28% 12%; /* Dark background color for text on primary */
+    
+    --secondary: 215 28% 28%; /* Slightly lighter than card for secondary elements */
+    --secondary-foreground: 210 40% 95%;
+
+    --muted: 215 28% 25%; /* Darker muted background */
+    --muted-foreground: 210 25% 75%;
+
+    /* Adapted PRD Accent for Dark Mode: Lighter Pale Blue */
+    --accent: 220 89% 85%; /* Lighter version of #A3BFFA for hovers/interactive */
+    --accent-foreground: 215 28% 12%; /* Dark text for contrast on light accent */
+
+    --destructive: 0 70% 45%; /* Adjusted destructive for dark mode contrast */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 28% 28%; 
+    --input: 215 28% 28%;
+    --ring: 230 79% 75%; /* Ring to match dark primary */
+
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Sidebar specific colors - Dark Mode */
+    --sidebar-background: 215 28% 12%; /* Darker sidebar background */
+    --sidebar-foreground: 210 30% 88%; 
+    --sidebar-primary: 215 28% 20%; /* Selected item background (matches overall dark bg) */
+    --sidebar-primary-foreground: 230 79% 75%; /* Selected item text (matches dark primary) */
+    --sidebar-accent: 215 28% 25%; /* Hover item background */
+    --sidebar-accent-foreground: 220 89% 85%; /* Hover item text (matches dark accent) */
+    --sidebar-border: 215 28% 20%; 
+    --sidebar-ring: 230 79% 75%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

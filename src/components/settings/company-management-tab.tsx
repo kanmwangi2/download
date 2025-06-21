@@ -1,0 +1,584 @@
+
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PlusCircle, Edit, Trash2, Building, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getAllFromGlobalStore, putToGlobalStore, deleteFromGlobalStore, STORE_NAMES, bulkPutToStore as bulkPutToGlobalStore } from '@/lib/indexedDbUtils';
+import type { Company as UserDataCompany } from '@/lib/userData';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from '@/lib/utils';
+
+
+export interface Company extends UserDataCompany {
+  tinNumber?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  primaryBusiness?: string;
+}
+
+export const initialCompaniesDataForSeed: Company[] = [
+  {
+    id: "co_001",
+    name: "Umoja Tech Solutions (Demo)",
+    tinNumber: "TIN102345678",
+    address: "KN 5 Rd, Kigali Heights, Kigali, Rwanda",
+    email: "info@umojatech.rw",
+    phone: "0788123456",
+    primaryBusiness: "Software Development & IT Consulting",
+  },
+  {
+    id: "co_002",
+    name: "Isoko Trading Co. (Demo)",
+    tinNumber: "TIN103456789",
+    address: "CHIC Complex, Nyarugenge, Kigali",
+    email: "sales@isoko.rw",
+    phone: "0788234567",
+    primaryBusiness: "General Trading & Imports",
+  },
+];
+
+
+const defaultNewCompany: Omit<Company, 'id'> = {
+  name: "",
+  tinNumber: "",
+  address: "",
+  email: "",
+  phone: "",
+  primaryBusiness: "",
+};
+
+const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
+
+type FeedbackMessage = {
+  type: 'success' | 'error' | 'info';
+  message: string;
+  details?: string;
+};
+
+const idLikeCompanyFields = ['id', 'tinNumber', 'phone'];
+
+export default function CompanyManagementTab() {
+  const [allCompanies, setAllCompanies] = useState<Company[]>([]);
+  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [formData, setFormData] = useState<Omit<Company, 'id'>>(defaultNewCompany);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [companySearchTerm, setCompanySearchTerm] = useState("");
+  const companyImportFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [compCurrentPage, setCompCurrentPage] = useState(1);
+  const [compRowsPerPage, setCompRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
+  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [selectedCompanyItems, setSelectedCompanyItems] = useState<Set<string>>(new Set());
+  const [isBulkDeleteCompaniesDialogOpen, setIsBulkDeleteCompaniesDialogOpen] = useState(false);
+
+
+  useEffect(() => {
+    const loadCompanies = async () => {
+      if (typeof window !== 'undefined') {
+        setIsLoaded(false);
+        setFeedback(null);
+        try {
+          let storedCompanies = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES);
+          if (!storedCompanies || storedCompanies.length === 0) {
+            await Promise.all(initialCompaniesDataForSeed.map(comp => putToGlobalStore<Company>(STORE_NAMES.COMPANIES, comp)));
+            storedCompanies = initialCompaniesDataForSeed;
+            setFeedback({ type: "info", message: "Initial Companies Seeded", details: "Default company records have been added."});
+          }
+          setAllCompanies(storedCompanies);
+        } catch (error) {
+          console.error("Error loading companies from IndexedDB:", error);
+          setAllCompanies(initialCompaniesDataForSeed);
+          setFeedback({ type: "error", message: "Loading Error", details: "Could not load company records."})
+        } finally {
+          setIsLoaded(true);
+        }
+      }
+    };
+    loadCompanies();
+  }, []);
+
+
+  useEffect(() => {
+    if (editingCompany) {
+      setFormData({
+        name: editingCompany.name,
+        tinNumber: editingCompany.tinNumber || "",
+        address: editingCompany.address || "",
+        email: editingCompany.email || "",
+        phone: editingCompany.phone || "",
+        primaryBusiness: editingCompany.primaryBusiness || "",
+      });
+    } else {
+      setFormData(defaultNewCompany);
+    }
+  }, [editingCompany, isCompanyDialogOpen]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddCompanyClick = () => {
+    setFeedback(null);
+    setEditingCompany(null);
+    setIsCompanyDialogOpen(true);
+  };
+
+  const handleEditCompanyClick = (company: Company) => {
+    setFeedback(null);
+    setEditingCompany(company);
+    setIsCompanyDialogOpen(true);
+  };
+
+  const handleDeleteCompanyClick = (company: Company) => {
+    setFeedback(null);
+    setCompanyToDelete(company);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const deleteCompaniesByIds = async (idsToDelete: string[]) => {
+    setFeedback(null);
+    if (idsToDelete.length === 0) return;
+    try {
+      for (const id of idsToDelete) {
+        await deleteFromGlobalStore(STORE_NAMES.COMPANIES, id);
+      }
+      setAllCompanies(prev => prev.filter(comp => !idsToDelete.includes(comp.id)));
+      setSelectedCompanyItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
+      setFeedback({type: 'success', message: "Company(s) Deleted", details: `Successfully deleted ${idsToDelete.length} company(s).`});
+       if (compCurrentPage > 1 && paginatedCompanies.length === idsToDelete.length && filteredCompaniesSource.slice((compCurrentPage - 2) * compRowsPerPage, (compCurrentPage - 1) * compRowsPerPage).length > 0) { setCompCurrentPage(compCurrentPage - 1); }
+      else if (compCurrentPage > 1 && paginatedCompanies.length === idsToDelete.length && filteredCompaniesSource.slice((compCurrentPage-1)*compRowsPerPage).length === 0){ setCompCurrentPage( Math.max(1, compCurrentPage -1)); }
+    } catch (error) {
+      console.error("Error deleting company(s) from IndexedDB:", error);
+      setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} company(s).`});
+    }
+  };
+
+  const confirmDeleteCompany = async () => { if (companyToDelete) { await deleteCompaniesByIds([companyToDelete.id]); } setIsDeleteDialogOpen(false); setCompanyToDelete(null); };
+  const handleOpenBulkDeleteCompaniesDialog = () => { setFeedback(null); if (selectedCompanyItems.size === 0) { setFeedback({type: 'info', message: "No Selection", details: "Please select companies to delete."}); return; } setIsBulkDeleteCompaniesDialogOpen(true); };
+  const confirmBulkDeleteCompanies = async () => { await deleteCompaniesByIds(Array.from(selectedCompanyItems)); setIsBulkDeleteCompaniesDialogOpen(false); };
+
+  const handleSaveCompany = async () => {
+    setFeedback(null);
+    if (!formData.name || !formData.tinNumber) {
+      setFeedback({type: 'error', message: "Validation Error", details: "Company Name and TIN Number are required."});
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+
+    try {
+        if (editingCompany) {
+        const updatedCompany: Company = { ...editingCompany, ...formData };
+        await putToGlobalStore<Company>(STORE_NAMES.COMPANIES, updatedCompany);
+        setAllCompanies(prevCompanies =>
+            prevCompanies.map(company =>
+            company.id === editingCompany.id
+                ? updatedCompany
+                : company
+            )
+        );
+        setFeedback({type: 'success', message: "Company Updated", details: `Company "${formData.name}" has been updated.`});
+        } else {
+        const newCompany: Company = {
+            id: `co_${Date.now()}`,
+            ...formData,
+        };
+        await putToGlobalStore<Company>(STORE_NAMES.COMPANIES, newCompany);
+        setAllCompanies(prevCompanies => [...prevCompanies, newCompany]);
+        setFeedback({type: 'success', message: "Company Added", details: `Company "${newCompany.name}" has been added.`});
+        }
+        setIsCompanyDialogOpen(false);
+    } catch (error: any) {
+         console.error("Error saving company to IndexedDB:", error);
+         if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) {
+            setFeedback({type: 'error', message: "Save Failed", details: "A company with this ID or unique identifier already exists."});
+         } else {
+            setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${(error as Error).message}`});
+         }
+    }
+  };
+
+  const filteredCompaniesSource = useMemo(() => {
+    if (!companySearchTerm) return allCompanies;
+    const lowerSearchTerm = companySearchTerm.toLowerCase();
+    return allCompanies.filter(company =>
+      company.name.toLowerCase().includes(lowerSearchTerm) ||
+      (company.tinNumber && company.tinNumber.toLowerCase().includes(lowerSearchTerm)) ||
+      (company.primaryBusiness && company.primaryBusiness.toLowerCase().includes(lowerSearchTerm)) ||
+      (company.email && company.email.toLowerCase().includes(lowerSearchTerm))
+    );
+  }, [allCompanies, companySearchTerm]);
+
+  const compTotalItems = filteredCompaniesSource.length;
+  const compTotalPages = Math.ceil(compTotalItems / compRowsPerPage) || 1;
+  const compStartIndex = (compCurrentPage - 1) * compRowsPerPage;
+  const compEndIndex = compStartIndex + compRowsPerPage;
+  const paginatedCompanies = filteredCompaniesSource.slice(compStartIndex, compEndIndex);
+
+  const handleSelectCompanyRow = (itemId: string, checked: boolean) => {
+    setSelectedCompanyItems(prev => { const newSelected = new Set(prev); if (checked) newSelected.add(itemId); else newSelected.delete(itemId); return newSelected; });
+  };
+  const handleSelectAllCompaniesOnPage = (checked: boolean) => {
+    const pageItemIds = paginatedCompanies.map(item => item.id);
+    if (checked) { setSelectedCompanyItems(prev => new Set([...prev, ...pageItemIds])); }
+    else { const pageItemIdsSet = new Set(pageItemIds); setSelectedCompanyItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id)))); }
+  };
+  const isAllCompaniesOnPageSelected = paginatedCompanies.length > 0 && paginatedCompanies.every(item => selectedCompanyItems.has(item.id));
+
+  const globalCompanyExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'name', label: 'Name' }, { key: 'tinNumber', label: 'TINNumber', isIdLike: true }, { key: 'address', label: 'Address' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'primaryBusiness', label: 'PrimaryBusiness' }];
+
+  const exportGlobalCompanyData = (fileType: "csv" | "xlsx" | "pdf") => {
+    setFeedback(null);
+    if (allCompanies.length === 0) { setFeedback({type: 'info', message: "No Data", details: `There are no companies to export.`}); return; }
+
+    const headers = globalCompanyExportColumns.map(c => c.label);
+    const dataToExport = allCompanies.map(row => {
+      const exportRow: Record<string, string | number> = {};
+      globalCompanyExportColumns.forEach(col => {
+          const value = row[col.key as keyof Company];
+          if (col.isIdLike) {
+              exportRow[col.label] = String(value || '');
+          } else if (typeof value === 'number') { // Should not happen for Company, but good practice
+              exportRow[col.label] = value;
+          } else {
+              exportRow[col.label] = String(value || '');
+          }
+      });
+      return exportRow;
+    });
+    const fileName = `global_companies_export.${fileType}`;
+
+    if (fileType === "csv") {
+        const csvData = dataToExport.map(row => {
+            const newRow: Record<string, string> = {};
+            headers.forEach(header => {
+                const colDef = globalCompanyExportColumns.find(c => c.label === header);
+                let cellValue = String(row[header] || '');
+                if (colDef?.isIdLike && /^\d+$/.test(cellValue) && cellValue.length > 0) {
+                    cellValue = `'${cellValue}`;
+                }
+                newRow[header] = cellValue;
+            });
+            return newRow;
+        });
+        const csvString = Papa.unparse(csvData, { header: true, columns: headers });
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a'); const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url); link.setAttribute('download', fileName);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
+    } else if (fileType === "xlsx") {
+        const xlsxData = dataToExport.map(row => {
+            const newRow: Record<string, string|number>={};
+            headers.forEach(h => {
+                const colDef = globalCompanyExportColumns.find(c => c.label === h);
+                if (colDef?.isIdLike) newRow[h] = String(row[h] || '');
+                else newRow[h] = (typeof row[h] === 'number' ? row[h] : String(row[h] || ''));
+            });
+            return newRow;
+        });
+        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: headers, skipHeader: false});
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Global Companies");
+        XLSX.writeFile(workbook, fileName);
+        setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
+    } else if (fileType === "pdf") {
+        const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
+        const doc = new jsPDF({ orientation: 'landscape' });
+        (doc as any).autoTable({ head: [headers], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
+        doc.save(fileName);
+        setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
+    }
+  };
+
+  const handleDownloadGlobalCompanyTemplate = () => { setFeedback(null); const headers = ['ID', 'Name', 'TINNumber', 'Address', 'Email', 'Phone', 'PrimaryBusiness']; const csvString = headers.join(',') + '\n'; const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); const url = URL.createObjectURL(blob); link.setAttribute('href', url); link.setAttribute('download', `global_companies_import_template.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); setFeedback({type: 'info', message: "Template Downloaded", details: "Tip: If a field contains commas, ensure the entire field is enclosed in double quotes."}); };
+  const handleGlobalCompanyImportClick = () => { setFeedback(null); companyImportFileInputRef.current?.click(); };
+
+  const handleGlobalCompanyFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFeedback(null);
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async (results) => {
+          const { data: rawData, errors: papaParseErrors } = results;
+          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Company[] = [];
+          const existingCompanies = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES);
+          for (const [index, rawRowUntyped] of rawData.entries()) {
+            const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
+            const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const tin = String(rawRow.TINNumber || '').trim();
+            const address = String(rawRow.Address || '').trim(); const email = String(rawRow.Email || '').trim(); const phone = String(rawRow.Phone || '').trim(); const primaryBusiness = String(rawRow.PrimaryBusiness || '').trim();
+            if (!name || !tin) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name and TINNumber are required.`); continue; }
+            const companyData: Omit<Company, 'id'> = { name, tinNumber: tin, address, email, phone, primaryBusiness };
+            const existingComp = id ? existingCompanies.find(c => c.id === id) : null;
+            if (existingComp) { itemsToBulkPut.push({ ...existingComp, ...companyData }); updatedCount++; }
+            else { itemsToBulkPut.push({ id: id || `co_${Date.now()}_${index}`, ...companyData }); newCount++; }
+          }
+          if (itemsToBulkPut.length > 0) { await bulkPutToGlobalStore<Company>(STORE_NAMES.COMPANIES, itemsToBulkPut); const updatedList = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES); setAllCompanies(updatedList); }
+          let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} companies added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
+          let details = "";
+          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
+          setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
+        }
+      }); if (event.target) event.target.value = '';
+    }
+  };
+
+  const renderFeedbackMessage = () => {
+    if (!feedback) return null;
+    let IconComponent;
+    let variant: "default" | "destructive" = "default";
+    let additionalAlertClasses = "";
+
+    switch (feedback.type) {
+      case 'success':
+        IconComponent = CheckCircle2;
+        variant = "default";
+        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
+        break;
+      case 'error':
+        IconComponent = AlertTriangle;
+        variant = "destructive";
+        break;
+      case 'info':
+        IconComponent = Info;
+        variant = "default";
+        break;
+      default:
+        return null;
+    }
+    return (
+      <Alert variant={variant} className={cn("mb-4", additionalAlertClasses)}>
+        <IconComponent className="h-4 w-4" />
+        <AlertTitle>{feedback.message}</AlertTitle>
+        {feedback.details && <AlertDescription>{feedback.details}</AlertDescription>}
+      </Alert>
+    );
+  };
+
+
+  if (!isLoaded) {
+      return <div>Loading companies...</div>;
+  }
+
+  return (
+    <Card>
+      <input type="file" ref={companyImportFileInputRef} onChange={handleGlobalCompanyFileUpload} accept=".csv" className="hidden" />
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Building className="mr-2 h-5 w-5" /> Company Management
+        </CardTitle>
+        <CardDescription>
+          Add, edit, and manage company records available across the application.
+          These companies will be assignable to users. Data is persisted in IndexedDB.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {renderFeedbackMessage()}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-4">
+            <div className="relative w-full sm:max-w-xs md:max-w-sm lg:max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Search companies by name, TIN..."
+                    className="w-full pl-10"
+                    value={companySearchTerm}
+                    onChange={(e) => {setCompanySearchTerm(e.target.value); setCompCurrentPage(1); setFeedback(null);}}
+                />
+            </div>
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
+                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full sm:w-auto" onClick={() => setFeedback(null)}><Upload className="mr-2 h-4 w-4" /> Import / Template</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={handleDownloadGlobalCompanyTemplate}><Download className="mr-2 h-4 w-4" /> Download Template</DropdownMenuItem><DropdownMenuItem onClick={handleGlobalCompanyImportClick}><Upload className="mr-2 h-4 w-4" /> Upload Data</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full sm:w-auto" disabled={allCompanies.length === 0} onClick={() => setFeedback(null)}><Download className="mr-2 h-4 w-4" /> Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => exportGlobalCompanyData('csv')}><FileText className="mr-2 h-4 w-4" /> CSV</DropdownMenuItem><DropdownMenuItem onClick={() => exportGlobalCompanyData('xlsx')}><FileSpreadsheet className="mr-2 h-4 w-4" /> XLSX</DropdownMenuItem><DropdownMenuItem onClick={() => exportGlobalCompanyData('pdf')}><FileType className="mr-2 h-4 w-4" /> PDF</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                <Button onClick={handleAddCompanyClick} className="w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Company
+                </Button>
+            </div>
+        </div>
+        {selectedCompanyItems.size > 0 && (<div className="my-2 flex items-center justify-between p-3 bg-muted/50 rounded-md"><span className="text-sm text-muted-foreground">{selectedCompanyItems.size} item(s) selected</span><Button variant="destructive" onClick={handleOpenBulkDeleteCompaniesDialog}><Trash2 className="mr-2 h-4 w-4" /> Delete Selected</Button></div>)}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sticky top-0 z-10 bg-card w-[50px]"><Checkbox checked={isAllCompaniesOnPageSelected} onCheckedChange={(checked) => handleSelectAllCompaniesOnPage(Boolean(checked))} aria-label="Select all companies on page" disabled={paginatedCompanies.length === 0}/></TableHead>
+                <TableHead className="sticky top-0 z-10 bg-card">Name</TableHead>
+                <TableHead className="sticky top-0 z-10 bg-card">TIN Number</TableHead>
+                <TableHead className="sticky top-0 z-10 bg-card">Primary Business</TableHead>
+                <TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedCompanies.map(company => (
+                <TableRow key={company.id} data-state={selectedCompanyItems.has(company.id) ? "selected" : ""}>
+                  <TableCell><Checkbox checked={selectedCompanyItems.has(company.id)} onCheckedChange={(checked) => handleSelectCompanyRow(company.id, Boolean(checked))} aria-label={`Select company ${company.name}`}/></TableCell>
+                  <TableCell className="font-medium">{company.name}</TableCell>
+                  <TableCell>{company.tinNumber}</TableCell>
+                  <TableCell>{company.primaryBusiness}</TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditCompanyClick(company)} title="Edit Company">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteCompanyClick(company)}
+                      title="Delete Company"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {paginatedCompanies.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-24">
+                    {companySearchTerm ? "No companies match your search." : "No companies found."}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {compTotalPages > 1 && (
+        <div className="flex items-center justify-between py-4">
+            <div className="text-sm text-muted-foreground">
+            {selectedCompanyItems.size > 0 ? `${selectedCompanyItems.size} item(s) selected.` : `Page ${compCurrentPage} of ${compTotalPages} (${compTotalItems} total companies)`}
+            </div>
+            <div className="flex items-center space-x-6 lg:space-x-8">
+            <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium">Rows per page</p>
+                <Select value={`${compRowsPerPage}`} onValueChange={(value) => {setCompRowsPerPage(Number(value)); setCompCurrentPage(1); setSelectedCompanyItems(new Set());}}>
+                <SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={`${compRowsPerPage}`} /></SelectTrigger>
+                <SelectContent side="top">
+                    {ROWS_PER_PAGE_OPTIONS.map((pageSize) => (<SelectItem key={`comp-${pageSize}`} value={`${pageSize}`}>{pageSize}</SelectItem>))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setCompCurrentPage(1); setSelectedCompanyItems(new Set());}} disabled={compCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setCompCurrentPage(prev => prev - 1); setSelectedCompanyItems(new Set());}} disabled={compCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setCompCurrentPage(prev => prev + 1); setSelectedCompanyItems(new Set());}} disabled={compCurrentPage === compTotalPages}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setCompCurrentPage(compTotalPages); setSelectedCompanyItems(new Set());}} disabled={compCurrentPage === compTotalPages}><ChevronsRight className="h-4 w-4" /></Button>
+            </div>
+            </div>
+        </div>
+        )}
+      </CardContent>
+
+      <Dialog open={isCompanyDialogOpen} onOpenChange={(isOpen) => { setIsCompanyDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
+        <DialogContent className="sm:max-w-[725px]">
+          <DialogHeader>
+            <DialogTitle>{editingCompany ? "Edit Company" : "Add New Company"}</DialogTitle>
+            <DialogDescription>
+              {editingCompany ? "Update the company's details." : "Fill in the details for the new company."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4" tabIndex={0}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Company Name *</Label>
+                <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter company name" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tinNumber">TIN Number *</Label>
+                <Input id="tinNumber" name="tinNumber" value={formData.tinNumber} onChange={handleInputChange} placeholder="Enter TIN number" required />
+              </div>
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="primaryBusiness">Primary Business</Label>
+                <Input id="primaryBusiness" name="primaryBusiness" value={formData.primaryBusiness || ""} onChange={handleInputChange} placeholder="e.g., Technology, Manufacturing"/>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Company Address</Label>
+              <Textarea id="address" name="address" value={formData.address || ""} onChange={handleInputChange} placeholder="Enter full company address" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Company Email</Label>
+                <Input id="email" name="email" type="email" value={formData.email || ""} onChange={handleInputChange} placeholder="contact@company.com"/>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Company Phone</Label>
+                <Input id="phone" name="phone" type="tel" value={formData.phone || ""} onChange={handleInputChange} placeholder="e.g., 078XXXXXXX"/>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsCompanyDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveCompany}>Save Company</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the company: "{companyToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCompany} className="bg-destructive hover:bg-destructive/90">
+              Delete Company
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={isBulkDeleteCompaniesDialogOpen} onOpenChange={setIsBulkDeleteCompaniesDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedCompanyItems.size} selected company(s)?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteCompanies} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    </Card>
+  );
+}

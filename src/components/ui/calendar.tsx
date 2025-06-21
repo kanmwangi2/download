@@ -5,7 +5,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button"
+// Make sure buttonVariants is exported from the correct file.
+// If it is not, either export it from "@/components/ui/button" or import from the correct path.
+// Example if buttonVariants is in "@/components/ui/buttonVariants":
+// import { buttonVariants } from "@/components/ui/buttonVariants"
+// Update the import path below to where buttonVariants is actually exported from.
+// For example, if it's in "@/components/ui/buttonVariants":
+import { buttonVariants } from "@/components/ui/buttonVariants"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 

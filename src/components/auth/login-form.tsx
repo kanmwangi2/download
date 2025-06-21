@@ -56,21 +56,51 @@ export function LoginForm() {
     }
 
     try {
+      console.log("🔄 Attempting login...");
       const { data, error } = await signIn(email.trim().toLowerCase(), password);
 
+      console.log("📊 Login result:", { user: data?.user?.id, error: error?.message });
+
       if (error) {
+        console.error("❌ Login failed:", error);
         setFeedback({ 
           type: 'error', 
           message: "Login Failed", 
           details: error.message || "Invalid email or password." 
         });
       } else if (data.user) {
+        console.log("✅ Login successful, setting up user session");
         setFeedback({ 
           type: 'success', 
           message: "Login Successful", 
-          details: "Welcome back!" 
+          details: "Setting up your session..." 
         });
-        setTimeout(() => router.push("/select-company"), 1000);
+        
+        // Store user data in localStorage for CompanySelector compatibility
+        const currentUserData = {
+          id: data.user.id,
+          email: data.user.email || "",
+          firstName: data.user.user_metadata?.first_name || "User",
+          lastName: data.user.user_metadata?.last_name || "",
+          role: "Primary Admin" as const, // Default role - you may want to get this from user profile
+          assignedCompanyIds: [] // This should be fetched from user profile later
+        };
+        
+        localStorage.setItem("cheetahPayrollCurrentUser", JSON.stringify(currentUserData));
+        console.log("💾 User data stored in localStorage");
+        
+        // Stop loading state first
+        setIsLoading(false);
+        
+        // Use replace to prevent going back to login page
+        try {
+          console.log("🚀 Redirecting to /select-company");
+          router.replace("/select-company");
+        } catch (routerError) {
+          console.log("❌ Router redirect failed, using window.location");
+          window.location.href = "/select-company";
+        }
+        return; // Exit early after successful login
       }
     } catch (error) {
       console.error("Login error:", error);

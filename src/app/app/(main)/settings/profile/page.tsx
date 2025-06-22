@@ -108,7 +108,7 @@ async function fetchUserAvatar(userId: string): Promise<string | null> {
     .from('user_avatars')
     .select('avatar_url')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle(); // Use maybeSingle instead of single
   if (error) throw new Error(error.message);
   return data?.avatar_url || null;
 }

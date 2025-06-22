@@ -1,4 +1,3 @@
-
 // This file centralizes initial user and company data for seeding and type definitions.
 
 export type UserRole = "Primary Admin" | "App Admin" | "Company Admin" | "Payroll Approver" | "Payroll Preparer";
@@ -7,108 +6,130 @@ export type UserRole = "Primary Admin" | "App Admin" | "Company Admin" | "Payrol
 export interface Company {
   id: string;
   name: string;
-  tinNumber?: string;
+  tin_number?: string;
   address?: string;
   email?: string;
   phone?: string;
-  primaryBusiness?: string;
+  primary_business?: string;
 }
 
 export interface User {
   id: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   email: string;
   role: UserRole;
-  assignedCompanyIds: string[];
+  assigned_company_ids: string[];
   password?: string; // Stored plain text for simulation
   phone?: string;
 }
 
 // This will be dynamically populated by initialCompaniesDataForSeed from company-management-tab.tsx
 // during IndexedDB seeding.
-export const allCompanyIdsForUserSeed: string[] = ["co_001", "co_002"];
+export const all_company_ids_for_user_seed: string[] = ["co_001", "co_002"];
 
 
 export const initialUsers: User[] = [
   {
     id: "usr_pa001",
-    firstName: "Jean Pierre",
-    lastName: "Mugabe",
+    first_name: "Jean Pierre",
+    last_name: "Mugabe",
     email: "jp.mugabe.admin@example.rw",
     role: "Primary Admin",
-    assignedCompanyIds: allCompanyIdsForUserSeed,
+    assigned_company_ids: all_company_ids_for_user_seed,
     password: "password123",
     phone: "0788123456",
   },
   {
     id: "usr_aa001",
-    firstName: "Marie Claire",
-    lastName: "Uwineza",
+    first_name: "Marie Claire",
+    last_name: "Uwineza",
     email: "mc.uwineza.admin@example.rw",
     role: "App Admin",
-    assignedCompanyIds: allCompanyIdsForUserSeed,
+    assigned_company_ids: all_company_ids_for_user_seed,
     password: "password123",
     phone: "0788000111",
   },
   {
     id: "usr_ca001", // Kevin Gatete
-    firstName: "Kevin",
-    lastName: "Gatete",
+    first_name: "Kevin",
+    last_name: "Gatete",
     email: "kevin.gatete@example.rw",
     role: "Company Admin",
-    assignedCompanyIds: ["co_001", "co_002"],
+    assigned_company_ids: ["co_001", "co_002"],
     password: "password123",
     phone: "0788111222",
   },
    {
     id: "usr_pp001", // Diane Keza - Payroll Preparer for Umoja (co_001)
-    firstName: "Diane",
-    lastName: "Keza",
+    first_name: "Diane",
+    last_name: "Keza",
     email: "diane.keza@example.rw",
     role: "Payroll Preparer",
-    assignedCompanyIds: ["co_001"],
+    assigned_company_ids: ["co_001"],
     password: "password123",
     phone: "0788333444",
   },
   {
     id: "usr_pa002", // Eric Shema - Payroll Approver for Umoja (co_001)
-    firstName: "Eric",
-    lastName: "Shema",
+    first_name: "Eric",
+    last_name: "Shema",
     email: "eric.shema@example.rw",
     role: "Payroll Approver",
-    assignedCompanyIds: ["co_001"],
+    assigned_company_ids: ["co_001"],
     password: "password123",
     phone: "0788555666",
   },
   { // New Payroll Preparer for Isoko (co_002)
     id: "usr_pp002",
-    firstName: "Aisha",
-    lastName: "Nizam",
+    first_name: "Aisha",
+    last_name: "Nizam",
     email: "aisha.nizam@example.rw",
     role: "Payroll Preparer",
-    assignedCompanyIds: ["co_002"],
+    assigned_company_ids: ["co_002"],
     password: "password123",
     phone: "0788777888",
   },
   { // New Payroll Approver for Isoko (co_002)
     id: "usr_pa003",
-    firstName: "Samuel",
-    lastName: "Kaneza",
+    first_name: "Samuel",
+    last_name: "Kaneza",
     email: "samuel.kaneza@example.rw",
     role: "Payroll Approver",
-    assignedCompanyIds: ["co_002"],
+    assigned_company_ids: ["co_002"],
     password: "password123",
     phone: "0788999000",
   }
 ];
 
 export const defaultNewUserFormData: Omit<User, 'id' | 'password'> & { password?: string } = {
-  firstName: "",
-  lastName: "",
+  first_name: "",
+  last_name: "",
   email: "",
   role: "Payroll Preparer",
-  assignedCompanyIds: [],
+  assigned_company_ids: [],
   password: "",
   phone: "",
 };
+
+// Utility: Convert camelCase user to snake_case for backend
+export function userToBackend(user: any): any {
+  return {
+    ...user,
+    first_name: user.firstName,
+    last_name: user.lastName,
+    assigned_company_ids: user.assignedCompanyIds,
+    // ...other mappings as needed
+  };
+}
+
+// Utility: Convert backend user to camelCase for frontend
+export function userFromBackend(user: any): any {
+  return {
+    ...user,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    assignedCompanyIds: user.assigned_company_ids,
+    // ...other mappings as needed
+  };
+}

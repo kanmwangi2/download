@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox";
 import { countries } from "@/lib/countries";
-import { StaffMember, StaffStatus, EmployeeCategory } from "@/lib/staffData";
+import { StaffMember, StaffStatus, EmployeeCategory, staffFromBackend, staffToBackend } from '@/lib/staffData';
 import { CustomFieldDefinition } from '@/lib/customFieldDefinitionData';
 import { getSupabaseClient } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -133,18 +133,18 @@ export default function StaffPage() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        // Fetch staff from Supabase
+        // Fetch staff from Supabase (snake_case)
         const { data: staff, error: staffError } = await getSupabaseClient()
           .from('staff')
           .select('*')
-          .eq('companyId', selectedCompanyId);
+          .eq('company_id', selectedCompanyId);
         if (staffError) throw staffError;
-        setAllStaffForCompany(staff || []);
-        // Fetch custom field definitions from Supabase
+        setAllStaffForCompany((staff || []).map(staffFromBackend));
+        // Fetch custom field definitions from Supabase (snake_case)
         const { data: cfds, error: cfdError } = await getSupabaseClient()
           .from('custom_field_definitions')
           .select('*')
-          .eq('companyId', selectedCompanyId);
+          .eq('company_id', selectedCompanyId);
         if (cfdError) throw cfdError;
         setCustomFieldDefinitions((cfds || []).sort((a, b) => a.order - b.order));
       } catch (error) {
@@ -167,14 +167,18 @@ export default function StaffPage() {
     }
   }, [isCfdDialogOpen, editingCfd]);
 
-  const filteredStaffSource = useMemo(() => allStaffForCompany.filter(
+  // Use allStaffForCompanyUI (camelCase) for all UI logic
+  const allStaffForCompanyUI = allStaffForCompany.map(staffFromBackend);
+
+  // Use allStaffForCompanyUI in all UI/filter/search/export logic
+  const filteredStaffSource = useMemo(() => allStaffForCompanyUI.filter(
     (staff) =>
       staff.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staff.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (staff.email && staff.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (staff.department && staff.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (staff.designation && staff.designation.toLowerCase().includes(searchTerm.toLowerCase()))
-  ), [allStaffForCompany, searchTerm]);
+  ), [allStaffForCompanyUI, searchTerm]);
 
   const totalItems = filteredStaffSource.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
@@ -206,7 +210,7 @@ export default function StaffPage() {
         customFieldsData[cfd.id] = value.trim();
       }
     });
-    const newStaff: Omit<StaffMember, 'id'> = {
+    const newStaffUI = {
       companyId: selectedCompanyId,
       firstName: formData.get('firstName') as string, lastName: formData.get('lastName') as string,
       staffNumber: formData.get('staffNumber') as string, email: formData.get('email') as string,
@@ -229,12 +233,12 @@ export default function StaffPage() {
     try {
       const { data: inserted, error } = await getSupabaseClient()
         .from('staff')
-        .insert(newStaff)
+        .insert(staffToBackend(newStaffUI))
         .select();
       if (error) throw error;
       if (inserted && inserted.length > 0) {
-        setAllStaffForCompany(prev => [inserted[0], ...prev].sort((a, b) => a.id.localeCompare(b.id)));
-        setFeedback({ type: 'success', message: `Staff Added`, details: `${inserted[0].firstName} ${inserted[0].lastName} has been added.` });
+        setAllStaffForCompany(prev => [staffFromBackend(inserted[0]), ...prev].sort((a, b) => a.id.localeCompare(b.id)));
+        setFeedback({ type: 'success', message: `Staff Added`, details: `${newStaffUI.firstName} ${newStaffUI.lastName} has been added.` });
       } else {
         setFeedback({ type: 'success', message: `Staff Added`, details: `Staff member has been added.` });
       }
@@ -254,7 +258,7 @@ export default function StaffPage() {
             .from('staff')
             .delete()
             .eq('id', id)
-            .eq('companyId', selectedCompanyId);
+            .eq('company_id', selectedCompanyId);
           if (staffMember) {
                //await logAuditEvent("Staff Deleted", `Staff member ${staffMember.firstName} ${staffMember.lastName} (ID: ${id}) deleted.`, selectedCompanyId, selectedCompanyName);
           }
@@ -304,7 +308,7 @@ export default function StaffPage() {
             let value: any;
             if (col.key.startsWith('custom_')) {
                 const cfdId = col.key.substring(7);
-                value = staff.customFields?.[cfdId];
+                value = staff.custom_fields?.[cfdId];
             } else {
                 value = (staff as any)[col.key];
             }
@@ -372,7 +376,8 @@ export default function StaffPage() {
           staffDataColumnsForExport.forEach(col => { headerToStaffKeyMap[col.label.toLowerCase().replace(/\s+/g, '')] = col.key as keyof StaffMember | `custom_${string}`; });
           results.data.forEach((rawRow: any, index: number) => {
             processedDataRowCount++; const originalLineNumber = index + 2;
-            const staffObject: Partial<StaffMember> & { companyId: string; customFields?: Record<string, string> } = { companyId: currentCompanyId, customFields: {} };
+            // Use camelCase for UI, then map to backend
+            const staffObject: any = { companyId: currentCompanyId, customFields: {} };
             let rowParseError = false;
             for (const csvHeader in rawRow) {
               const normalizedCsvHeader = csvHeader.trim().toLowerCase().replace(/\s+/g, '');
@@ -395,29 +400,43 @@ export default function StaffPage() {
                            staffObject.customFields[cfd.id] = value;
                         }
                     }
-                } else if (mappedKey === 'birthDate' || mappedKey === 'employmentDate') {
+                } else if (mappedKey === 'birth_date' || mappedKey === 'employment_date') {
                     if (value) {
                         const parsedDate = parse(value, 'dd/MM/yyyy', new Date());
                         if (isValidDate(parsedDate)) {
-                            (staffObject as any)[mappedKey] = format(parsedDate, 'yyyy-MM-dd');
+                            staffObject[mappedKey] = format(parsedDate, 'yyyy-MM-dd');
                         } else {
                             validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid Date format for ${mappedKey} ('${value}'). Expected DD/MM/YYYY. Field cleared.`);
-                            (staffObject as any)[mappedKey] = undefined;
+                            staffObject[mappedKey] = undefined;
                         }
                     } else {
-                        (staffObject as any)[mappedKey] = undefined;
+                        staffObject[mappedKey] = undefined;
                     }
                 }
-                else { (staffObject as any)[mappedKey] = value; }
+                else { staffObject[mappedKey] = value; }
               }
             }
-            const requiredFields: (keyof StaffMember)[] = ['id', 'firstName', 'lastName', 'email', 'department', 'status'];
-            const missingFields: string[] = []; requiredFields.forEach(field => { if (!(staffObject as any)[field] || String((staffObject as any)[field]).trim() === "") { missingFields.push(staffDataColumnsForExport.find(c => c.key === field)?.label || field); }});
+            // Use camelCase for required fields
+            const requiredFields = ['id', 'firstName', 'lastName', 'email', 'department', 'status'];
+            const missingFields: string[] = [];
+            requiredFields.forEach(field => { if (!staffObject[field] || String(staffObject[field]).trim() === "") { missingFields.push(staffDataColumnsForExport.find(c => c.key === field)?.label || field); }});
             if (missingFields.length > 0) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Missing required field(s): ${missingFields.join(', ')}.`); rowParseError = true; }
-            if (staffObject.status && !['Active', 'Inactive'].includes(staffObject.status as string)) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid Status value: '${staffObject.status}'.`); rowParseError = true; }
-            if (staffObject.employeeCategory && !['P', 'C', 'E', 'S'].includes(staffObject.employeeCategory as string)) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid EmployeeCategory value: '${staffObject.employeeCategory}'.`); rowParseError = true; }
+            if (staffObject.status && !['Active', 'Inactive'].includes(staffObject.status)) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid Status value: '${staffObject.status}'.`); rowParseError = true; }
+            if (staffObject.employeeCategory && !['P', 'C', 'E', 'S'].includes(staffObject.employeeCategory)) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid EmployeeCategory value: '${staffObject.employeeCategory}'.`); rowParseError = true; }
 
-            if (!rowParseError) { parsedData.push({ ...staffObject, id: staffObject.id!.trim(), firstName: staffObject.firstName!.trim(), lastName: staffObject.lastName!.trim(), email: staffObject.email!.trim(), department: staffObject.department!.trim(), status: staffObject.status as StaffStatus, employeeCategory: (staffObject.employeeCategory as EmployeeCategory) || 'P', customFields: staffObject.customFields || {} } as StaffMember); }
+            if (!rowParseError) {
+              parsedData.push({
+                ...staffObject,
+                id: staffObject.id?.trim(),
+                firstName: staffObject.firstName?.trim(),
+                lastName: staffObject.lastName?.trim(),
+                email: staffObject.email?.trim(),
+                department: staffObject.department?.trim(),
+                status: staffObject.status,
+                employeeCategory: staffObject.employeeCategory || 'P',
+                customFields: staffObject.customFields || {}
+              });
+            }
           });
           resolve({ data: parsedData, processedDataRowCount, papaParseErrors: results.errors, validationSkippedLog });
         }
@@ -446,25 +465,25 @@ export default function StaffPage() {
           const { data: currentStaffForCompany = [] } = await getSupabaseClient()
             .from('staff')
             .select('*')
-            .eq('companyId', selectedCompanyId);
+            .eq('company_id', selectedCompanyId);
           for (const importedStaff of parsedStaffArray) {
-            const existingStaff = (currentStaffForCompany || []).find((s: StaffMember) => s.id === importedStaff.id && s.companyId === selectedCompanyId);
+            const existingStaff = (currentStaffForCompany || []).find((s: StaffMember) => s.id === importedStaff.id && s.company_id === selectedCompanyId);
             if (existingStaff) {
-              const hasChanges = Object.keys(importedStaff).some(key => (importedStaff as any)[key] !== undefined && (importedStaff as any)[key] !== (existingStaff as any)[key]) || JSON.stringify(importedStaff.customFields) !== JSON.stringify(existingStaff.customFields);
+              const hasChanges = Object.keys(importedStaff).some(key => (importedStaff as any)[key] !== undefined && (importedStaff as any)[key] !== (existingStaff as any)[key]) || JSON.stringify(importedStaff.custom_fields) !== JSON.stringify(existingStaff.custom_fields);
               if (hasChanges) {
-                await getSupabaseClient().from('staff').upsert([ { ...existingStaff, ...importedStaff, companyId: selectedCompanyId } ]);
+                await getSupabaseClient().from('staff').upsert([ staffToBackend({ ...existingStaff, ...importedStaff, companyId: selectedCompanyId }) ]);
                 updatedCount++;
               }
             } else {
-              await getSupabaseClient().from('staff').upsert([ { ...importedStaff, companyId: selectedCompanyId } ]);
+              await getSupabaseClient().from('staff').upsert([ staffToBackend({ ...importedStaff, companyId: selectedCompanyId }) ]);
               newCount++;
             }
           }
           const { data: updatedStaffList = [] } = await getSupabaseClient()
             .from('staff')
             .select('*')
-            .eq('companyId', selectedCompanyId);
-          setAllStaffForCompany((updatedStaffList || []).sort((a: StaffMember, b: StaffMember) => a.id.localeCompare(b.id)));
+            .eq('company_id', selectedCompanyId);
+          setAllStaffForCompany((updatedStaffList || []).map(staffFromBackend).sort((a: StaffMember, b: StaffMember) => a.id.localeCompare(b.id)));
           resetSelectionAndPage();
           let fbMsg = '';
           let fbTitle = 'Import Processed';
@@ -519,11 +538,17 @@ export default function StaffPage() {
   const handleCfdTypeChange = (value: "Text" | "Number" | "Date") => { setCfdFormData(prev => ({ ...prev, type: value })); };
   const handleAddCfdClick = () => { setFeedback(null); setEditingCfd(null); setIsCfdDialogOpen(true); };
   const handleEditCfdClick = (cfd: CustomFieldDefinition) => { setFeedback(null); setEditingCfd(cfd); setIsCfdDialogOpen(true); };
-  const handleDeleteCfdClick = (cfd: CustomFieldDefinition) => { setFeedback(null); const isUsed = allStaffForCompany.some(staff => staff.customFields && staff.customFields.hasOwnProperty(cfd.id)); if (isUsed) { setFeedback({type: 'error', message: "Deletion Blocked", details: `Custom field "${cfd.name}" is in use by staff and cannot be deleted.`}); return; } setCfdToDelete(cfd); setIsDeleteCfdDialogOpen(true); };
+  const handleDeleteCfdClick = (cfd: CustomFieldDefinition) => { setFeedback(null); const isUsed = allStaffForCompany.some(staff => staff.custom_fields && staff.custom_fields.hasOwnProperty(cfd.id)); if (isUsed) { setFeedback({type: 'error', message: "Deletion Blocked", details: `Custom field "${cfd.name}" is in use by staff and cannot be deleted.`}); return; } setCfdToDelete(cfd); setIsDeleteCfdDialogOpen(true); };
+
+  // Fix: TableBody status label index, cast staff.status to StaffStatus or string as needed
+  const statusLabels = {
+    Active: "Active",
+    Inactive: "Inactive",
+  };
 
   const deleteCfdsByIds = async (idsToDelete: string[]) => {
     setFeedback(null); if (!selectedCompanyId || idsToDelete.length === 0) return; let actualIdsToDelete: string[] = []; let skippedInUseCount = 0;
-    for (const id of idsToDelete) { const isUsed = allStaffForCompany.some(staff => staff.customFields && staff.customFields.hasOwnProperty(id)); if (isUsed) { skippedInUseCount++; } else { actualIdsToDelete.push(id); } }
+    for (const id of idsToDelete) { const isUsed = allStaffForCompany.some(staff => staff.custom_fields && staff.custom_fields.hasOwnProperty(id)); if (isUsed) { skippedInUseCount++; } else { actualIdsToDelete.push(id); } }
     if (actualIdsToDelete.length === 0 && skippedInUseCount > 0) { setFeedback({type: 'info', message: "Deletion Blocked", details: `${skippedInUseCount} custom field(s) are in use and were not deleted.`}); return; }
     if (actualIdsToDelete.length === 0) { setFeedback({type: 'info', message: "No fields to delete."}); return; }
     try {
@@ -606,26 +631,26 @@ export default function StaffPage() {
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: CustomFieldDefinition[] = []; const { data: existingCfds = [] } = await getSupabaseClient()
             .from('custom_field_definitions')
             .select('*')
-            .eq('companyId', selectedCompanyId);
+            .eq('company_id', selectedCompanyId);
           let maxOrder = (existingCfds || []).reduce((max: number, cfd: any) => Math.max(max, cfd.order), 0);
           for (const [index, rawRowUntyped] of (rawData as any[]).entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const type = String(rawRow.Type || 'Text').trim() as "Text" | "Number" | "Date";
             if (!name) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name is required.`); continue; }
             if (!["Text", "Number", "Date"].includes(type)) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Invalid Type '${type}'. Must be Text, Number, or Date.`); continue; }
-            const existingByName = (existingCfds || []).find((c: any) => c.name.toLowerCase() === name.toLowerCase() && c.id !== id && c.companyId === selectedCompanyId); if (existingByName) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Name already exists for this company.`); continue; }
-            const existingCfd = id ? (existingCfds || []).find((c: any) => c.id === id && c.companyId === selectedCompanyId) : null;
+            const existingByName = (existingCfds || []).find((c: any) => c.name.toLowerCase() === name.toLowerCase() && c.id !== id && c.company_id === selectedCompanyId); if (existingByName) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Name already exists for this company.`); continue; }
+            const existingCfd = id ? (existingCfds || []).find((c: any) => c.id === id && c.company_id === selectedCompanyId) : null;
             if (existingCfd) { itemsToBulkPut.push({ ...existingCfd, name, type }); updatedCount++; }
             else { maxOrder++; itemsToBulkPut.push({ id: id || `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, name, type, order: maxOrder, isDeletable: true }); newCount++; }
           }
           if (itemsToBulkPut.length > 0) {
             for (const cfd of itemsToBulkPut) {
-              await getSupabaseClient().from('custom_field_definitions').upsert([cfd]);
+              await getSupabaseClient().from('custom_field_definitions').upsert([{ ...cfd, company_id: cfd.companyId }]);
             }
             const { data: updatedList = [] } = await getSupabaseClient()
               .from('custom_field_definitions')
               .select('*')
-              .eq('companyId', selectedCompanyId);
+              .eq('company_id', selectedCompanyId);
             setCustomFieldDefinitions((updatedList || []).sort((a: any, b: any) => a.order - b.order));
           }
           let fbMsg = ""; let fbTitle = "Import Processed"; let fbType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { fbTitle = "Import Successful"; fbMsg = `${newCount} fields added, ${updatedCount} updated.`; fbType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { fbMsg = `CSV processed. ${rawData.length} rows. No changes.`; } else { fbMsg = "No changes applied."; }
@@ -789,7 +814,7 @@ export default function StaffPage() {
               </div>
               {selectedItems.size > 0 && (<div className="my-4 flex items-center justify-between p-3 bg-muted/50 rounded-md"><span className="text-sm text-muted-foreground">{selectedItems.size} staff selected</span><Button variant="destructive" onClick={handleOpenBulkDeleteDialog} disabled={!selectedCompanyId}><Trash2 className="mr-2 h-4 w-4" /> Delete Selected</Button></div>)}
               <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap w-[50px]"><Checkbox checked={isAllOnPageSelected} onCheckedChange={handleSelectAllOnPage} aria-label="Select all on page" disabled={paginatedStaff.length === 0}/></TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">ID</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">Name</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">Email</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">Department</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">Birth Date</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap">Status</TableHead><TableHead className="sticky top-0 z-10 bg-card whitespace-nowrap text-right">Actions</TableHead></TableRow></TableHeader>
-                <TableBody>{paginatedStaff.map(staff => (<TableRow key={staff.id} data-state={selectedItems.has(staff.id) ? "selected" : ""}><TableCell><Checkbox checked={selectedItems.has(staff.id)} onCheckedChange={(c) => handleSelectRow(staff.id, Boolean(c))} aria-label={`Select ${staff.id}`}/></TableCell><TableCell>{staff.id}</TableCell><TableCell className="font-medium">{staff.firstName} {staff.lastName}</TableCell><TableCell>{staff.email}</TableCell><TableCell>{staff.department}</TableCell><TableCell>{formatDateForDisplay(staff.birthDate)}</TableCell><TableCell><Badge className={`${statusColors[staff.status]} text-white`}>{staff.status}</Badge></TableCell><TableCell className="text-right space-x-1"><Button variant="ghost" size="icon" asChild title="View/Edit" onClick={() => setFeedback(null)}><Link href={`/app/staff/${staff.id}`}><Eye className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" title="Delete" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteSingleStaffClick(staff)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>))}{paginatedStaff.length === 0 && (<TableRow><TableCell colSpan={8} className="text-center h-24">No staff members.</TableCell></TableRow>)}</TableBody></Table>
+                <TableBody>{paginatedStaff.map(staff => (<TableRow key={staff.id} data-state={selectedItems.has(staff.id) ? "selected" : ""}><TableCell><Checkbox checked={selectedItems.has(staff.id)} onCheckedChange={(c) => handleSelectRow(staff.id, Boolean(c))} aria-label={`Select ${staff.id}`}/></TableCell><TableCell>{staff.id}</TableCell><TableCell className="font-medium">{staff.firstName} {staff.lastName}</TableCell><TableCell>{staff.email}</TableCell><TableCell>{staff.department}</TableCell><TableCell>{formatDateForDisplay(staff.birthDate)}</TableCell><TableCell><Badge className={`${statusColors[staff.status as StaffStatus] ?? "bg-gray-400"} text-white`}>{staff.status}</Badge></TableCell><TableCell className="text-right space-x-1"><Button variant="ghost" size="icon" asChild title="View/Edit" onClick={() => setFeedback(null)}><Link href={`/app/staff/${staff.id}`}><Eye className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" title="Delete" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteSingleStaffClick(staff)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>))}{paginatedStaff.length === 0 && (<TableRow><TableCell colSpan={8} className="text-center h-24">No staff members.</TableCell></TableRow>)}</TableBody></Table>
               </div>
               {totalPages > 1 && (<div className="flex items-center justify-between py-4"><div className="text-sm text-muted-foreground">{selectedItems.size > 0 ? `${selectedItems.size} of ${totalItems} row(s) selected.` : `Page ${currentPage} of ${totalPages} (${totalItems} total items)`}</div><div className="flex items-center space-x-6 lg:space-x-8"><div className="flex items-center space-x-2"><p className="text-sm font-medium">Rows per page</p><Select value={`${rowsPerPage}`} onValueChange={(v) => { setRowsPerPage(Number(v)); setCurrentPage(1); setSelectedItems(new Set());}}><SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={`${rowsPerPage}`} /></SelectTrigger><SelectContent side="top">{ROWS_PER_PAGE_OPTIONS.map(s => (<SelectItem key={s} value={`${s}`}>{s}</SelectItem>))}</SelectContent></Select></div><div className="flex w-[100px] items-center justify-center text-sm font-medium">Page {currentPage} of {totalPages}</div><div className="flex items-center space-x-2"><Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setCurrentPage(1); setSelectedItems(new Set());}} disabled={currentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button><Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setCurrentPage(p => p - 1); setSelectedItems(new Set());}} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setCurrentPage(p => p + 1); setSelectedItems(new Set());}} disabled={currentPage === totalPages}><ChevronRight className="h-4 w-4" /></Button><Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setCurrentPage(totalPages); setSelectedItems(new Set());}} disabled={currentPage === totalPages}><ChevronsRight className="h-4 w-4" /></Button></div></div></div>)}
             </CardContent>
@@ -820,7 +845,7 @@ export default function StaffPage() {
 
       <AlertDialog open={isDeleteStaffDialogOpen} onOpenChange={(isOpen) => { setIsDeleteStaffDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete staff member: "{staffToDelete?.firstName} {staffToDelete?.lastName}".</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete staff member: "{staffToDelete?.first_name} {staffToDelete?.last_name}".</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSingleStaff} className="bg-destructive hover:bg-destructive/90">Delete Staff</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

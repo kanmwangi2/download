@@ -51,6 +51,30 @@ import 'jspdf-autotable';
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from '@/lib/utils';
 
+// Utility: Convert camelCase company to snake_case for backend
+function companyToBackend(company: any): any {
+  return {
+    id: company.id,
+    name: company.name,
+    tin_number: company.tinNumber,
+    address: company.address,
+    email: company.email,
+    phone: company.phone,
+    primary_business: company.primaryBusiness,
+  };
+}
+// Utility: Convert backend company to camelCase for frontend
+function companyFromBackend(company: any): any {
+  return {
+    id: company.id,
+    name: company.name,
+    tinNumber: company.tin_number,
+    address: company.address,
+    email: company.email,
+    phone: company.phone,
+    primaryBusiness: company.primary_business,
+  };
+}
 
 export interface Company extends UserDataCompany {
   tinNumber?: string;
@@ -128,7 +152,7 @@ export default function CompanyManagementTab() {
         const supabase = getSupabaseClient();
         const { data: companies, error } = await supabase.from('companies').select('*');
         if (error) throw error;
-        setAllCompanies(companies || []);
+        setAllCompanies((companies || []).map(companyFromBackend));
       } catch (error) {
         setAllCompanies([]);
         setFeedback({ type: "error", message: "Loading Error", details: "Could not load company records."})
@@ -206,17 +230,16 @@ export default function CompanyManagementTab() {
     try {
       const supabase = getSupabaseClient();
       if (editingCompany) {
-        const updatedCompany: Company = { ...editingCompany, ...formData };
+        const updatedCompany = companyToBackend({ ...editingCompany, ...formData });
         const { error } = await supabase.from('companies').update(updatedCompany).eq('id', editingCompany.id);
         if (error) throw error;
-        setAllCompanies(prevCompanies => prevCompanies.map(company => company.id === editingCompany.id ? updatedCompany : company));
+        setAllCompanies(prevCompanies => prevCompanies.map(company => company.id === editingCompany.id ? { ...formData, id: editingCompany.id } : company));
         setFeedback({type: 'success', message: "Company Updated", details: `Company "${formData.name}" has been updated.`});
       } else {
-        // Remove manual id assignment; let Supabase/Postgres generate the UUID
-        const { data: inserted, error } = await supabase.from('companies').insert(formData).select();
+        const { data: inserted, error } = await supabase.from('companies').insert(companyToBackend(formData)).select();
         if (error) throw error;
         if (inserted && inserted.length > 0) {
-          setAllCompanies(prevCompanies => [...prevCompanies, inserted[0]]);
+          setAllCompanies(prevCompanies => [...prevCompanies, companyFromBackend(inserted[0])]);
           setFeedback({type: 'success', message: "Company Added", details: `Company "${inserted[0].name}" has been added.`});
         } else {
           setFeedback({type: 'success', message: "Company Added", details: `Company has been added.`});
@@ -255,43 +278,73 @@ export default function CompanyManagementTab() {
   };
   const isAllCompaniesOnPageSelected = paginatedCompanies.length > 0 && paginatedCompanies.every(item => selectedCompanyItems.has(item.id));
 
-  const globalCompanyExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'name', label: 'Name' }, { key: 'tinNumber', label: 'TINNumber', isIdLike: true }, { key: 'address', label: 'Address' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'primaryBusiness', label: 'PrimaryBusiness' }];
+  // --- EXPORT/IMPORT LOGIC ---
+  // Update export columns to use backend keys for file headers, but map to camelCase for UI
+  const globalCompanyExportColumns = [
+    { key: 'id', label: 'ID', isIdLike: true },
+    { key: 'name', label: 'Name' },
+    { key: 'tinNumber', label: 'TINNumber', isIdLike: true },
+    { key: 'address', label: 'Address' },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone', isIdLike: true },
+    { key: 'primaryBusiness', label: 'PrimaryBusiness' }
+  ];
 
+  // Helper: Map camelCase UI company to export row with correct headers
+  type CompanyExportRow = {
+    ID: string;
+    Name: string;
+    TINNumber: string;
+    Address: string;
+    Email: string;
+    Phone: string;
+    PrimaryBusiness: string;
+    [key: string]: string; // Add index signature for dynamic access
+  };
+  function companyToExportRow(company: Company): CompanyExportRow {
+    return {
+      ID: company.id || '',
+      Name: company.name || '',
+      TINNumber: company.tinNumber || '',
+      Address: company.address || '',
+      Email: company.email || '',
+      Phone: company.phone || '',
+      PrimaryBusiness: company.primaryBusiness || '',
+    };
+  }
+  // Helper: Map import row (from CSV) to camelCase UI company (no id)
+  function importRowToCompany(row: Record<string, string>): Omit<Company, 'id'> {
+    return {
+      name: row.Name?.trim() || '',
+      tinNumber: row.TINNumber?.trim() || '',
+      address: row.Address?.trim() || '',
+      email: row.Email?.trim() || '',
+      phone: row.Phone?.trim() || '',
+      primaryBusiness: row.PrimaryBusiness?.trim() || '',
+    };
+  }
+
+  // When exporting, always use camelCase for UI, but map to backend for file headers
   const exportGlobalCompanyData = (fileType: "csv" | "xlsx" | "pdf") => {
     setFeedback(null);
     if (allCompanies.length === 0) { setFeedback({type: 'info', message: "No Data", details: `There are no companies to export.`}); return; }
-
-    const headers = globalCompanyExportColumns.map(c => c.label);
-    const dataToExport = allCompanies.map(row => {
-      const exportRow: Record<string, string | number> = {};
-      globalCompanyExportColumns.forEach(col => {
-          const value = row[col.key as keyof Company];
-          if (col.isIdLike) {
-              exportRow[col.label] = String(value || '');
-          } else if (typeof value === 'number') { // Should not happen for Company, but good practice
-              exportRow[col.label] = value;
-          } else {
-              exportRow[col.label] = String(value || '');
-          }
-      });
-      return exportRow;
-    });
+    const headers = ['ID', 'Name', 'TINNumber', 'Address', 'Email', 'Phone', 'PrimaryBusiness'] as (keyof CompanyExportRow)[];
+    const dataToExport = allCompanies.map(companyToExportRow);
     const fileName = `global_companies_export.${fileType}`;
 
     if (fileType === "csv") {
         const csvData = dataToExport.map(row => {
             const newRow: Record<string, string> = {};
             headers.forEach(header => {
-                const colDef = globalCompanyExportColumns.find(c => c.label === header);
                 let cellValue = String(row[header] || '');
-                if (colDef?.isIdLike && /^\d+$/.test(cellValue) && cellValue.length > 0) {
-                    cellValue = `'${cellValue}`;
+                if ((header === 'ID' || header === 'TINNumber' || header === 'Phone') && /^\d+$/.test(cellValue) && cellValue.length > 0) {
+                  cellValue = `'${cellValue}`;
                 }
                 newRow[header] = cellValue;
             });
             return newRow;
         });
-        const csvString = Papa.unparse(csvData, { header: true, columns: headers });
+        const csvString = Papa.unparse(csvData, { header: true, columns: headers as string[] });
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a'); const url = URL.createObjectURL(blob);
         link.setAttribute('href', url); link.setAttribute('download', fileName);
@@ -300,15 +353,13 @@ export default function CompanyManagementTab() {
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
     } else if (fileType === "xlsx") {
         const xlsxData = dataToExport.map(row => {
-            const newRow: Record<string, string|number>={};
+            const newRow: Record<string, string|number> = {};
             headers.forEach(h => {
-                const colDef = globalCompanyExportColumns.find(c => c.label === h);
-                if (colDef?.isIdLike) newRow[h] = String(row[h] || '');
-                else newRow[h] = (typeof row[h] === 'number' ? row[h] : String(row[h] || ''));
+                newRow[h] = row[h] || '';
             });
             return newRow;
         });
-        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: headers, skipHeader: false});
+        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: headers as string[], skipHeader: false});
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Global Companies");
         XLSX.writeFile(workbook, fileName);
@@ -316,25 +367,38 @@ export default function CompanyManagementTab() {
     } else if (fileType === "pdf") {
         const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
         const doc = new jsPDF({ orientation: 'landscape' });
-        (doc as any).autoTable({ head: [headers], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
+        (doc as any).autoTable({ head: [headers as string[]], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
         doc.save(fileName);
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
     }
   };
 
-  const handleDownloadGlobalCompanyTemplate = () => { setFeedback(null); const headers = ['ID', 'Name', 'TINNumber', 'Address', 'Email', 'Phone', 'PrimaryBusiness']; const csvString = headers.join(',') + '\n'; const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); const url = URL.createObjectURL(blob); link.setAttribute('href', url); link.setAttribute('download', `global_companies_import_template.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); setFeedback({type: 'info', message: "Template Downloaded", details: "Tip: If a field contains commas, ensure the entire field is enclosed in double quotes."}); };
+  const handleDownloadGlobalCompanyTemplate = () => {
+    setFeedback(null);
+    const headers = ['ID', 'Name', 'TINNumber', 'Address', 'Email', 'Phone', 'PrimaryBusiness'];
+    const csvString = headers.join(',') + '\n';
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `global_companies_import_template.csv`);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setFeedback({type: 'info', message: "Template Downloaded", details: "Tip: If a field contains commas, ensure the entire field is enclosed in double quotes."});
+  };
   const handleGlobalCompanyImportClick = () => { setFeedback(null); companyImportFileInputRef.current?.click(); };
 
+  // When importing, always map file headers to camelCase, then to backend snake_case before upsert
   const handleGlobalCompanyFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setFeedback(null);
     const file = event.target.files?.[0];
     if (file) {
-      Papa.parse(file, {
+      Papa.parse(file as File, {
         header: true, skipEmptyLines: true,
-        complete: async (results) => {
+        complete: async (results: Papa.ParseResult<Record<string, string>>) => {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: (Company | Omit<Company, 'id'>)[] = [];
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: any[] = [];
           // Fetch existing companies from Supabase
           const supabase = getSupabaseClient();
           const { data: existingCompanies, error: fetchError } = await supabase.from('companies').select('*');
@@ -342,28 +406,24 @@ export default function CompanyManagementTab() {
             setFeedback({type: 'error', message: "Import Failed", details: "Could not fetch existing companies from Supabase."});
             return;
           }
-          // --- Fix: Remove manual id assignment for upsert, let Supabase/Postgres generate UUID unless updating existing ---
+          const existingCompaniesCamel = (existingCompanies || []).map(companyFromBackend);
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
-            const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim();
-            const tin = String(rawRow.TINNumber || '').trim();
-            const address = String(rawRow.Address || '').trim(); const email = String(rawRow.Email || '').trim(); const phone = String(rawRow.Phone || '').trim(); const primaryBusiness = String(rawRow.PrimaryBusiness || '').trim();
-            if (!name || !tin) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name and TINNumber are required.`); continue; }
-            const companyData: Omit<Company, 'id'> = { name, tinNumber: tin, address, email, phone, primaryBusiness };
-            const existingComp = id ? existingCompanies?.find((c: Company) => c.id === id) : null;
-            if (existingComp) { itemsToBulkPut.push({ ...existingComp, ...companyData }); updatedCount++; }
-            else { itemsToBulkPut.push(companyData); newCount++; } // Do not assign id manually
+            const id = String(rawRow.ID || '').trim();
+            const companyData = importRowToCompany(rawRow);
+            if (!companyData.name || !companyData.tinNumber) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name and TINNumber are required.`); continue; }
+            const existingComp = id ? existingCompaniesCamel.find((c: Company) => c.id === id) : null;
+            if (existingComp) { itemsToBulkPut.push(companyToBackend({ ...existingComp, ...companyData })); updatedCount++; }
+            else { itemsToBulkPut.push(companyToBackend(companyData)); newCount++; }
           }
-          // Bulk upsert to Supabase
           if (itemsToBulkPut.length > 0) {
             const { error: upsertError } = await supabase.from('companies').upsert(itemsToBulkPut, { onConflict: 'id' });
             if (upsertError) {
               setFeedback({type: 'error', message: "Import Failed", details: "Could not import companies to Supabase."});
               return;
             }
-            // Refresh company list from Supabase
             const { data: updatedList, error: reloadError } = await supabase.from('companies').select('*');
-            if (!reloadError && updatedList) setAllCompanies(updatedList);
+            if (!reloadError && updatedList) setAllCompanies((updatedList || []).map(companyFromBackend));
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} companies added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";

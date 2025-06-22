@@ -51,6 +51,45 @@ type FeedbackMessage = {
   details?: string;
 };
 
+// Utility functions for camelCase <-> snake_case mapping
+function toSnakeCaseTaxSettings(data: TaxSettingsData): Record<string, any> {
+  return {
+    paye_band1_limit: data.payeBand1Limit,
+    paye_band2_limit: data.payeBand2Limit,
+    paye_band3_limit: data.payeBand3Limit,
+    paye_rate1: data.payeRate1,
+    paye_rate2: data.payeRate2,
+    paye_rate3: data.payeRate3,
+    paye_rate4: data.payeRate4,
+    pension_employer_rate: data.pensionEmployerRate,
+    pension_employee_rate: data.pensionEmployeeRate,
+    maternity_employer_rate: data.maternityEmployerRate,
+    maternity_employee_rate: data.maternityEmployeeRate,
+    cbhi_rate: data.cbhiRate,
+    rama_employer_rate: data.ramaEmployerRate,
+    rama_employee_rate: data.ramaEmployeeRate,
+  };
+}
+
+function fromSnakeCaseTaxSettings(data: Record<string, any>): TaxSettingsData {
+  return {
+    payeBand1Limit: data.paye_band1_limit,
+    payeBand2Limit: data.paye_band2_limit,
+    payeBand3Limit: data.paye_band3_limit,
+    payeRate1: data.paye_rate1,
+    payeRate2: data.paye_rate2,
+    payeRate3: data.paye_rate3,
+    payeRate4: data.paye_rate4,
+    pensionEmployerRate: data.pension_employer_rate,
+    pensionEmployeeRate: data.pension_employee_rate,
+    maternityEmployerRate: data.maternity_employer_rate,
+    maternityEmployeeRate: data.maternity_employee_rate,
+    cbhiRate: data.cbhi_rate,
+    ramaEmployerRate: data.rama_employer_rate,
+    ramaEmployeeRate: data.rama_employee_rate,
+  };
+}
+
 export default function TaxesTab() {
   const [settings, setSettings] = useState<TaxSettingsData>(() => getDefaultSettings());
   const [isLoaded, setIsLoaded] = useState(false);
@@ -65,11 +104,11 @@ export default function TaxesTab() {
         const { data, error } = await supabase.from('tax_settings').select('*').single();
         if (error && error.code !== 'PGRST116') throw error; // PGRST116: No rows found
         if (data) {
-          setSettings(data as TaxSettingsData);
+          setSettings(fromSnakeCaseTaxSettings(data));
         } else {
           const defaultSettings = getDefaultSettings();
           setSettings(defaultSettings);
-          await supabase.from('tax_settings').upsert([defaultSettings]);
+          await supabase.from('tax_settings').upsert([toSnakeCaseTaxSettings(defaultSettings)]);
         }
       } catch (error) {
         console.error("Error loading global tax settings from Supabase:", error);
@@ -109,7 +148,7 @@ export default function TaxesTab() {
     };
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('tax_settings').upsert([numericSettings]);
+      const { error } = await supabase.from('tax_settings').upsert([toSnakeCaseTaxSettings(numericSettings)]);
       if (error) throw error;
       setSettings(numericSettings);
       setFeedback({ type: 'success', message: "Global Tax Settings Saved", details: "Tax configurations for the application have been saved." });

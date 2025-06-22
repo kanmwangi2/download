@@ -53,19 +53,10 @@ import {
     type Company, 
     type User, 
     // USER_ROLES, // <-- Removed: not exported from userData
-    allCompanyIdsForUserSeed as globalAllCompanyIds, // Corrected import alias
+    all_company_ids_for_user_seed as globalAllCompanyIds, // Corrected import alias
     defaultNewUserFormData
 } from '@/lib/userData';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-
-// Define allowed user roles for runtime validation
-const USER_ROLE_VALUES = [
-  "Primary Admin",
-  "App Admin",
-  "Company Admin",
-  "Payroll Approver",
-  "Payroll Preparer"
-];
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -76,6 +67,14 @@ import { cn } from '@/lib/utils';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
+const USER_ROLE_VALUES = [
+  "Primary Admin",
+  "App Admin",
+  "Company Admin",
+  "Payroll Approver",
+  "Payroll Preparer"
+];
+
 type FeedbackMessage = {
   type: 'success' | 'error' | 'info';
   message: string;
@@ -85,11 +84,53 @@ type FeedbackMessage = {
 const idLikeUserFields = ['id', 'phone'];
 
 
+// Utility: Convert camelCase user to snake_case for backend
+function userToBackend(user: any): any {
+  return {
+    ...user,
+    first_name: user.firstName,
+    last_name: user.lastName,
+    assigned_company_ids: user.assignedCompanyIds,
+    // ...other mappings as needed
+  };
+}
+// Utility: Convert backend user to camelCase for frontend
+function userFromBackend(user: any): any {
+  return {
+    ...user,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    assignedCompanyIds: user.assigned_company_ids,
+    // ...other mappings as needed
+  };
+}
+// UI type for all state and form logic
+export type UserUI = {
+  id?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  assignedCompanyIds: string[];
+  password?: string;
+  phone?: string;
+};
+
+const defaultNewUserFormDataUI: UserUI = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  role: "Payroll Preparer",
+  assignedCompanyIds: [],
+  password: "",
+  phone: "",
+};
+
 export default function UserManagementTab() {
-  const [allUsers, setAllUsers] = useState<User[]>([]); 
+  const [allUsers, setAllUsers] = useState<UserUI[]>([]); 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState<Omit<User, 'id' | 'password'> & { password?: string }>(defaultNewUserFormData);
+  const [formData, setFormData] = useState<UserUI>(defaultNewUserFormDataUI);
   
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -116,7 +157,7 @@ export default function UserManagementTab() {
         const supabase = getSupabaseClient();
         const { data: users, error: userError } = await supabase.from('users').select('*');
         if (userError) throw userError;
-        setAllUsers(users || []);
+        setAllUsers((users || []).map(userFromBackend));
         const { data: companies, error: companyError } = await supabase.from('companies').select('*');
         if (companyError) throw companyError;
         setAvailableCompaniesForAssignment(companies || []);
@@ -138,26 +179,29 @@ export default function UserManagementTab() {
   useEffect(() => {
     setShowPasswordInDialog(false); 
     if (editingUser) {
-      let assignedIds = [...editingUser.assignedCompanyIds];
-      if (editingUser.role === "Primary Admin" || editingUser.role === "App Admin") {
+      // Map backend User (snake_case) to UI User (camelCase)
+      const uiUser = userFromBackend(editingUser);
+      let assignedIds = [...(uiUser.assignedCompanyIds || [])];
+      if (uiUser.role === "Primary Admin" || uiUser.role === "App Admin") {
         assignedIds = availableCompaniesForAssignment.map(c => c.id);
       }
       setFormData({
-        firstName: editingUser.firstName,
-        lastName: editingUser.lastName,
-        email: editingUser.email,
-        phone: editingUser.phone || "",
-        role: editingUser.role,
+        id: uiUser.id,
+        firstName: uiUser.firstName,
+        lastName: uiUser.lastName,
+        email: uiUser.email,
+        phone: uiUser.phone || "",
+        role: uiUser.role,
         assignedCompanyIds: assignedIds,
-        password: "", 
+        password: "",
       });
-      setOriginalEmailForEdit(editingUser.email);
+      setOriginalEmailForEdit(uiUser.email);
     } else {
-      let initialAssignedIds = defaultNewUserFormData.assignedCompanyIds;
-      if (defaultNewUserFormData.role === "Primary Admin" || defaultNewUserFormData.role === "App Admin") {
-          initialAssignedIds = availableCompaniesForAssignment.map(c => c.id);
+      let initialAssignedIds = defaultNewUserFormDataUI.assignedCompanyIds || [];
+      if (defaultNewUserFormDataUI.role === "Primary Admin" || defaultNewUserFormDataUI.role === "App Admin") {
+        initialAssignedIds = availableCompaniesForAssignment.map(c => c.id);
       }
-      setFormData({...defaultNewUserFormData, assignedCompanyIds: initialAssignedIds, password: ""});
+      setFormData({ ...defaultNewUserFormDataUI, assignedCompanyIds: initialAssignedIds, password: "" });
       setOriginalEmailForEdit("");
     }
   }, [editingUser, isUserDialogOpen, availableCompaniesForAssignment]);
@@ -175,12 +219,11 @@ export default function UserManagementTab() {
         return { ...prev, role: value, assignedCompanyIds: newAssignedCompanyIds };
     });
   };
-
   const handleCompanyAssignmentChange = (companyId: string, checked: boolean | "indeterminate") => {
     setFormData(prev => {
       const newAssignedCompanyIds = checked === true
         ? [...prev.assignedCompanyIds, companyId]
-        : prev.assignedCompanyIds.filter(id => id !== companyId);
+        : prev.assignedCompanyIds.filter((id: string) => id !== companyId);
       return { ...prev, assignedCompanyIds: newAssignedCompanyIds };
     });
   };
@@ -214,11 +257,15 @@ export default function UserManagementTab() {
       const supabase = getSupabaseClient();
       const { error } = await supabase.from('users').delete().in('id', idsToDelete);
       if (error) throw error;
-      setAllUsers(prev => prev.filter((user) => !idsToDelete.includes(user.id)));
-      setSelectedUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
-      setFeedback({type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).`});
+      setAllUsers(prev => prev.filter((user) => user.id && !idsToDelete.includes(user.id)));
+      setSelectedUserItems(prev => {
+        const newSelected = new Set(prev);
+        idsToDelete.forEach(id => newSelected.delete(id));
+        return newSelected;
+      });
+      setFeedback({ type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).` });
     } catch (error) {
-      setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} user(s).`});
+      setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} user(s).` });
     }
   };
 
@@ -248,28 +295,21 @@ export default function UserManagementTab() {
     const newEmail = formData.email.trim().toLowerCase();
     try {
       const supabase = getSupabaseClient();
-      // Determine assigned company IDs based on role
       const finalAssignedCompanyIds =
         formData.role === "Primary Admin" || formData.role === "App Admin"
           ? availableCompaniesForAssignment.map(c => c.id)
           : formData.assignedCompanyIds;
-
       if (editingUser) {
-        const updatedUser: User = { ...editingUser, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds };
+        const updatedUser = userToBackend({ ...editingUser, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds });
         const { error } = await supabase.from('users').update(updatedUser).eq('id', editingUser.id);
         if (error) throw error;
-        setAllUsers(prevUsers => prevUsers.map((user) => user.id === editingUser.id ? updatedUser : user));
+        setAllUsers(prevUsers => prevUsers.map((user) => user.id === editingUser.id ? { ...formData, id: editingUser.id } : user));
         setFeedback({type: 'success', message: "User Updated", details: `${formData.firstName} ${formData.lastName}'s details have been updated.`});
       } else {
-        // Remove manual id assignment; let Supabase/Postgres generate the UUID
-        const { data: inserted, error } = await supabase.from('users').insert({
-          ...formData,
-          email: newEmail,
-          assignedCompanyIds: finalAssignedCompanyIds
-        }).select();
+        const { data: inserted, error } = await supabase.from('users').insert(userToBackend({ ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds })).select();
         if (error) throw error;
         if (inserted && inserted.length > 0) {
-          setAllUsers(prevUsers => [...prevUsers, inserted[0]]);
+          setAllUsers(prevUsers => [...prevUsers, userFromBackend(inserted[0])]);
           setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
         } else {
           setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
@@ -312,38 +352,43 @@ export default function UserManagementTab() {
     setSelectedUserItems(prev => { const newSelected = new Set(prev); if (checked) newSelected.add(itemId); else newSelected.delete(itemId); return newSelected; });
   };
   const handleSelectAllUsersOnPage = (checked: boolean) => {
-    const pageItemIds = paginatedUsers.map(item => item.id);
-    if (checked) { setSelectedUserItems(prev => new Set([...prev, ...pageItemIds])); }
-    else { const pageItemIdsSet = new Set(pageItemIds); setSelectedUserItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id)))); }
+    const pageItemIds = paginatedUsers.map(item => item.id).filter((id): id is string => !!id);
+    if (checked) {
+      setSelectedUserItems(prev => new Set([...prev, ...pageItemIds]));
+    } else {
+      const pageItemIdsSet = new Set(pageItemIds);
+      setSelectedUserItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id))));
+    }
   };
-  const isAllUsersOnPageSelected = paginatedUsers.length > 0 && paginatedUsers.every(item => selectedUserItems.has(item.id));
+  const isAllUsersOnPageSelected = paginatedUsers.length > 0 && paginatedUsers.every(item => item.id && selectedUserItems.has(item.id));
 
   const globalUsersExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'firstName', label: 'FirstName' }, { key: 'lastName', label: 'LastName' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'role', label: 'Role' }, { key: 'assignedCompanyIds', label: 'AssignedCompanyIDs', isIdLike: true}];
 
   const exportGlobalUserData = (fileType: "csv" | "xlsx" | "pdf") => {
     setFeedback(null);
-    if (allUsers.length === 0) { setFeedback({type: 'info', message: "No Data", details: `There are no users to export.`}); return; }
-    
+    if (allUsers.length === 0) {
+      setFeedback({ type: 'info', message: "No Data", details: `There are no users to export.` });
+      return;
+    }
     const headers = globalUsersExportColumns.map(c => c.label);
     const dataToExport = allUsers.map(user => {
-        const row: Record<string, string | number> = {};
-        globalUsersExportColumns.forEach(col => {
-            let value: any;
-            if (col.key === 'assignedCompanyIds') {
-                value = user.assignedCompanyIds.join(',');
-            } else {
-                value = user[col.key as keyof User];
-            }
-            
-            if (col.isIdLike) {
-                row[col.label] = String(value || '');
-            } else if (typeof value === 'number') {
-                row[col.label] = value;
-            } else {
-                row[col.label] = String(value || '');
-            }
-        });
-        return row;
+      const row: Record<string, string | number> = {};
+      globalUsersExportColumns.forEach(col => {
+        let value: any;
+        if (col.key === 'assignedCompanyIds') {
+          value = user.assignedCompanyIds.join(',');
+        } else {
+          value = user[col.key as keyof UserUI];
+        }
+        if (col.isIdLike) {
+          row[col.label] = String(value || '');
+        } else if (typeof value === 'number') {
+          row[col.label] = value;
+        } else {
+          row[col.label] = String(value || '');
+        }
+      });
+      return row;
     });
 
     const fileName = `global_users_export.${fileType}`;
@@ -403,18 +448,15 @@ export default function UserManagementTab() {
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: (User | Omit<User, 'id'>)[] = [];
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: any[] = [];
           const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
-
-          // Fetch all users from Supabase for validation
           const supabase = getSupabaseClient();
           const { data: existingUsersRaw = [], error: fetchUsersError } = await supabase.from('users').select('*');
-          const existingUsers: User[] = existingUsersRaw || [];
+          const existingUsers = (existingUsersRaw || []).map(userFromBackend);
           if (fetchUsersError) {
             setFeedback({type: 'error', message: "Import Failed", details: `Could not fetch users from Supabase: ${fetchUsersError.message}`});
             return;
           }
-
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const firstName = String(rawRow.FirstName || '').trim(); const lastName = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim(); const assignedCompanyIDsStr = String(rawRow.AssignedCompanyIDs || '').trim();
@@ -429,25 +471,23 @@ export default function UserManagementTab() {
                 if (existingUserByEmail && existingUserByEmail.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} conflicts with existing user ${existingUserByEmail.id}.`); continue;}
                 if (existingUserById.role === "Primary Admin" && role !== "Primary Admin") { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Primary Admin role cannot be changed.`); continue; }
                 if (role === "Primary Admin" && currentPrimaryAdmin && currentPrimaryAdmin.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Another user is already Primary Admin.`); continue; }
-                itemsToBulkUpsert.push({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password, assignedCompanyIds: assignedCompanyIdsArray }); updatedCount++;
+                itemsToBulkUpsert.push(userToBackend({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password, assignedCompanyIds: assignedCompanyIdsArray })); updatedCount++;
               } else { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User ID not found for update.`); continue; }
             } else { 
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
               if (role === "Primary Admin" && primaryAdminExists) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Primary Admin already exists.`); continue; }
-              itemsToBulkUpsert.push({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray }); newCount++; // Do not assign id manually
+              itemsToBulkUpsert.push(userToBackend({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray })); newCount++; // Do not assign id manually
             }
           }
-          // Upsert users to Supabase
           if (itemsToBulkUpsert.length > 0) {
             const { error: upsertError } = await supabase.from('users').upsert(itemsToBulkUpsert, { onConflict: 'id' });
             if (upsertError) {
               setFeedback({type: 'error', message: "Import Failed", details: `Could not upsert users: ${upsertError.message}`});
               return;
             }
-            // Refresh user list
             const { data: updatedListRaw = [], error: refreshError } = await supabase.from('users').select('*');
-            const updatedList: User[] = updatedListRaw || [];
+            const updatedList = (updatedListRaw || []).map(userFromBackend);
             if (!refreshError) setAllUsers(updatedList);
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; } 
@@ -540,9 +580,9 @@ export default function UserManagementTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedUsers.map(user => (
-                <TableRow key={user.id} data-state={selectedUserItems.has(user.id) ? "selected" : ""}>
-                  <TableCell><Checkbox checked={selectedUserItems.has(user.id)} onCheckedChange={(checked) => handleSelectUserRow(user.id, Boolean(checked))} aria-label={`Select user ${user.firstName} ${user.lastName}`} disabled={user.role === 'Primary Admin'}/></TableCell>
+              {paginatedUsers.filter(user => user.id).map(user => (
+                <TableRow key={user.id} data-state={selectedUserItems.has(user.id!)}>
+                  <TableCell><Checkbox checked={selectedUserItems.has(user.id!)} onCheckedChange={(checked) => handleSelectUserRow(user.id!, Boolean(checked))} aria-label={`Select user ${user.firstName} ${user.lastName}`} disabled={user.role === 'Primary Admin'}/></TableCell>
                   <TableCell className="font-medium">{user.firstName} {user.lastName}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.role}</TableCell>
@@ -551,7 +591,7 @@ export default function UserManagementTab() {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={() => handleEditUserClick(user)} 
+                      onClick={() => setEditingUser(userToBackend(user))} 
                       title="Edit User"
                     >
                       <Edit className="h-4 w-4" />
@@ -559,7 +599,7 @@ export default function UserManagementTab() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteUserClick(user)}
+                      onClick={() => setUserToDelete(userToBackend(user))}
                       disabled={user.role === "Primary Admin"}
                       title={user.role === "Primary Admin" ? "Cannot delete Primary Admin" : "Delete User"}
                       className={user.role === "Primary Admin" ? "text-muted-foreground cursor-not-allowed" : "text-destructive hover:text-destructive"}
@@ -724,7 +764,7 @@ export default function UserManagementTab() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the user
-              "{userToDelete?.firstName} {userToDelete?.lastName}".
+              "{userToDelete ? `${userToDelete.first_name ?? ''} ${userToDelete.last_name ?? ''}` : ''}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

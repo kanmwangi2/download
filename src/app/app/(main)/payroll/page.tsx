@@ -145,7 +145,7 @@ export default function PayrollPage() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        // Fetch payroll run summaries from Supabase
+        // Fetch payroll run summaries from Supabase (snake_case)
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
         // Get current user from Supabase auth
@@ -170,22 +170,34 @@ export default function PayrollPage() {
         setCurrentUser({
           id: userProfile.id,
           email: userProfile.email,
-          firstName: userProfile.firstName,
-          lastName: userProfile.lastName,
+          firstName: userProfile.first_name,
+          lastName: userProfile.last_name,
           role: userProfile.role,
-          assignedCompanyIds: userProfile.assignedCompanyIds || [],
+          assignedCompanyIds: userProfile.assigned_company_ids || [],
         });
 
-        // Fetch payroll run summaries for the selected company
+        // Fetch payroll run summaries for the selected company (snake_case)
         const { data: summaries, error } = await supabase
           .from("payroll_summaries")
           .select("*")
-          .eq("companyId", selectedCompanyId);
+          .eq("company_id", selectedCompanyId);
 
         if (error) {
           throw error;
         }
-        setAllPayrollRunsData(summaries);
+        // Map backend (snake_case) to UI (camelCase)
+        setAllPayrollRunsData((summaries || []).map((s: any) => ({
+          id: s.id,
+          companyId: s.company_id,
+          month: s.month,
+          year: s.year,
+          employees: s.employees,
+          grossSalary: s.gross_salary,
+          deductions: s.deductions,
+          netPay: s.net_pay,
+          status: s.status,
+          rejectionReason: s.rejection_reason,
+        })));
       } catch (error) {
         console.error("Error loading payroll summaries from Supabase:", error);
         setAllPayrollRunsData([]);
@@ -272,7 +284,7 @@ export default function PayrollPage() {
       const { data: existingSummaries, error: fetchError } = await supabase
         .from('payroll_summaries')
         .select('id')
-        .eq('companyId', selectedCompanyId)
+        .eq('company_id', selectedCompanyId)
         .eq('id', newRunId);
       if (fetchError) throw fetchError;
       if (existingSummaries && existingSummaries.length > 0) {
@@ -283,7 +295,24 @@ export default function PayrollPage() {
         });
         return;
       }
-      const newRun: PayrollRunSummary = {
+      // Insert using snake_case for backend
+      const newRun = {
+        id: newRunId,
+        company_id: selectedCompanyId,
+        month,
+        year,
+        employees: 0,
+        gross_salary: 0,
+        deductions: 0,
+        net_pay: 0,
+        status: "Draft",
+      };
+      const { error: insertError } = await supabase
+        .from('payroll_summaries')
+        .insert([newRun]);
+      if (insertError) throw insertError;
+      // Add to UI state as camelCase
+      setAllPayrollRunsData(prev => [{
         id: newRunId,
         companyId: selectedCompanyId,
         month,
@@ -293,19 +322,14 @@ export default function PayrollPage() {
         deductions: 0,
         netPay: 0,
         status: "Draft",
-      };
-      const { error: insertError } = await supabase
-        .from('payroll_summaries')
-        .insert([newRun]);
-      if (insertError) throw insertError;
-      setAllPayrollRunsData(prev => [newRun, ...prev]);
+      }, ...prev]);
       setFeedback({ type: 'success', message: "Payroll Run Created", details: `Payroll run for ${month} ${year} (ID: ${newRunId}) created as Draft. You will be redirected to process it.` });
       setIsCreateRunDialogOpen(false);
       if (currentForm) {
         currentForm.reset();
       }
       resetSelectionAndPage();
-      router.push(`/app/payroll/${newRun.id}`);
+      router.push(`/app/payroll/${newRunId}`);
     } catch (error) {
       setFeedback({ type: 'error', message: "Creation Failed", details: "Could not create payroll run." });
     }
@@ -360,9 +384,9 @@ export default function PayrollPage() {
         for (const id of actualIdsToDeleteFromDB) {
             // Reverse deductions if needed (implement as needed in Supabase)
             // Delete payroll run summary
-            await supabase.from('payroll_summaries').delete().eq('id', id).eq('companyId', selectedCompanyId);
+            await supabase.from('payroll_summaries').delete().eq('id', id).eq('company_id', selectedCompanyId);
             // Optionally delete details, etc.
-            await supabase.from('payroll_run_details').delete().eq('id', id).eq('companyId', selectedCompanyId);
+            await supabase.from('payroll_run_details').delete().eq('id', id).eq('company_id', selectedCompanyId);
         }
         setAllPayrollRunsData(prev => prev.filter(run => !(actualIdsToDeleteFromDB.includes(run.id) && run.companyId === selectedCompanyId)));
         setSelectedItems(prev => {

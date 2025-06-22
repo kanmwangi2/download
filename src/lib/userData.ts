@@ -133,3 +133,23 @@ export function userFromBackend(user: any): any {
     // ...other mappings as needed
   };
 }
+
+import { getSupabaseClient } from './supabase';
+
+/**
+ * Ensures a user profile exists for the current authenticated user.
+ * Call this after login or on app load.
+ */
+export async function ensureUserProfile() {
+  const supabase = getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase.from('user_profiles').upsert({
+      id: user.id,
+      email: user.email,
+      first_name: user.user_metadata?.first_name ?? '',
+      last_name: user.user_metadata?.last_name ?? '',
+      // Add more fields if needed
+    });
+  }
+}

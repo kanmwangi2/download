@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
 import { signIn } from '@/lib/supabase';
+import { ensureUserProfile } from '@/lib/userData';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
@@ -74,10 +75,9 @@ export function LoginForm() {
           message: "Login Successful", 
           details: "Setting up your session..." 
         });
-        
-        // No localStorage: user session is managed by Supabase
+        // Ensure user profile exists
+        await ensureUserProfile();
         setIsLoading(false);
-        
         // Use replace to prevent going back to login page
         try {
           console.log("🚀 Redirecting to /select-company");

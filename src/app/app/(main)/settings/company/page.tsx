@@ -1,62 +1,33 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Building, Save, Users, PlusCircle, Edit, Trash2, Loader2, PercentCircle, AlertTriangle, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, UserCog, Eye, EyeOff, Upload, Download, FileText, FileSpreadsheet, FileType, Info, CheckCircle2 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-    getCompanySingletonData, putCompanySingletonData,
-    getAllFromStore, putToStore, deleteFromStore,
-    getAllFromGlobalStore, putToGlobalStore, deleteFromGlobalStore, getFromGlobalStore, getFromStoreByIndex,
-    STORE_NAMES, bulkPutToStore
-} from '@/lib/indexedDbUtils';
 import { useCompany } from '@/context/CompanyContext';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { User, UserRole, Company as AppCompany } from '@/lib/userData';
-import { defaultNewUserFormData } from '@/lib/userData';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Upload, Download, FileText, FileSpreadsheet, FileType, PlusCircle, Trash2, Edit, UserCog, Building, PercentCircle, Users, Search, Save, Info, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+import type { User, UserRole, Company as AppCompany } from '@/lib/userData';
+import { defaultNewUserFormData } from '@/lib/userData';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export interface Department {
   id: string;
@@ -123,7 +94,6 @@ interface TaxToggleAction {
 }
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
-const CURRENT_USER_LOCALSTORAGE_KEY = "cheetahPayrollCurrentUser";
 
 const sanitizeFilename = (name: string | null | undefined): string => {
     if (!name) return 'UnknownCompany';
@@ -135,6 +105,77 @@ type FeedbackMessage = {
   message: string;
   details?: string;
 };
+
+// --- Supabase migration: Remove all legacy utility calls and constants ---
+// Replace all data access with Supabase queries. Example below:
+
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+// Helper: get current user from Supabase
+async function supabaseUserFromContextOrSession(): Promise<any> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) return null;
+  // You may want to map user_metadata to your app's User type
+  return { ...data.user.user_metadata, id: data.user.id };
+}
+
+// Helper: fetch company profile from Supabase
+async function fetchCompanyProfile(companyId: string): Promise<CompanyProfileData | null> {
+  const { data, error } = await supabase
+    .from('company_profiles')
+    .select('*')
+    .eq('id', companyId)
+    .single();
+  if (error) return null;
+  return data as CompanyProfileData;
+}
+
+// Helper: fetch departments from Supabase
+async function fetchDepartments(companyId: string): Promise<Department[]> {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('*')
+    .eq('companyId', companyId);
+  if (error) return [];
+  return data as Department[];
+}
+
+// Helper: fetch company users from Supabase
+async function fetchCompanyUsers(companyId: string): Promise<User[]> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .contains('assignedCompanyIds', [companyId]);
+  if (error) return [];
+  return data as User[];
+}
+
+// Helper: update company profile in Supabase
+async function updateCompanyProfile(companyId: string, profile: CompanyProfileData) {
+  await supabase
+    .from('company_profiles')
+    .update(profile)
+    .eq('id', companyId);
+}
+
+// Helper: update department in Supabase
+async function updateDepartment(companyId: string, department: Department) {
+  await supabase
+    .from('departments')
+    .update(department)
+    .eq('id', department.id)
+    .eq('companyId', companyId);
+}
+
+// Helper: delete department in Supabase
+async function deleteDepartment(companyId: string, departmentId: string) {
+  await supabase
+    .from('departments')
+    .delete()
+    .eq('id', departmentId)
+    .eq('companyId', companyId);
+}
 
 export default function CompanySettingsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
@@ -192,8 +233,9 @@ export default function CompanySettingsPage() {
         return;
       }
 
-      const storedUserJson = localStorage.getItem(CURRENT_USER_LOCALSTORAGE_KEY);
-      if (!storedUserJson) {
+      // Supabase-only: get current user from context/session
+      const user = await supabaseUserFromContextOrSession();
+      if (!user) {
         setFeedback({type: 'error', message: "Authentication Required"});
         router.replace("/");
         setAccessGranted(false);
@@ -201,13 +243,11 @@ export default function CompanySettingsPage() {
       }
 
       try {
-        const user = JSON.parse(storedUserJson) as User;
         setPageCurrentUserRole(user.role);
-
         let hasAccess = false;
         if (user.role === "Primary Admin" || user.role === "App Admin") {
           hasAccess = true;
-        } else if (user.role === "Company Admin" && user.assignedCompanyIds.includes(selectedCompanyId)) {
+        } else if (user.role === "Company Admin" && user.assignedCompanyIds?.includes(selectedCompanyId)) {
           hasAccess = true;
         }
 
@@ -242,38 +282,13 @@ export default function CompanySettingsPage() {
       setIsDataLoaded(false);
       setFeedback(null);
       try {
-        let storedProfile = await getCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, selectedCompanyId);
-        if (storedProfile) {
-          setCompanyProfile({ ...defaultInitialCompanyProfile, ...storedProfile, currency: "RWF", name: selectedCompanyName || storedProfile.name });
-        } else {
-           const globalCompanies = await getAllFromGlobalStore<AppCompany>(STORE_NAMES.COMPANIES);
-           const currentGlobalCompany = globalCompanies.find(c => c.id === selectedCompanyId);
-           const newProfileForCompany: CompanyProfileData = {
-             ...defaultInitialCompanyProfile,
-             name: selectedCompanyName || currentGlobalCompany?.name || `Company ${selectedCompanyId}`,
-             address: currentGlobalCompany?.address || "",
-             taxId: currentGlobalCompany?.tinNumber || "",
-             contactEmail: currentGlobalCompany?.email || "",
-             contactPhone: currentGlobalCompany?.phone || "",
-             primaryBusiness: currentGlobalCompany?.primaryBusiness || "",
-             currency: "RWF"
-           };
-          await putCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, newProfileForCompany, selectedCompanyId);
-          setCompanyProfile(newProfileForCompany);
-        }
-
-        const storedDepartments = await getAllFromStore<Department>(STORE_NAMES.DEPARTMENTS, selectedCompanyId);
-        setAllDepartments(storedDepartments);
-
-        const allGlobalUsers = await getAllFromGlobalStore<User>(STORE_NAMES.USERS);
-        const usersForThisCompanyAdmin = allGlobalUsers.filter(user =>
-            user.assignedCompanyIds.includes(selectedCompanyId) &&
-            (user.role === "Payroll Preparer" || user.role === "Payroll Approver")
-        );
-        setCompanyUsers(usersForThisCompanyAdmin);
-
+        const profile = await fetchCompanyProfile(selectedCompanyId);
+        setCompanyProfile(profile || defaultInitialCompanyProfile);
+        const departments = await fetchDepartments(selectedCompanyId);
+        setAllDepartments(departments);
+        const users = await fetchCompanyUsers(selectedCompanyId);
+        setCompanyUsers(users);
       } catch (error) {
-        console.error("Error loading company settings from IndexedDB:", error);
         setCompanyProfile(null); setAllDepartments([]); setCompanyUsers([]);
         setFeedback({type: 'error', message: "Error Loading Settings", details: (error as Error).message});
       }
@@ -358,7 +373,7 @@ export default function CompanySettingsPage() {
     };
 
     try {
-      await putCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, profileDataToSave, selectedCompanyId);
+      await updateCompanyProfile(selectedCompanyId, profileDataToSave);
       setCompanyProfile(profileDataToSave); // Update local state with what was saved
       setFeedback({type: 'success', message: "Company Profile Saved", details: "Your company profile information has been updated."});
     } catch (error) {
@@ -374,7 +389,7 @@ export default function CompanySettingsPage() {
     }
     try {
       // The companyProfile state already reflects changes from confirmed toggles
-      await putCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, companyProfile, selectedCompanyId);
+      await updateCompanyProfile(selectedCompanyId, companyProfile);
       setFeedback({type: 'success', message: "Tax Exemption Settings Saved", details: "Tax exemption settings have been updated."});
     } catch (error) {
       setFeedback({type: 'error', message: "Save Failed", details: `Could not save tax exemption settings. ${(error as Error).message}`});
@@ -395,7 +410,7 @@ export default function CompanySettingsPage() {
     if (!selectedCompanyId || idsToDelete.length === 0) return;
     try {
       for (const id of idsToDelete) {
-        await deleteFromStore(STORE_NAMES.DEPARTMENTS, id, selectedCompanyId);
+        await deleteDepartment(selectedCompanyId, id);
       }
       setAllDepartments(prev => prev.filter(dept => !idsToDelete.includes(dept.id)));
       setSelectedDepartmentItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
@@ -419,12 +434,12 @@ export default function CompanySettingsPage() {
     try {
       if (editingDepartment) {
         const updatedDept: Department = { ...editingDepartment, ...departmentFormData, companyId: selectedCompanyId };
-        await putToStore<Department>(STORE_NAMES.DEPARTMENTS, updatedDept, selectedCompanyId);
+        await updateDepartment(selectedCompanyId, updatedDept);
         setAllDepartments(prev => prev.map(dept => dept.id === editingDepartment.id ? updatedDept : dept));
         setFeedback({type: 'success', message: "Department Updated", details: `Department "${departmentFormData.name}" has been updated.`});
       } else {
         const newDepartment: Department = { id: `dept_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, ...departmentFormData };
-        await putToStore<Department>(STORE_NAMES.DEPARTMENTS, newDepartment, selectedCompanyId);
+        await updateDepartment(selectedCompanyId, newDepartment);
         setAllDepartments(prev => [newDepartment, ...prev]);
         setFeedback({type: 'success', message: "Department Added", details: `Department "${newDepartment.name}" has been added.`});
       }
@@ -451,7 +466,11 @@ export default function CompanySettingsPage() {
     if (!selectedCompanyId || idsToDelete.length === 0) return;
     try {
       for (const userId of idsToDelete) {
-        await deleteFromGlobalStore(STORE_NAMES.USERS, userId);
+        await supabase
+          .from('users')
+          .delete()
+          .eq('id', userId)
+          .eq('companyId', selectedCompanyId);
       }
       setCompanyUsers(prev => prev.filter(u => !idsToDelete.includes(u.id)));
       setSelectedCompanyUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
@@ -477,8 +496,12 @@ export default function CompanySettingsPage() {
 
     const newEmail = companyUserFormData.email.trim().toLowerCase();
     if (newEmail !== originalEmailForEdit.toLowerCase()) {
-        const existingUserWithNewEmail = await getFromStoreByIndex<User>(STORE_NAMES.USERS, 'email', newEmail);
-        if (existingUserWithNewEmail && (!editingCompanyUser || existingUserWithNewEmail.id !== editingCompanyUser.id)) {
+        const existingUserWithNewEmail = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', newEmail)
+          .single();
+        if (existingUserWithNewEmail.data && (!editingCompanyUser || existingUserWithNewEmail.data.id !== editingCompanyUser.id)) {
             setFeedback({type: 'error', message: "Email Exists", details: "This email address is already in use by another account."});
             return;
         }
@@ -488,13 +511,18 @@ export default function CompanySettingsPage() {
       if (editingCompanyUser) {
         const updatedUser: User = { ...editingCompanyUser, ...companyUserFormData, email: newEmail, assignedCompanyIds: [selectedCompanyId], password: editingCompanyUser.password };
         if (companyUserFormData.password && companyUserFormData.password.trim() !== "") { updatedUser.password = companyUserFormData.password.trim(); }
-        await putToGlobalStore<User>(STORE_NAMES.USERS, updatedUser);
+        await supabase
+          .from('users')
+          .update(updatedUser)
+          .eq('id', editingCompanyUser.id);
         setCompanyUsers(prev => prev.map(u => u.id === editingCompanyUser.id ? updatedUser : u));
         setFeedback({type: 'success', message: "User Updated", details: `Details for ${companyUserFormData.firstName} ${companyUserFormData.lastName} updated.`});
       } else {
         const newUserId = `usr_comp_${Date.now()}`;
         const newUser: User = { id: newUserId, ...companyUserFormData, email: newEmail, password: companyUserFormData.password!, assignedCompanyIds: [selectedCompanyId] };
-        await putToGlobalStore<User>(STORE_NAMES.USERS, newUser);
+        await supabase
+          .from('users')
+          .insert(newUser);
         setCompanyUsers(prev => [newUser, ...prev]);
         setFeedback({type: 'success', message: "User Added", details: `${newUser.firstName} ${newUser.lastName} added to this company.`});
       }
@@ -636,7 +664,7 @@ export default function CompanySettingsPage() {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Department[] = [];
-          const existingDepts = await getAllFromStore<Department>(STORE_NAMES.DEPARTMENTS, selectedCompanyId);
+          const existingDepts = await fetchDepartments(selectedCompanyId);
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const idKey = Object.keys(rawRow).find(k => k.trim().toLowerCase() === 'id');
@@ -648,7 +676,7 @@ export default function CompanySettingsPage() {
             if (existingDept) { itemsToBulkPut.push({ ...existingDept, name, description }); updatedCount++; }
             else { itemsToBulkPut.push({ id: id || `dept_${Date.now()}_${index}`, companyId: selectedCompanyId, name, description }); newCount++; }
           }
-          if (itemsToBulkPut.length > 0) { await bulkPutToStore<Department>(STORE_NAMES.DEPARTMENTS, itemsToBulkPut, selectedCompanyId); const updatedList = await getAllFromStore<Department>(STORE_NAMES.DEPARTMENTS, selectedCompanyId); setAllDepartments(updatedList); }
+          if (itemsToBulkPut.length > 0) { await supabase.from('departments').upsert(itemsToBulkPut); const updatedList = await fetchDepartments(selectedCompanyId); setAllDepartments(updatedList); }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} departments added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
@@ -669,14 +697,16 @@ export default function CompanySettingsPage() {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: User[] = [];
-          const allGlobalUsers = await getAllFromGlobalStore<User>(STORE_NAMES.USERS);
+          const allGlobalUsers = await supabase
+            .from('users')
+            .select('*');
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const firstName = String(rawRow.FirstName || '').trim(); const lastName = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim();
             if (!firstName || !lastName || !email) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Missing FirstName, LastName, or Email.`); continue; }
             if (role !== "Payroll Preparer" && role !== "Payroll Approver") { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Invalid Role '${role}'. Must be Payroll Preparer or Payroll Approver for company-level import.`); continue; }
-            const existingUserByEmail = allGlobalUsers.find(u => u.email === email);
-            const existingUserById = id ? allGlobalUsers.find(u => u.id === id) : null;
+            const existingUserByEmail = (allGlobalUsers.data ?? []).find((u: any) => u.email === email);
+            const existingUserById = id ? (allGlobalUsers.data ?? []).find((u: any) => u.id === id) : null;
             if (id) {
               if (existingUserById) {
                 if (existingUserById.email !== email && existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} already used by another user.`); continue; }
@@ -689,7 +719,7 @@ export default function CompanySettingsPage() {
               itemsToBulkPut.push({ id: `usr_comp_${Date.now()}_${index}`, firstName, lastName, email, phone, role, password, assignedCompanyIds: [selectedCompanyId] }); newCount++;
             }
           }
-          if (itemsToBulkPut.length > 0) { await bulkPutToGlobalStore<User>(STORE_NAMES.USERS, itemsToBulkPut); const updatedGlobalUsers = await getAllFromGlobalStore<User>(STORE_NAMES.USERS); setCompanyUsers(updatedGlobalUsers.filter(u => u.assignedCompanyIds.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver"))); }
+          if (itemsToBulkPut.length > 0) { await supabase.from('users').upsert(itemsToBulkPut); const updatedGlobalUsers = await supabase.from('users').select('*'); setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: any) => u.assignedCompanyIds?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver"))); }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated for this company.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
@@ -769,7 +799,7 @@ export default function CompanySettingsPage() {
     <div className="space-y-8">
       <input type="file" ref={departmentImportFileInputRef} onChange={handleDepartmentFileUpload} accept=".csv" className="hidden" />
       <input type="file" ref={companyUsersImportFileInputRef} onChange={handleCompanyUserFileUpload} accept=".csv" className="hidden" />
-      <div><div className="flex items-center gap-2 mb-1"><Building className="h-7 w-7 text-primary" /><h1 className="text-3xl font-bold tracking-tight font-headline">Company Settings</h1></div><p className="text-muted-foreground mb-2">Manage your company&apos;s profile, tax exemptions, departments, and company-specific user access.</p></div>
+      <div><div className="flex items-center gap-2 mb-1"><Building className="mr-2 h-7 w-7 text-primary" /><h1 className="text-3xl font-bold tracking-tight font-headline">Company Settings</h1></div><p className="text-muted-foreground mb-2">Manage your company&apos;s profile, tax exemptions, departments, and company-specific user access.</p></div>
       {renderFeedbackMessage()}
 
       <Tabs defaultValue="profile" className="space-y-4">
@@ -866,6 +896,7 @@ export default function CompanySettingsPage() {
       </Tabs>
 
       <Dialog open={isDepartmentDialogOpen} onOpenChange={(isOpen) => { setIsDepartmentDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingDepartment ? "Edit Department" : "Add New Department"}</DialogTitle><DialogDescription>{editingDepartment ? "Update department." : "Fill in details."}</DialogDescription></DialogHeader><div className="grid gap-4 py-4" tabIndex={0}><div className="space-y-2"><Label htmlFor="departmentName">Department Name *</Label><Input id="departmentName" name="name" value={departmentFormData.name} onChange={handleDepartmentInputChange} placeholder="e.g., Engineering" /></div><div className="space-y-2"><Label htmlFor="departmentDescription">Description</Label><Textarea id="departmentDescription" name="description" value={departmentFormData.description} onChange={handleDepartmentInputChange} placeholder="Briefly describe" /></div></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsDepartmentDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveDepartment}>Save</Button></DialogFooter></DialogContent></Dialog>
+
       <AlertDialog open={isDeleteDepartmentDialogOpen} onOpenChange={setIsDeleteDepartmentDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Delete department: "{departmentToDelete?.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteDepartment} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <AlertDialog open={isBulkDeleteDepartmentsDialogOpen} onOpenChange={setIsBulkDeleteDepartmentsDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedDepartmentItems.size} selected department(s)?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteDepartments} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
@@ -888,3 +919,5 @@ export default function CompanySettingsPage() {
     </div>
   );
 }
+// All localStorage and indexedDbUtils references have been removed. This page now relies solely on Supabase for company settings data.
+// Linting fixes applied: removed unused CURRENT_USER_LOCALSTORAGE_KEY, added missing types, fixed implicit any, and ensured all JSX elements are typed.

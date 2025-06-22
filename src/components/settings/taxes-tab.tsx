@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -10,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Save, Loader2, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { PAYE_BANDS as DEFAULT_PAYE_BANDS, PENSION_EMPLOYER_RATE as DEFAULT_PENSION_EMPLOYER_RATE, PENSION_EMPLOYEE_RATE as DEFAULT_PENSION_EMPLOYEE_RATE, MATERNITY_EMPLOYER_RATE as DEFAULT_MATERNITY_EMPLOYER_RATE, MATERNITY_EMPLOYEE_RATE as DEFAULT_MATERNITY_EMPLOYEE_RATE, CBHI_RATE as DEFAULT_CBHI_RATE, RAMA_EMPLOYER_RATE as DEFAULT_RAMA_EMPLOYER_RATE, RAMA_EMPLOYEE_RATE as DEFAULT_RAMA_EMPLOYEE_RATE } from "@/lib/taxConfig";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getGlobalSingletonData, putGlobalSingletonData, STORE_NAMES, FIXED_KEY_SINGLETON } from '@/lib/indexedDbUtils';
+import { getSupabaseClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 export interface TaxSettingsData {
@@ -62,21 +60,21 @@ export default function TaxesTab() {
     const loadSettings = async () => {
       setIsLoaded(false);
       setFeedback(null);
-      if (typeof window !== 'undefined') {
-        try {
-          const loadedSettings = await getGlobalSingletonData<TaxSettingsData>(STORE_NAMES.TAX_SETTINGS);
-          if (loadedSettings) {
-            setSettings(loadedSettings);
-          } else {
-            const defaultSettings = getDefaultSettings();
-            setSettings(defaultSettings);
-            await putGlobalSingletonData<TaxSettingsData>(STORE_NAMES.TAX_SETTINGS, defaultSettings);
-          }
-        } catch (error) {
-          console.error("Error loading global tax settings from IndexedDB:", error);
-          setSettings(getDefaultSettings());
-          setFeedback({ type: 'error', message: 'Error loading tax settings.', details: (error as Error).message });
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase.from('tax_settings').select('*').single();
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116: No rows found
+        if (data) {
+          setSettings(data as TaxSettingsData);
+        } else {
+          const defaultSettings = getDefaultSettings();
+          setSettings(defaultSettings);
+          await supabase.from('tax_settings').upsert([defaultSettings]);
         }
+      } catch (error) {
+        console.error("Error loading global tax settings from Supabase:", error);
+        setSettings(getDefaultSettings());
+        setFeedback({ type: 'error', message: 'Error loading tax settings.', details: (error as Error).message });
       }
       setIsLoaded(true);
     };
@@ -93,7 +91,6 @@ export default function TaxesTab() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
-
     const numericSettings: TaxSettingsData = {
         payeBand1Limit: Number(settings.payeBand1Limit) || 0,
         payeBand2Limit: Number(settings.payeBand2Limit) || 0,
@@ -110,13 +107,14 @@ export default function TaxesTab() {
         ramaEmployerRate: Number(settings.ramaEmployerRate) || 0,
         ramaEmployeeRate: Number(settings.ramaEmployeeRate) || 0,
     };
-
     try {
-      await putGlobalSingletonData<TaxSettingsData>(STORE_NAMES.TAX_SETTINGS, numericSettings);
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('tax_settings').upsert([numericSettings]);
+      if (error) throw error;
       setSettings(numericSettings);
       setFeedback({ type: 'success', message: "Global Tax Settings Saved", details: "Tax configurations for the application have been saved." });
     } catch (error) {
-      console.error("Error saving global tax settings to IndexedDB:", error);
+      console.error("Error saving global tax settings to Supabase:", error);
       setFeedback({ type: 'error', message: "Save Failed", details: "Could not save tax settings." });
     }
   };

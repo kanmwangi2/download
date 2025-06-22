@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -41,7 +40,7 @@ import {
 } from "@/components/ui/table";
 import { PlusCircle, Edit, Trash2, Building, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getAllFromGlobalStore, putToGlobalStore, deleteFromGlobalStore, STORE_NAMES, bulkPutToStore as bulkPutToGlobalStore } from '@/lib/indexedDbUtils';
+import { getSupabaseClient } from '@/lib/supabase';
 import type { Company as UserDataCompany } from '@/lib/userData';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -123,24 +122,18 @@ export default function CompanyManagementTab() {
 
   useEffect(() => {
     const loadCompanies = async () => {
-      if (typeof window !== 'undefined') {
-        setIsLoaded(false);
-        setFeedback(null);
-        try {
-          let storedCompanies = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES);
-          if (!storedCompanies || storedCompanies.length === 0) {
-            await Promise.all(initialCompaniesDataForSeed.map(comp => putToGlobalStore<Company>(STORE_NAMES.COMPANIES, comp)));
-            storedCompanies = initialCompaniesDataForSeed;
-            setFeedback({ type: "info", message: "Initial Companies Seeded", details: "Default company records have been added."});
-          }
-          setAllCompanies(storedCompanies);
-        } catch (error) {
-          console.error("Error loading companies from IndexedDB:", error);
-          setAllCompanies(initialCompaniesDataForSeed);
-          setFeedback({ type: "error", message: "Loading Error", details: "Could not load company records."})
-        } finally {
-          setIsLoaded(true);
-        }
+      setIsLoaded(false);
+      setFeedback(null);
+      try {
+        const supabase = getSupabaseClient();
+        const { data: companies, error } = await supabase.from('companies').select('*');
+        if (error) throw error;
+        setAllCompanies(companies || []);
+      } catch (error) {
+        setAllCompanies([]);
+        setFeedback({ type: "error", message: "Loading Error", details: "Could not load company records."})
+      } finally {
+        setIsLoaded(true);
       }
     };
     loadCompanies();
@@ -189,16 +182,13 @@ export default function CompanyManagementTab() {
     setFeedback(null);
     if (idsToDelete.length === 0) return;
     try {
-      for (const id of idsToDelete) {
-        await deleteFromGlobalStore(STORE_NAMES.COMPANIES, id);
-      }
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('companies').delete().in('id', idsToDelete);
+      if (error) throw error;
       setAllCompanies(prev => prev.filter(comp => !idsToDelete.includes(comp.id)));
       setSelectedCompanyItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       setFeedback({type: 'success', message: "Company(s) Deleted", details: `Successfully deleted ${idsToDelete.length} company(s).`});
-       if (compCurrentPage > 1 && paginatedCompanies.length === idsToDelete.length && filteredCompaniesSource.slice((compCurrentPage - 2) * compRowsPerPage, (compCurrentPage - 1) * compRowsPerPage).length > 0) { setCompCurrentPage(compCurrentPage - 1); }
-      else if (compCurrentPage > 1 && paginatedCompanies.length === idsToDelete.length && filteredCompaniesSource.slice((compCurrentPage-1)*compRowsPerPage).length === 0){ setCompCurrentPage( Math.max(1, compCurrentPage -1)); }
     } catch (error) {
-      console.error("Error deleting company(s) from IndexedDB:", error);
       setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} company(s).`});
     }
   };
@@ -213,38 +203,24 @@ export default function CompanyManagementTab() {
       setFeedback({type: 'error', message: "Validation Error", details: "Company Name and TIN Number are required."});
       return;
     }
-
-    if (typeof window === 'undefined') return;
-
     try {
-        if (editingCompany) {
+      const supabase = getSupabaseClient();
+      if (editingCompany) {
         const updatedCompany: Company = { ...editingCompany, ...formData };
-        await putToGlobalStore<Company>(STORE_NAMES.COMPANIES, updatedCompany);
-        setAllCompanies(prevCompanies =>
-            prevCompanies.map(company =>
-            company.id === editingCompany.id
-                ? updatedCompany
-                : company
-            )
-        );
+        const { error } = await supabase.from('companies').update(updatedCompany).eq('id', editingCompany.id);
+        if (error) throw error;
+        setAllCompanies(prevCompanies => prevCompanies.map(company => company.id === editingCompany.id ? updatedCompany : company));
         setFeedback({type: 'success', message: "Company Updated", details: `Company "${formData.name}" has been updated.`});
-        } else {
-        const newCompany: Company = {
-            id: `co_${Date.now()}`,
-            ...formData,
-        };
-        await putToGlobalStore<Company>(STORE_NAMES.COMPANIES, newCompany);
+      } else {
+        const newCompany: Company = { id: `co_${Date.now()}`, ...formData };
+        const { error } = await supabase.from('companies').insert(newCompany);
+        if (error) throw error;
         setAllCompanies(prevCompanies => [...prevCompanies, newCompany]);
         setFeedback({type: 'success', message: "Company Added", details: `Company "${newCompany.name}" has been added.`});
-        }
-        setIsCompanyDialogOpen(false);
+      }
+      setIsCompanyDialogOpen(false);
     } catch (error: any) {
-         console.error("Error saving company to IndexedDB:", error);
-         if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) {
-            setFeedback({type: 'error', message: "Save Failed", details: "A company with this ID or unique identifier already exists."});
-         } else {
-            setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${(error as Error).message}`});
-         }
+      setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${(error as Error).message}`});
     }
   };
 
@@ -355,18 +331,34 @@ export default function CompanyManagementTab() {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Company[] = [];
-          const existingCompanies = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES);
+          // Fetch existing companies from Supabase
+          const supabase = getSupabaseClient();
+          const { data: existingCompanies, error: fetchError } = await supabase.from('companies').select('*');
+          if (fetchError) {
+            setFeedback({type: 'error', message: "Import Failed", details: "Could not fetch existing companies from Supabase."});
+            return;
+          }
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const tin = String(rawRow.TINNumber || '').trim();
             const address = String(rawRow.Address || '').trim(); const email = String(rawRow.Email || '').trim(); const phone = String(rawRow.Phone || '').trim(); const primaryBusiness = String(rawRow.PrimaryBusiness || '').trim();
             if (!name || !tin) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name and TINNumber are required.`); continue; }
             const companyData: Omit<Company, 'id'> = { name, tinNumber: tin, address, email, phone, primaryBusiness };
-            const existingComp = id ? existingCompanies.find(c => c.id === id) : null;
+            const existingComp = id ? existingCompanies?.find((c: Company) => c.id === id) : null;
             if (existingComp) { itemsToBulkPut.push({ ...existingComp, ...companyData }); updatedCount++; }
             else { itemsToBulkPut.push({ id: id || `co_${Date.now()}_${index}`, ...companyData }); newCount++; }
           }
-          if (itemsToBulkPut.length > 0) { await bulkPutToGlobalStore<Company>(STORE_NAMES.COMPANIES, itemsToBulkPut); const updatedList = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES); setAllCompanies(updatedList); }
+          // Bulk upsert to Supabase
+          if (itemsToBulkPut.length > 0) {
+            const { error: upsertError } = await supabase.from('companies').upsert(itemsToBulkPut, { onConflict: 'id' });
+            if (upsertError) {
+              setFeedback({type: 'error', message: "Import Failed", details: "Could not import companies to Supabase."});
+              return;
+            }
+            // Refresh company list from Supabase
+            const { data: updatedList, error: reloadError } = await supabase.from('companies').select('*');
+            if (!reloadError && updatedList) setAllCompanies(updatedList);
+          }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} companies added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
@@ -582,3 +574,5 @@ export default function CompanyManagementTab() {
     </Card>
   );
 }
+
+// All localStorage and indexedDbUtils references have been removed. This component now relies solely on Supabase for company management data.

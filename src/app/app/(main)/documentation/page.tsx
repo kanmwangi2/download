@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -49,7 +48,7 @@ const documentationContent: DocSectionData[] = [
             "Frontend: Next.js (React framework), TypeScript",
             "UI Components: ShadCN UI (customizable components built with Radix UI and Tailwind CSS)",
             "Styling: Tailwind CSS",
-            "Local Data Storage: Browser's IndexedDB",
+            "Backend: Supabase (PostgreSQL, Auth, Storage, Functions)",
           ]}
         ]
       },
@@ -57,13 +56,13 @@ const documentationContent: DocSectionData[] = [
         type: 'subsection',
         subTitle: "Data Persistence & Reset",
         subContent: [
-          "Cheetah Payroll primarily uses your browser's IndexedDB for data storage. This means all application data (staff records, payroll runs, company settings including payment types, deduction types, custom field definitions, tax configurations, user profiles, audit logs etc.) is stored locally on your computer and persists between sessions on the same browser.",
+          "Cheetah Payroll uses Supabase as its exclusive backend. All application data (staff records, payroll runs, company settings including payment types, deduction types, custom field definitions, tax configurations, user profiles, audit logs, etc.) is securely stored in the cloud and accessible from any device.",
           { type: 'list', items: [
-            "<strong>Data Location:</strong> All data resides in your browser; no data is sent to an external server in this demonstration version.",
+            "<strong>Data Location:</strong> All data resides in Supabase; nothing is stored locally in the browser.",
             "<strong>Data Scoping:</strong> Operational data is scoped per company. Global data includes the overall list of companies, user accounts, and tax settings.",
-            "<strong>Resetting the Application:</strong> To reset Cheetah Payroll to its initial state (including default sample data for users, the two sample companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', global tax settings, and sample data like staff, payment types, deduction types, and custom field definitions for these two demo companies), you must clear your browser's site data (cache, cookies, IndexedDB storage) specifically for the Cheetah Payroll application's URL. Be aware that this action will permanently erase all your entered and generated data for all companies.",
-            "<strong>Suitability:</strong> This local storage setup is suitable for demonstration or single-user scenarios. A production environment or multi-user collaboration would require a backend database and server-side logic.",
-            "<strong>Initial Data:</strong> Upon first load or after a data reset, the application is seeded with initial default data (for users and the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', including their respective staff, payment types, deduction types, custom fields, departments, company profiles, and payroll history) to allow for immediate exploration and use.",
+            "<strong>Resetting the Application:</strong> To reset your company or user data, contact your system administrator or use the admin tools in the application settings (if available).",
+            "<strong>Suitability:</strong> This cloud-native setup is suitable for production, multi-user, and collaborative scenarios.",
+            "<strong>Initial Data:</strong> The application is seeded with initial default data (for users and the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', including their respective staff, payment types, deduction types, custom fields, departments, company profiles, and payroll history) to allow for immediate exploration and use.",
           ]}
         ]
       },
@@ -109,7 +108,7 @@ const documentationContent: DocSectionData[] = [
           "Access the application by navigating to the root URL. You will be presented with a login form.",
           { type: 'list', items: [
             "Enter your registered email and password.",
-            "Initial default users (including a Primary Admin for 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)') are seeded into IndexedDB on first load or after a data reset. Refer to `src/lib/userData.ts` for default credentials if testing locally.",
+            "Initial default users (including a Primary Admin for 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)') are seeded into Supabase on first load or after a data reset. Refer to `src/lib/userData.ts` for default credentials if testing locally.",
           ]}
         ]
       },
@@ -416,7 +415,7 @@ export default function DocumentationPage() {
         let isFirstWordOnLine = true;
 
         doc.setFontSize(fontSize);
-        doc.setFont(undefined, (isMainSectionTitle || isSubSectionTitle) ? 'bold' : 'normal');
+        doc.setFont('helvetica', (isMainSectionTitle || isSubSectionTitle) ? 'bold' : 'normal');
 
 
         if (isListItem) {
@@ -428,7 +427,7 @@ export default function DocumentationPage() {
             lineHasContentOnCurrentLine = true;
             isFirstWordOnLine = true;
         } else if ((isMainSectionTitle || isSubSectionTitle) && numberPrefix) {
-            doc.setFont(undefined, 'bold');
+            doc.setFont('helvetica', 'bold');
             const numWidth = doc.getTextWidth(numberPrefix);
             doc.text(numberPrefix, initialX, y);
             textStartX = initialX + numWidth + numberTextGap;
@@ -443,7 +442,7 @@ export default function DocumentationPage() {
         }
 
         for (const segment of textSegments) {
-            doc.setFont(undefined, (segment.isBold || isMainSectionTitle || isSubSectionTitle) ? 'bold' : 'normal');
+            doc.setFont('helvetica', (segment.isBold || isMainSectionTitle || isSubSectionTitle) ? 'bold' : 'normal');
             const words = segment.text.split(/\s+/).filter(w => w.length > 0);
 
             for (let k = 0; k < words.length; k++) {
@@ -492,7 +491,7 @@ export default function DocumentationPage() {
       }
       yPos = checkPageBreak(yPos, estSectionTitleHeight + firstContentEstimatedHeight + sectionTitleSpacingAfter);
 
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       const { y: sectionEndY, textStartX: sectionTextActualStartX } = addStyledText(
           sectionTitleSegments,
           margin,
@@ -530,7 +529,7 @@ export default function DocumentationPage() {
           }
           yPos = checkPageBreak(yPos, estSubTitleHeight + firstSubContentEstHeight + subsectionTitleSpacingAfter);
 
-          doc.setFont(undefined, 'bold');
+          doc.setFont('helvetica', 'bold');
           const { y: subTitleEndY, textStartX: subSectionTextActualStartX } = addStyledText(
               subTitleSegments,
               contentStartX,
@@ -568,7 +567,7 @@ export default function DocumentationPage() {
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(100);
       doc.text("Cheetah Payroll - Documentation", margin, margin / 2, { align: 'left' });
       doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth - margin, margin / 2, { align: 'right' });

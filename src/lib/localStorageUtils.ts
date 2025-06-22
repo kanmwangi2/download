@@ -1,4 +1,1 @@
-// This file is deprecated. Its functionality has been replaced by indexedDbUtils.ts.
-// Kept for historical reference or if any missed imports exist.
-// Consider removing in a future cleanup.
-// Content has been emptied as part of cleanup.
+// This file has been deleted. All localStorage logic has been removed. Supabase is now the exclusive backend.

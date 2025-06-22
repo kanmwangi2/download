@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -24,21 +23,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffMember } from '@/lib/staffData';
 import { StaffPaymentDetails, defaultPaymentDetails } from '@/lib/paymentData';
 import { PaymentType, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID, initialPaymentTypesForCompanySeed, exampleUserDefinedPaymentTypesForUmoja, exampleUserDefinedPaymentTypesForIsoko } from '@/lib/paymentTypesData';
-import {
-    getPaymentConfigForStaff, putPaymentConfigForStaff, deletePaymentConfigForStaff, getAllPaymentConfigsForCompany,
-    getAllFromStore, putToStore, deleteFromStore, bulkPutToStore,
-    STORE_NAMES
-} from '@/lib/indexedDbUtils';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCompany } from '@/context/CompanyContext';
-import Link from 'next/link';
+import { getSupabaseClient } from '@/lib/supabase';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { useCompany } from '@/context/CompanyContext';
+import Link from 'next/link';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formatNumberForTable = (amount?: number): string => {
   if (amount === undefined || amount === null || isNaN(amount)) return "0";
@@ -61,6 +56,42 @@ type FeedbackMessage = {
   type: 'success' | 'error' | 'info';
   message: string;
   details?: string;
+};
+
+// --- Supabase CRUD helpers ---
+// Payment Types
+const fetchPaymentTypes = async (companyId: string) => {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from('payment_types').select('*').eq('companyId', companyId);
+  if (error) throw error;
+  return data || [];
+};
+const upsertPaymentType = async (paymentType: any) => {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('payment_types').upsert([paymentType]);
+  if (error) throw error;
+};
+const deletePaymentType = async (id: string) => {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('payment_types').delete().eq('id', id);
+  if (error) throw error;
+};
+// Staff Payment Configs
+const fetchStaffPaymentConfigs = async (companyId: string) => {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from('staff_payment_configs').select('*').eq('companyId', companyId);
+  if (error) throw error;
+  return data || [];
+};
+const upsertStaffPaymentConfig = async (config: any) => {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('staff_payment_configs').upsert([config]);
+  if (error) throw error;
+};
+const deleteStaffPaymentConfig = async (companyId: string, staffId: string) => {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('staff_payment_configs').delete().eq('companyId', companyId).eq('staffId', staffId);
+  if (error) throw error;
 };
 
 
@@ -114,16 +145,19 @@ export default function PaymentsPage() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        let companySpecificPaymentTypes = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
+        // Fetch payment types
+        let companySpecificPaymentTypes = await fetchPaymentTypes(selectedCompanyId);
+
         let coreTypesModified = false;
 
         const ensureCoreType = async (id: string, name: string, order: number) => {
-          if (!companySpecificPaymentTypes.some(t => t.id === id)) {
+          const safePaymentTypes = companySpecificPaymentTypes || [];
+          if (!safePaymentTypes.some(t => t.id === id)) {
             const coreType: PaymentType = {
               id, companyId: selectedCompanyId, name,
               type: "Gross", order, isFixedName: true, isDeletable: false,
             };
-            await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, coreType, selectedCompanyId);
+            await upsertPaymentType(coreType);
             coreTypesModified = true;
           }
         };
@@ -133,36 +167,46 @@ export default function PaymentsPage() {
 
         if (selectedCompanyId === "co_001") {
             for (const exampleType of exampleUserDefinedPaymentTypesForUmoja) {
-                if (!companySpecificPaymentTypes.some(t => t.id === exampleType.id)) {
-                    await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, { ...exampleType, companyId: selectedCompanyId }, selectedCompanyId);
+                const safePaymentTypes = companySpecificPaymentTypes || [];
+                if (!safePaymentTypes.some(t => t.id === exampleType.id)) {
+                    await upsertPaymentType({ ...exampleType, companyId: selectedCompanyId });
                     coreTypesModified = true;
                 }
             }
         } else if (selectedCompanyId === "co_002") {
             for (const exampleType of exampleUserDefinedPaymentTypesForIsoko) {
-                if (!companySpecificPaymentTypes.some(t => t.id === exampleType.id)) {
-                    await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, { ...exampleType, companyId: selectedCompanyId }, selectedCompanyId);
+                const safePaymentTypes = companySpecificPaymentTypes || [];
+                if (!safePaymentTypes.some(t => t.id === exampleType.id)) {
+                    await upsertPaymentType({ ...exampleType, companyId: selectedCompanyId });
                     coreTypesModified = true;
                 }
             }
         }
 
         if (coreTypesModified) {
-          companySpecificPaymentTypes = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
+          companySpecificPaymentTypes = await fetchPaymentTypes(selectedCompanyId);
         }
 
         if (companySpecificPaymentTypes.length === 0) {
             await ensureCoreType(DEFAULT_BASIC_PAY_ID, "Basic Pay", 1);
             await ensureCoreType(DEFAULT_TRANSPORT_ALLOWANCE_ID, "Transport Allowance", 2);
-            companySpecificPaymentTypes = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
+            companySpecificPaymentTypes = await fetchPaymentTypes(selectedCompanyId);
         }
-        setPaymentTypes(companySpecificPaymentTypes.sort((a, b) => a.order - b.order));
+        setPaymentTypes(companySpecificPaymentTypes);
 
-        const staff = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId);
+        // Fetch staff list
+        const { data: staff, error: staffError } = await getSupabaseClient()
+          .from('staff')
+          .select('*')
+          .eq('companyId', selectedCompanyId);
+
+        if (staffError) throw staffError;
         setStaffList(staff);
 
-        const paymentConfigs = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId);
-        setPaymentDataStore(paymentConfigs);
+        // Fetch payment configs
+        const paymentConfigs = await fetchStaffPaymentConfigs(selectedCompanyId);
+
+        setPaymentDataStore(Object.fromEntries((paymentConfigs || []).map((config: any) => [config.staffId, config])));
 
       } catch (error) {
         console.error("Error loading data for Payments page:", error);
@@ -227,62 +271,21 @@ export default function PaymentsPage() {
     }
   };
 
-  const confirmDeletePaymentType = async () => { if (paymentTypeToDelete) { await deletePaymentTypesByIds([paymentTypeToDelete.id]); } setIsDeletePaymentTypeDialogOpen(false); setPaymentTypeToDelete(null); };
+  const confirmDeletePaymentType = async () => { if (paymentTypeToDelete) {
+    await deletePaymentType(paymentTypeToDelete.id);
+    setPaymentTypes(prev => prev.filter(pt => pt.id !== paymentTypeToDelete.id));
+  } setIsDeletePaymentTypeDialogOpen(false); setPaymentTypeToDelete(null); };
   const handleOpenBulkDeletePaymentTypesDialog = () => { setFeedback(null); if (selectedPaymentTypeItems.size === 0) { setFeedback({type: 'info', message: "No Selection", details: "Please select payment types to delete."}); return; } setIsBulkDeletePaymentTypesDialogOpen(true); };
-  const confirmBulkDeletePaymentTypes = async () => { await deletePaymentTypesByIds(Array.from(selectedPaymentTypeItems)); setIsBulkDeletePaymentTypesDialogOpen(false); };
-
-  const deletePaymentTypesByIds = async (idsToDelete: string[]) => {
-    setFeedback(null);
-    if (!selectedCompanyId || idsToDelete.length === 0) return;
-
-    const actualIdsToDeleteFromDB: string[] = [];
-    let skippedNonDeletableCount = 0;
-    let skippedInUseCount = 0;
-
-    for (const id of idsToDelete) {
-        const type = paymentTypes.find(pt => pt.id === id);
-        if (!type) continue;
-
-        if (!type.isDeletable) {
-            skippedNonDeletableCount++;
-            continue;
-        }
-        const isUsed = Object.values(paymentDataStore).some(config => config.hasOwnProperty(type.id));
-        if (isUsed) {
-            skippedInUseCount++;
-            continue;
-        }
-        actualIdsToDeleteFromDB.push(id);
-    }
-
-    let detailsParts: string[] = [];
-    if (skippedNonDeletableCount > 0) detailsParts.push(`${skippedNonDeletableCount} core type(s) skipped.`);
-    if (skippedInUseCount > 0) detailsParts.push(`${skippedInUseCount} type(s) in use skipped.`);
-
-    if (actualIdsToDeleteFromDB.length > 0) {
-        try {
-            for (const id of actualIdsToDeleteFromDB) {
-                await deleteFromStore(STORE_NAMES.PAYMENT_TYPES, id, selectedCompanyId);
-            }
-            setPaymentTypes(prev => prev.filter(pt => !actualIdsToDeleteFromDB.includes(pt.id)).sort((a, b) => a.order - b.order));
-            setSelectedPaymentTypeItems(prev => {
-                const newSelected = new Set(prev);
-                actualIdsToDeleteFromDB.forEach(id => newSelected.delete(id));
-                return newSelected;
-            });
-
-            if (ptCurrentPage > 1 && paginatedPaymentTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedPaymentTypes.some(pt => pt.id === id)).length && displayablePaymentTypes.slice((ptCurrentPage - 2) * ptRowsPerPage, (ptCurrentPage - 1) * ptRowsPerPage).length > 0) { setPtCurrentPage(ptCurrentPage - 1); }
-            else if (ptCurrentPage > 1 && paginatedPaymentTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedPaymentTypes.some(pt => pt.id === id)).length && displayablePaymentTypes.slice((ptCurrentPage-1)*ptRowsPerPage).length === 0){ setPtCurrentPage( Math.max(1, ptCurrentPage -1)); }
-
-            detailsParts.unshift(`Successfully deleted ${actualIdsToDeleteFromDB.length} payment type(s).`);
-            setFeedback({type: 'success', message: "Deletion Processed", details: detailsParts.join(' ')});
-        } catch (error) {
-            console.error("Error deleting payment type(s):", error);
-            setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${actualIdsToDeleteFromDB.length} payment type(s). ${(error as Error).message}`});
-        }
-    } else if (detailsParts.length > 0) {
-        setFeedback({type: 'info', message: "No Deletions Performed", details: detailsParts.join(' ')});
-    }
+  const confirmBulkDeletePaymentTypes = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.from('payment_types').delete().in('id', Array.from(selectedPaymentTypeItems));
+    setPaymentTypes(prev => prev.filter(pt => !selectedPaymentTypeItems.has(pt.id)));
+    setSelectedPaymentTypeItems(prev => {
+        const newSelected = new Set(prev);
+        Array.from(selectedPaymentTypeItems).forEach(id => newSelected.delete(id));
+        return newSelected;
+    });
+    setIsBulkDeletePaymentTypesDialogOpen(false);
   };
 
 
@@ -294,7 +297,7 @@ export default function PaymentsPage() {
     try {
       if (editingPaymentType) {
         const updatedType: PaymentType = { ...editingPaymentType, name: editingPaymentType.isFixedName ? editingPaymentType.name : paymentTypeFormData.name.trim(), type: paymentTypeFormData.type };
-        await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, updatedType, selectedCompanyId);
+        await upsertPaymentType(updatedType);
         setPaymentTypes(prev => prev.map(pt => pt.id === updatedType.id ? updatedType : pt).sort((a,b)=>a.order - b.order));
         setFeedback({type: 'success', message: "Payment Type Updated"});
       } else {
@@ -303,7 +306,7 @@ export default function PaymentsPage() {
           id: `pt_custom_${Date.now()}`, companyId: selectedCompanyId, name: paymentTypeFormData.name.trim(),
           type: paymentTypeFormData.type, order: maxOrder + 1, isFixedName: false, isDeletable: true,
         };
-        await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, newType, selectedCompanyId);
+        await upsertPaymentType(newType);
         setPaymentTypes(prev => [...prev, newType].sort((a,b)=>a.order - b.order));
         setFeedback({type: 'success', message: "Payment Type Added"});
       }
@@ -317,7 +320,7 @@ export default function PaymentsPage() {
     const numericValue = parseFloat(value.replace(/,/g, ''));
     setCurrentStaffPaymentFormData(prev => ({
       ...prev,
-      [paymentTypeId]: isNaN(numericValue) ? "" : numericValue,
+      [paymentTypeId]: isNaN(numericValue) ? 0 : numericValue,
     }));
   };
 
@@ -332,11 +335,16 @@ export default function PaymentsPage() {
     let errorCount = 0;
     for (const staffId of staffIdsToDelete) {
       try {
-        await deletePaymentConfigForStaff(selectedCompanyId, staffId); deletedCount++;
+        await deleteStaffPaymentConfig(selectedCompanyId, staffId);
+        deletedCount++;
       } catch (error) { console.error(`Error deleting payment config for staff ${staffId}:`, error); errorCount++; }
     }
     if (deletedCount > 0) {
-      const updatedPaymentStore = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId); setPaymentDataStore(updatedPaymentStore);
+      const { data: updatedPaymentStore } = await getSupabaseClient()
+        .from('staff_payment_configs')
+        .select('*')
+        .eq('companyId', selectedCompanyId);
+      setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
       setSelectedStaffPaymentItems(prev => { const updatedSelection = new Set(prev); staffIdsToDelete.forEach(id => updatedSelection.delete(id)); return updatedSelection; });
       if (spCurrentPage > 1 && paginatedStaffPayments.length === staffIdsToDelete.filter(id => paginatedStaffPayments.some(psp => psp.staffId === id)).length && staffPaymentTableData.slice((spCurrentPage - 2) * spRowsPerPage, (spCurrentPage - 1) * spRowsPerPage).length > 0) { setSpCurrentPage(spCurrentPage - 1); }
       else if (spCurrentPage > 1 && paginatedStaffPayments.length === staffIdsToDelete.filter(id => paginatedStaffPayments.some(psp => psp.staffId === id)).length && staffPaymentTableData.slice((spCurrentPage-1)*spRowsPerPage).length === 0){ setSpCurrentPage( Math.max(1, spCurrentPage -1)); }
@@ -363,8 +371,12 @@ export default function PaymentsPage() {
     if (!editingStaffForPayments || !selectedCompanyId) return;
     if (!validateStaffPaymentFormData(currentStaffPaymentFormData)) { setFeedback({type: 'error', message: "Validation Error", details: "Please ensure all amount fields are valid numbers."}); return; }
     try {
-      await putPaymentConfigForStaff(currentStaffPaymentFormData, selectedCompanyId, editingStaffForPayments.id);
-      const updatedPaymentStore = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId); setPaymentDataStore(updatedPaymentStore);
+      await upsertStaffPaymentConfig({ ...currentStaffPaymentFormData, companyId: selectedCompanyId, id: editingStaffForPayments.id });
+      const { data: updatedPaymentStore } = await getSupabaseClient()
+        .from('staff_payment_configs')
+        .select('*')
+        .eq('companyId', selectedCompanyId);
+      setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
       setFeedback({type: 'success', message: "Staff Payments Saved", details: `Details for ${editingStaffForPayments.firstName} ${editingStaffForPayments.lastName} updated.`});
     } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: `Could not save staff payment details. ${(error as Error).message}`}); }
     setIsStaffPaymentFormDialogOpen(false);
@@ -376,8 +388,12 @@ export default function PaymentsPage() {
     if (paymentTypes.length === 0) { setFeedback({type: 'error', message: "Error", details: "No payment types defined for this company."}); return; }
     if (!validateStaffPaymentFormData(currentStaffPaymentFormData)) { setFeedback({type: 'error', message: "Validation Error", details: "Please ensure all amount fields are valid numbers."}); return; }
     try {
-      await putPaymentConfigForStaff(currentStaffPaymentFormData, selectedCompanyId, selectedStaffIdForNewConfig);
-      const updatedPaymentStore = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId); setPaymentDataStore(updatedPaymentStore);
+      await upsertStaffPaymentConfig({ ...currentStaffPaymentFormData, companyId: selectedCompanyId, id: selectedStaffIdForNewConfig });
+      const { data: updatedPaymentStore } = await getSupabaseClient()
+        .from('staff_payment_configs')
+        .select('*')
+        .eq('companyId', selectedCompanyId);
+      setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
       const staffMember = staffList.find(s => s.id === selectedStaffIdForNewConfig);
       setFeedback({type: 'success', message: "Payment Configuration Added", details: `Payment details added for ${staffMember?.firstName} ${staffMember?.lastName}.`});
       setIsAddStaffPaymentDialogOpen(false);
@@ -575,11 +591,13 @@ export default function PaymentsPage() {
           const { data: parsedData, processedDataRowCount, papaParseErrors, validationSkippedLog } = await parseCSVToPaymentDetails(text, selectedCompanyId, paymentTypes, staffList);
           let newCount = 0; let updatedCount = 0;
           for (const item of parsedData) {
-            const existingConfig = await getPaymentConfigForStaff(selectedCompanyId, item.staffId);
-            if (existingConfig) updatedCount++; else newCount++;
-            await putPaymentConfigForStaff(item.details, selectedCompanyId, item.staffId);
+            // Supabase: Upsert staff payment config
+            await upsertStaffPaymentConfig({ ...item.details, companyId: selectedCompanyId, staffId: item.staffId });
+            // Optionally, you can check if the config exists by fetching it first if needed
           }
-          const updatedPaymentStore = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId); setPaymentDataStore(updatedPaymentStore);
+          // Supabase: Fetch all staff payment configs for the company
+          const updatedPaymentStore = await fetchStaffPaymentConfigs(selectedCompanyId);
+          setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
 
           let feedbackMessage = "";
           let feedbackTitle = "Import Processed";
@@ -817,16 +835,14 @@ export default function PaymentsPage() {
           const { data: parsedData, processedDataRowCount, papaParseErrors, validationSkippedLog } = await parseCSVToPaymentTypes(text, selectedCompanyId, paymentTypes);
           let newCount = 0, updatedCount = 0;
           const itemsToBulkPut: PaymentType[] = [];
-          const existingPaymentTypesInDB = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
+          const { data: updatedPaymentTypesList = [] } = await getSupabaseClient().from('payment_types').select('*').eq('companyId', selectedCompanyId);
 
+          const safeExistingPaymentTypesInDB = updatedPaymentTypesList || [];
           for (const importedPT of parsedData) {
-            const existingIndex = existingPaymentTypesInDB.findIndex(pt => pt.id === importedPT.id && pt.companyId === selectedCompanyId);
+            const existingIndex = safeExistingPaymentTypesInDB.findIndex((pt: PaymentType) => pt.id === importedPT.id && pt.companyId === selectedCompanyId);
             if (existingIndex > -1) {
-              const currentDbVersion = existingPaymentTypesInDB[existingIndex];
-
-              if(currentDbVersion.name !== importedPT.name || currentDbVersion.type !== importedPT.type ||
-                ( (currentDbVersion.id === DEFAULT_BASIC_PAY_ID || currentDbVersion.id === DEFAULT_TRANSPORT_ALLOWANCE_ID) && currentDbVersion.type !== importedPT.type )
-              ) {
+              const currentDbVersion = safeExistingPaymentTypesInDB[existingIndex];
+              if(currentDbVersion.name !== importedPT.name || currentDbVersion.type !== importedPT.type || ((currentDbVersion.id === DEFAULT_BASIC_PAY_ID || currentDbVersion.id === DEFAULT_TRANSPORT_ALLOWANCE_ID) && currentDbVersion.type !== importedPT.type)) {
                  itemsToBulkPut.push(importedPT);
                  updatedCount++;
               }
@@ -835,13 +851,13 @@ export default function PaymentsPage() {
               newCount++;
             }
           }
-
           if (itemsToBulkPut.length > 0) {
-            await bulkPutToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, itemsToBulkPut, selectedCompanyId);
+            for (const pt of itemsToBulkPut) {
+              await upsertPaymentType(pt);
+            }
           }
-
-          const updatedPaymentTypesList = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
-          setPaymentTypes(updatedPaymentTypesList.sort((a,b) => a.order - b.order));
+          const safeUpdatedPaymentTypesList = updatedPaymentTypesList || [];
+          setPaymentTypes(safeUpdatedPaymentTypesList.sort((a: PaymentType, b: PaymentType) => a.order - b.order));
 
           let feedbackMessage = "";
           let feedbackTitle = "Import Processed";
@@ -1122,6 +1138,7 @@ export default function PaymentsPage() {
                               {pt.name.toLowerCase() === "house allowance" && (
                                   <TooltipProvider delayDuration={100}>
                                       <Tooltip>
+
                                       <TooltipTrigger asChild><Info className="h-3.5 w-3.5 ml-1.5 text-primary/80 inline-block cursor-help" /></TooltipTrigger>
                                       <TooltipContent side="top" className="max-w-xs"><p>Naming this &apos;House Allowance&apos; will automatically map its calculated gross value to the &apos;Cash Allowance (House)&apos; column in relevant statutory reports.</p></TooltipContent>
                                       </Tooltip>
@@ -1205,10 +1222,27 @@ export default function PaymentsPage() {
 
 
       <Dialog open={isStaffPaymentFormDialogOpen} onOpenChange={(isOpen) => { setIsStaffPaymentFormDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
-        <DialogContent className="sm:max-w-lg md:max-w-xl"><DialogHeader><DialogTitle>Edit Payment Details for {editingStaffForPayments?.firstName} {editingStaffForPayments?.lastName}</DialogTitle><DialogDescription>Update amounts for each defined Payment Type (Gross/Net status is fixed by type).</DialogDescription></DialogHeader><ScrollArea className="max-h-[60vh] pr-3" tabIndex={0}><div className="grid grid-cols-1 gap-4 py-4">
-          {paymentTypes.map(pt => (<div key={pt.id} className="space-y-2 p-3 border rounded-md bg-muted/20"><Label htmlFor={`staffpay-${pt.id}`}>{pt.name} ({pt.type})</Label><Input id={`staffpay-${pt.id}`} type="number" value={currentStaffPaymentFormData[pt.id] || ""} onChange={(e) => handleStaffPaymentFormAmountChange(pt.id, e.target.value)} placeholder="0" min="0" step="1" /></div>))}
-          {paymentTypes.length === 0 && <p className="text-muted-foreground text-center col-span-full">No payment types defined for this company yet.</p>}
-        </div></ScrollArea><DialogFooter className="border-t pt-4"><Button type="button" variant="outline" onClick={() => setIsStaffPaymentFormDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveEditedStaffPaymentDetails} disabled={paymentTypes.length === 0}><Save className="mr-2 h-4 w-4" /> Save Changes</Button></DialogFooter></DialogContent>
+        <DialogContent className="sm:max-w-lg md:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit Payment Details for {editingStaffForPayments?.firstName} {editingStaffForPayments?.lastName}</DialogTitle>
+            <DialogDescription>Update amounts for each defined Payment Type (Gross/Net status is fixed by type).</DialogDescription>
+          </DialogHeader>
+          <ScrollArea>
+            <div>
+              {paymentTypes.map(pt => (
+                <div key={pt.id} className="space-y-2 p-3 border rounded-md bg-muted/20">
+                  <Label htmlFor={`staffpay-${pt.id}`}>{pt.name} ({pt.type})</Label>
+                  <Input id={`staffpay-${pt.id}`} type="number" value={currentStaffPaymentFormData[pt.id] || ""} onChange={(e) => handleStaffPaymentFormAmountChange(pt.id, e.target.value)} placeholder="0" min="0" step="1" />
+                </div>
+              ))}
+              {paymentTypes.length === 0 && <p className="text-muted-foreground text-center col-span-full">No payment types defined for this company yet.</p>}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="border-t pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsStaffPaymentFormDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveEditedStaffPaymentDetails} disabled={paymentTypes.length === 0}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
       <Dialog open={isAddStaffPaymentDialogOpen} onOpenChange={(isOpen) => { setIsAddStaffPaymentDialogOpen(isOpen); if (!isOpen) setFeedback(null); }}>
         <DialogContent className="sm:max-w-lg md:max-w-xl"><DialogHeader><DialogTitle>Add New Staff Payment Configuration</DialogTitle><DialogDescription>Select staff from current company without existing payment details.</DialogDescription></DialogHeader><ScrollArea className="max-h-[60vh] pr-3" tabIndex={0}><div className="space-y-4 py-4">
@@ -1232,4 +1266,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
-    
+

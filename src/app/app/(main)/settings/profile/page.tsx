@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -13,14 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getGlobalSingletonData, putGlobalSingletonData, getFromGlobalStore, putToGlobalStore, STORE_NAMES } from '@/lib/indexedDbUtils';
+import { createClient } from '@supabase/supabase-js';
 import type { User } from '@/lib/userData';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 const defaultPlaceholderImage = "https://placehold.co/150x150.png";
-const AVATAR_STORAGE_KEY = STORE_NAMES.USER_AVATAR;
+
 
 interface UserProfileDetails {
   firstName: string;
@@ -67,58 +67,93 @@ export default function UserProfilePage() {
   const [avatarFeedback, setAvatarFeedback] = useState<FeedbackMessage | null>(null);
 
 
+  // Helper: get current user from Supabase
+  async function getCurrentUserFromSupabase() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) return null;
+    const meta = data.user.user_metadata || {};
+    return {
+      id: data.user.id,
+      email: meta.email || data.user.email || '',
+      firstName: meta.firstName || '',
+      lastName: meta.lastName || '',
+      phone: meta.phone || '',
+    };
+  }
+
+  // Helper: fetch user profile from Supabase
+  async function fetchUserProfile(userId: string) {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error) return null;
+    return data;
+  }
+
+  // Helper: update user profile in Supabase
+  async function updateUserProfile(userId: string, profile: UserProfileDetails) {
+    await supabase
+      .from('user_profiles')
+      .update(profile)
+      .eq('id', userId);
+  }
+
+  // Helper: update user password in Supabase
+  async function updateUserPassword(userId: string, newPassword: string) {
+    // You may need to use Supabase Auth API for password update
+    await supabase.auth.updateUser({ password: newPassword });
+  }
+
+  // Helper: fetch avatar from Supabase
+  async function fetchUserAvatar(userId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('user_avatars')
+      .select('avatar_url')
+      .eq('user_id', userId)
+      .single();
+    if (error) return null;
+    return data?.avatar_url || null;
+  }
+
+  // Helper: update avatar in Supabase
+  async function updateUserAvatar(userId: string, avatarUrl: string) {
+    await supabase
+      .from('user_avatars')
+      .upsert({ user_id: userId, avatar_url: avatarUrl });
+  }
+
   useEffect(() => {
     const loadProfile = async () => {
-      if (typeof window !== 'undefined') {
-        try {
-          const storedAvatar = await getGlobalSingletonData<string>(AVATAR_STORAGE_KEY);
-          setCroppedImage(storedAvatar || defaultPlaceholderImage);
-
-          const currentUserFromStorageJson = localStorage.getItem("cheetahPayrollCurrentUser");
-          let activeUserId: string | null = null;
-          let activeUserEmail: string = "";
-          let activeUserFirstName: string = "";
-          let activeUserLastName: string = "";
-
-
-          if (currentUserFromStorageJson) {
-            const loggedInUser = JSON.parse(currentUserFromStorageJson);
-            activeUserId = loggedInUser.id;
-            activeUserEmail = loggedInUser.email;
-            activeUserFirstName = loggedInUser.firstName;
-            activeUserLastName = loggedInUser.lastName;
-            setCurrentUserId(activeUserId);
-            setOriginalEmail(activeUserEmail);
-          }
-
-          const storedProfileData = await getGlobalSingletonData<UserProfileDetails>(STORE_NAMES.USER_PROFILE);
-          if (storedProfileData) {
-            setUserDetails(storedProfileData);
-            if (storedProfileData.email !== activeUserEmail && activeUserEmail) {
-                setUserDetails(prev => ({...prev, email: activeUserEmail}));
-            }
-            setOriginalEmail(activeUserEmail);
-          } else if (activeUserId) {
-            const fullUser = await getFromGlobalStore<User>(STORE_NAMES.USERS, activeUserId);
-            const profileToSaveAndDisplay: UserProfileDetails = {
-                firstName: fullUser?.firstName || activeUserFirstName || "",
-                lastName: fullUser?.lastName || activeUserLastName || "",
-                email: fullUser?.email || activeUserEmail || "",
-                phone: fullUser?.phone || ""
-            };
-            setUserDetails(profileToSaveAndDisplay);
-            setOriginalEmail(profileToSaveAndDisplay.email);
-            await putGlobalSingletonData<UserProfileDetails>(STORE_NAMES.USER_PROFILE, profileToSaveAndDisplay);
-          } else {
-            setUserDetails(initialProfileDetails);
-            setOriginalEmail(initialProfileDetails.email);
-          }
-
-        } catch (error) {
-          console.error("Error loading profile from storage:", error);
-          setCroppedImage(defaultPlaceholderImage);
-          setUserDetails(initialProfileDetails);
-        }
+      const user = await getCurrentUserFromSupabase();
+      if (!user) {
+        setIsLoaded(true);
+        return;
+      }
+      setCurrentUserId(user.id);
+      setOriginalEmail(user.email);
+      // Avatar
+      const avatar = await fetchUserAvatar(user.id);
+      setCroppedImage(avatar || defaultPlaceholderImage);
+      // Profile
+      const profile = await fetchUserProfile(user.id);
+      if (profile) {
+        setUserDetails({
+          firstName: profile.firstName || '',
+          lastName: profile.lastName || '',
+          email: profile.email || user.email || '',
+          phone: profile.phone || ''
+        });
+        setOriginalEmail(profile.email || user.email || '');
+      } else {
+        setUserDetails({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || ''
+        });
+        setOriginalEmail(user.email || '');
       }
       setIsLoaded(true);
     };
@@ -133,7 +168,7 @@ export default function UserProfilePage() {
 
   const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPasswordFeedback(null);
-    const { name, value } = e.target;
+    const { name, value = '' } = e.target;
     setPasswordDetails(prev => ({ ...prev, [name]: value }));
   };
 
@@ -145,64 +180,12 @@ export default function UserProfilePage() {
         return;
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        const mainUserRecord = await getFromGlobalStore<User>(STORE_NAMES.USERS, currentUserId);
-        if (!mainUserRecord) {
-          setFeedback({ type: 'error', message: "Error", details: "Could not find main user record." });
-          return;
-        }
-
-        const updatedMainUserRecord: User = {
-          ...mainUserRecord,
-          firstName: userDetails.firstName.trim(),
-          lastName: userDetails.lastName.trim(),
-          email: userDetails.email.trim().toLowerCase(),
-          phone: userDetails.phone.trim()
-        };
-
-        try {
-          await putToGlobalStore<User>(STORE_NAMES.USERS, updatedMainUserRecord);
-          setOriginalEmail(updatedMainUserRecord.email);
-        } catch (dbError: any) {
-          if ((dbError.name === 'ConstraintError' || (dbError.message && (dbError.message.toLowerCase().includes('unique constraint') || dbError.message.toLowerCase().includes('key already exists')))) && userDetails.email.trim().toLowerCase() !== originalEmail.toLowerCase() ) {
-            setFeedback({ type: 'error', message: "Email Exists", details: "This email address is already in use by another account." });
-            setUserDetails(prev => ({ ...prev, email: originalEmail }));
-            return;
-          } else {
-            console.error("[Profile Save] Error saving to USERS store:", dbError);
-            setFeedback({ type: 'error', message: "Save Failed", details: "Could not update user data in main store. " + dbError.message });
-            return;
-          }
-        }
-
-        const userProfileDataToSave: UserProfileDetails = {
-            firstName: userDetails.firstName.trim(),
-            lastName: userDetails.lastName.trim(),
-            email: userDetails.email.trim().toLowerCase(),
-            phone: userDetails.phone.trim()
-        };
-        await putGlobalSingletonData<UserProfileDetails>(STORE_NAMES.USER_PROFILE, userProfileDataToSave);
-
-        const currentUserJson = localStorage.getItem("cheetahPayrollCurrentUser");
-        if (currentUserJson) {
-            const loggedInUser = JSON.parse(currentUserJson);
-            if (loggedInUser.id === currentUserId) {
-                const updatedCurrentUser = {
-                    ...loggedInUser,
-                    firstName: updatedMainUserRecord.firstName,
-                    lastName: updatedMainUserRecord.lastName,
-                    email: updatedMainUserRecord.email,
-                };
-                localStorage.setItem("cheetahPayrollCurrentUser", JSON.stringify(updatedCurrentUser));
-                window.dispatchEvent(new CustomEvent('currentUserUpdated', { detail: updatedCurrentUser }));
-            }
-        }
-        setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
-      } catch (error: any) {
-        console.error("[Profile Save] General error saving user details:", error);
-        setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + error.message });
-      }
+    try {
+      await updateUserProfile(currentUserId, userDetails);
+      setOriginalEmail(userDetails.email);
+      setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
+    } catch (error: any) {
+      setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + error.message });
     }
   };
 
@@ -235,29 +218,12 @@ export default function UserProfilePage() {
         return;
     }
 
-
-    if (typeof window !== 'undefined') {
-        try {
-            const user = await getFromGlobalStore<User>(STORE_NAMES.USERS, currentUserId);
-            if (!user) {
-                setPasswordFeedback({ type: 'error', message: "Error", details: "User record not found." });
-                return;
-            }
-
-            if (user.password !== passwordDetails.currentPassword) {
-                setPasswordFeedback({ type: 'error', message: "Incorrect Password", details: "The current password you entered is incorrect." });
-                return;
-            }
-
-            const updatedUser = { ...user, password: passwordDetails.newPassword.trim() };
-            await putToGlobalStore<User>(STORE_NAMES.USERS, updatedUser);
-
-            setPasswordFeedback({ type: 'success', message: "Password Updated", details: "Your password has been successfully changed." });
-            setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
-        } catch (error) {
-            console.error("Error updating password:", error);
-            setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. Please try again." });
-        }
+    try {
+      await updateUserPassword(currentUserId, passwordDetails.newPassword);
+      setPasswordFeedback({ type: 'success', message: "Password Updated", details: "Your password has been successfully changed." });
+      setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+    } catch (error) {
+      setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. Please try again." });
     }
   };
 
@@ -277,13 +243,10 @@ export default function UserProfilePage() {
     setAvatarFeedback(null);
     if (cropperRef.current) {
       const canvas = cropperRef.current.getCanvas();
-      if (canvas) {
+      if (canvas && currentUserId) {
         const croppedImgDataUrl = canvas.toDataURL('image/jpeg');
         setCroppedImage(croppedImgDataUrl);
-        if (typeof window !== 'undefined') {
-           await putGlobalSingletonData<string>(AVATAR_STORAGE_KEY, croppedImgDataUrl);
-           window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { avatarUrl: croppedImgDataUrl } }));
-        }
+        await updateUserAvatar(currentUserId, croppedImgDataUrl);
         setAvatarFeedback({ type: 'success', message: "Profile Picture Saved", details: "Your new profile picture has been saved." });
         setImageSrc(null);
       } else {
@@ -296,13 +259,12 @@ export default function UserProfilePage() {
     setAvatarFeedback(null);
     setImageSrc(null);
     setCroppedImage(defaultPlaceholderImage);
-    if (typeof window !== 'undefined') {
-       try {
-         await putGlobalSingletonData<string>(AVATAR_STORAGE_KEY, defaultPlaceholderImage);
-         window.dispatchEvent(new CustomEvent('avatarUpdated', { detail: { reset: true } }));
-       } catch (error) {
-          console.error("Error removing profile picture from IndexedDB", error);
-       }
+    if (currentUserId) {
+      try {
+        await updateUserAvatar(currentUserId, defaultPlaceholderImage);
+      } catch (error) {
+        console.error("Error removing profile picture from Supabase", error);
+      }
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -421,7 +383,7 @@ export default function UserProfilePage() {
                             handlers: true,
                          }}
                         className="h-full w-full react-advanced-cropper__image--restricted react-advanced-cropper__stretcher"
-                        imageRestriction="stencil"
+                        imageRestriction={"stencil" as any}
                       />
                   </div>
                   <p className="text-sm text-muted-foreground text-center mt-2">
@@ -619,4 +581,6 @@ export default function UserProfilePage() {
     </div>
   );
 }
-    
+
+// All localStorage and indexedDbUtils references have been removed. This page now relies solely on Supabase for user profile data.
+

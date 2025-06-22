@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -76,20 +75,7 @@ export function LoginForm() {
           details: "Setting up your session..." 
         });
         
-        // Store user data in localStorage for CompanySelector compatibility
-        const currentUserData = {
-          id: data.user.id,
-          email: data.user.email || "",
-          firstName: data.user.user_metadata?.first_name || "User",
-          lastName: data.user.user_metadata?.last_name || "",
-          role: "Primary Admin" as const, // Default role - you may want to get this from user profile
-          assignedCompanyIds: [] // This should be fetched from user profile later
-        };
-        
-        localStorage.setItem("cheetahPayrollCurrentUser", JSON.stringify(currentUserData));
-        console.log("💾 User data stored in localStorage");
-        
-        // Stop loading state first
+        // No localStorage: user session is managed by Supabase
         setIsLoading(false);
         
         // Use replace to prevent going back to login page
@@ -217,3 +203,5 @@ export function LoginForm() {
     </div>
   );
 }
+
+// All localStorage and indexedDbUtils references have been removed. This component now relies solely on Supabase for session and user data.

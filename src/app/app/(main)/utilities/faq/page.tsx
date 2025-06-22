@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 const faqItems = [
   {
     question: "How do I add a new staff member?",
-    answer: "Navigate to the 'Staff' page from the main menu (after selecting a company). Select the 'Staff Members' tab. Click the 'Add Staff' button and fill in the required details in the dialog. This includes standard information and any custom fields defined for the company (e.g., 'T-Shirt Size' for 'Umoja Tech Solutions (Demo)'). The new staff member will be associated with the currently selected company. All data is saved to your browser's IndexedDB, scoped to that company.",
+    answer: "Navigate to the 'Staff' page from the main menu (after selecting a company). Select the 'Staff Members' tab. Click the 'Add Staff' button and fill in the required details in the dialog. This includes standard information and any custom fields defined for the company (e.g., 'T-Shirt Size' for 'Umoja Tech Solutions (Demo)'). The new staff member will be associated with the currently selected company. All data is securely stored in Supabase and available across devices.",
   },
   {
     question: "How do I define a new Payment Type (e.g., Meal Allowance) for my company?",
@@ -32,11 +32,11 @@ const faqItems = [
   },
   {
     question: "How do I define custom data fields for my staff?",
-    answer: "On the 'Staff' page, select the 'Custom Fields' tab. Here, you can define company-specific fields (e.g., 'T-Shirt Size', 'Laptop Asset Tag' for Umoja Tech, or 'Transport Route' for Isoko Trading). Click 'Add Custom Field', give it a name, and select its type (Text, Number, or Date). These definitions are specific to the selected company. Once defined, these fields will appear in the 'Add Staff' dialog and the 'Edit Staff' page (in a 'Custom Information' section) for data entry. This is distinct from standard built-in fields like 'Employee Category', which are part of the main staff form. These definitions can also be imported/exported using `custom_fields_template.csv` and `[company-name]_custom_fields_export.[ext]` respectively.",
+    answer: "On the 'Staff' page, select the 'Custom Fields' tab. Here, you can define company-specific fields (e.g., 'T-Shirt Size', 'Laptop Asset Tag' for Umoja Tech, or 'Transport Route' for Isoko Trading). Click 'Add Custom Field', give it a name, and select its type (Text, Number, or Date). These definitions are specific to the selected company. Once defined, these fields will appear in the 'Add Staff' dialog and the 'Edit Staff' page (in a 'Custom Information' section) for data entry. This is distinct from standard built-in fields like 'Employee Category', which are part of the main staff form. These definitions can also be imported/exported using `custom_fields_template.csv` and `[company-name]_custom_fields_export.[ext]` respectively. All seeded data is managed and stored in Supabase, not in IndexedDB or localStorage.",
   },
   {
     question: "Is data shared between companies?",
-    answer: "No, all operational data such as staff records (including custom field values), payroll runs, payment types, payment configurations, deductions, deduction types, custom field definitions, and company-specific settings (like departments and company profile) are isolated to the specific company you have selected. The demo includes 'Umoja Tech Solutions (Demo)' (ID: co_001) and 'Isoko Trading Co. (Demo)' (ID: co_002) as examples. Global data includes the list of available companies that can be managed, user accounts, and the system-wide tax configurations which apply to all companies.",
+    answer: "No, all operational data such as staff records (including custom field values), payroll runs, payment types, payment configurations, deductions, deduction types, custom field definitions, and company-specific settings (like departments and company profile) are isolated to the specific company you have selected. The demo includes 'Umoja Tech Solutions (Demo)' (ID: co_001) and 'Isoko Trading Co. (Demo)' (ID: co_002) as examples. Global data includes the list of available companies that can be managed, user accounts, and the system-wide tax configurations which apply to all companies. All data is managed and stored in Supabase.",
   },
   {
     question: "How is payroll calculated if a Payment Type (e.g., Basic Pay or an allowance) is set to 'Net'?",
@@ -48,11 +48,11 @@ const faqItems = [
   },
   {
     question: "Where is my data stored? How can I reset the application?",
-    answer: "Cheetah Payroll uses your browser's IndexedDB for all data storage. Operational data (staff, payroll, payment types, etc.) is scoped per company. Global data (users, list of companies, tax settings, audit logs) is stored globally. To reset the application to its initial state (including default sample users, the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', global tax settings, and sample data like staff, payment types, deduction types, and custom field definitions for the demo companies), you need to clear your browser's site data (cache, cookies, IndexedDB) specifically for the Cheetah Payroll site URL. This will erase all your current data for all companies.",
+    answer: "Cheetah Payroll uses Supabase as its exclusive backend. All operational and global data (staff, payroll, payment types, users, companies, tax settings, audit logs, etc.) is securely stored in the cloud. All seeded data is initialized in Supabase. You can access your data from any device with your credentials. To reset your company or user data, contact your system administrator or use the provided admin tools in the application settings (if available).",
   },
   {
     question: "How do I change the tax rates (PAYE, Pension, etc.)?",
-    answer: "Global tax settings, which apply to all companies, can be configured by users with 'Primary Admin' or 'App Admin' roles. Navigate to 'Application Settings' (from the company selection screen) > 'Global Taxes' tab. Here you can adjust PAYE income bands and percentage rates, as well as contribution rates for Pension, Maternity, RAMA, and CBHI. These settings are saved globally in IndexedDB.",
+    answer: "Global tax settings, which apply to all companies, can be configured by users with 'Primary Admin' or 'App Admin' roles. Navigate to 'Application Settings' (from the company selection screen) > 'Global Taxes' tab. Here you can adjust PAYE income bands and percentage rates, as well as contribution rates for Pension, Maternity, RAMA, and CBHI. These settings are saved globally in Supabase.",
   },
   {
     question: "How is the RAMA contribution calculated?",
@@ -234,7 +234,7 @@ export default function FaqPage() {
 
         if (isQuestionFormat && questionNumberString) {
             doc.setFontSize(fontSize);
-            doc.setFont(undefined, 'bold');
+            doc.setFont('helvetica', 'bold');
             const numWidth = doc.getTextWidth(questionNumberString);
             doc.text(questionNumberString, initialX, y);
             textStartX = initialX + numWidth + numberTextGap;
@@ -250,7 +250,7 @@ export default function FaqPage() {
                 continue;
             }
             doc.setFontSize(fontSize);
-            doc.setFont(undefined, (isQuestionFormat || segment.isBold) ? 'bold' : 'normal');
+            doc.setFont('helvetica', (isQuestionFormat || segment.isBold) ? 'bold' : 'normal');
             const cleanedText = segment.text.replace(/&nbsp;/g, " ");
             const words = cleanedText.split(/\s+/).filter(w => w.length > 0);
 
@@ -267,7 +267,7 @@ export default function FaqPage() {
                 }
                 doc.text(wordWithSpace, currentWordX, y);
                 currentWordX += wordWidth;
-                lineCountForBlock = true;
+                lineCountForBlock = 1;
                 
             }
         }
@@ -328,7 +328,7 @@ export default function FaqPage() {
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(100);
       doc.text("Cheetah Payroll - FAQ", margin, margin / 2, { align: 'left' });
       doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth - margin, margin / 2, { align: 'right' });

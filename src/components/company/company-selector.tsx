@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -31,19 +30,17 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext";
-import { getAllFromGlobalStore, STORE_NAMES } from '@/lib/indexedDbUtils';
+import { getSupabaseClient } from '@/lib/supabase';
 import type { Company as AppCompany } from '@/lib/userData';
 
-const CURRENT_USER_LOCALSTORAGE_KEY = "cheetahPayrollCurrentUser";
-
-interface CurrentUser {
+type CurrentUser = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: UserRole;
+  role: UserRole | string;
   assignedCompanyIds: string[];
-}
+};
 
 export function CompanySelector() {
   const router = useRouter();
@@ -57,38 +54,35 @@ export function CompanySelector() {
   const [open, setOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<CurrentUser | null>(null);
   const [availableCompanies, setAvailableCompanies] = React.useState<AppCompany[]>([]);
-  const [isLoadingData, setIsLoadingData] = React.useState(true); // State for loading
+  const [isLoadingData, setIsLoadingData] = React.useState(true);
 
   React.useEffect(() => {
     const loadInitialData = async () => {
-      setIsLoadingData(true); // Start loading
-      if (typeof window !== 'undefined') {
-        const storedUserJson = localStorage.getItem(CURRENT_USER_LOCALSTORAGE_KEY);
-        if (storedUserJson) {
-          try {
-            setCurrentUser(JSON.parse(storedUserJson) as CurrentUser);
-          } catch (error) {
-            console.error("Error parsing current user from localStorage:", error);
-            localStorage.removeItem(CURRENT_USER_LOCALSTORAGE_KEY);
-            router.push("/");
-            setIsLoadingData(false); // Stop loading on error/redirect
-            return;
-          }
-        } else {
-          router.push("/");
-          setIsLoadingData(false); // Stop loading on redirect
-          return;
-        }
-
-        try {
-            const companiesFromDB = await getAllFromGlobalStore<AppCompany>(STORE_NAMES.COMPANIES);
-            setAvailableCompanies(companiesFromDB || []);
-        } catch (error) {
-            console.error("Error fetching companies:", error);
-            setAvailableCompanies([]);
-        }
+      setIsLoadingData(true);
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUser({
+          id: user.id,
+          email: user.email || '',
+          firstName: user.user_metadata?.first_name || 'User',
+          lastName: user.user_metadata?.last_name || '',
+          role: user.user_metadata?.role || 'Primary Admin',
+          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
+        });
+      } else {
+        router.push("/");
+        setIsLoadingData(false);
+        return;
       }
-      setIsLoadingData(false); // Done loading
+      // Fetch companies from Supabase
+      const { data: companies, error } = await supabase.from('companies').select('*');
+      if (error) {
+        setAvailableCompanies([]);
+      } else {
+        setAvailableCompanies(companies || []);
+      }
+      setIsLoadingData(false);
     };
     loadInitialData();
   }, [router]);
@@ -99,13 +93,12 @@ export function CompanySelector() {
     }
   };
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(CURRENT_USER_LOCALSTORAGE_KEY);
-      setContextCompanyId(null);
-      setContextCompanyName(null);
-      router.push("/");
-    }
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.auth.signOut();
+    setContextCompanyId(null);
+    setContextCompanyName(null);
+    router.push("/");
   };
 
   const canAccessApplicationSettings = currentUser && (currentUser.role === 'Primary Admin' || currentUser.role === 'App Admin');

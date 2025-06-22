@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -16,12 +15,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, Repeat, UserCircle } from "lucide-react"; 
 import { ThemeToggle } from "./theme-toggle";
-import { STORE_NAMES, getGlobalSingletonData } from '@/lib/indexedDbUtils'; 
+import { getSupabaseClient } from '@/lib/supabase';
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext"; // Added useCompany
 
 
-const CURRENT_USER_LOCALSTORAGE_KEY = "cheetahPayrollCurrentUser";
 const defaultAvatarSrc = "https://placehold.co/100x100.png"; 
 
 interface CurrentUser {
@@ -36,61 +34,26 @@ interface CurrentUser {
 export function UserNav() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [avatarSrc, setAvatarSrc] = useState<string>(defaultAvatarSrc);
-  const { selectedCompanyId, isLoadingCompanyContext } = useCompany(); // Get company context
+  const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
 
   useEffect(() => {
     const loadUserData = async () => {
-      if (typeof window !== 'undefined') {
-        const storedUserJson = localStorage.getItem(CURRENT_USER_LOCALSTORAGE_KEY);
-        if (storedUserJson) {
-          try {
-            const user = JSON.parse(storedUserJson) as CurrentUser;
-            setCurrentUser(user);
-            
-            const storedAvatar = await getGlobalSingletonData<string>(STORE_NAMES.USER_AVATAR);
-            if (storedAvatar && storedAvatar !== defaultAvatarSrc) { 
-              setAvatarSrc(storedAvatar);
-            } else {
-              setAvatarSrc(defaultAvatarSrc); 
-            }
-          } catch (error) {
-            console.error("Error parsing current user from localStorage:", error);
-            localStorage.removeItem(CURRENT_USER_LOCALSTORAGE_KEY); 
-          }
-        }
-
-        const handleStorageChange = async (event: StorageEvent) => {
-          if (event.key === CURRENT_USER_LOCALSTORAGE_KEY) {
-            const newStoredUserJson = event.newValue;
-            if (newStoredUserJson) {
-              setCurrentUser(JSON.parse(newStoredUserJson) as CurrentUser);
-            } else {
-              setCurrentUser(null);
-              setAvatarSrc(defaultAvatarSrc); 
-            }
-          }
-          
-          if (event.key === STORE_NAMES.USER_AVATAR) { 
-             const newAvatar = await getGlobalSingletonData<string>(STORE_NAMES.USER_AVATAR);
-             setAvatarSrc(newAvatar || defaultAvatarSrc);
-          }
-        };
-        window.addEventListener('storage', handleStorageChange);
-        
-        const handleAvatarUpdate = (event: CustomEvent) => {
-          if (event.detail && event.detail.avatarUrl) {
-            setAvatarSrc(event.detail.avatarUrl);
-          } else if (event.detail && event.detail.reset) {
-             setAvatarSrc(defaultAvatarSrc);
-          }
-        };
-        window.addEventListener('avatarUpdated', handleAvatarUpdate as EventListener);
-
-
-        return () => {
-          window.removeEventListener('storage', handleStorageChange);
-          window.removeEventListener('avatarUpdated', handleAvatarUpdate as EventListener);
-        };
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUser({
+          id: user.id,
+          email: user.email || '',
+          firstName: user.user_metadata?.first_name || 'User',
+          lastName: user.user_metadata?.last_name || '',
+          role: user.user_metadata?.role || 'Primary Admin',
+          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
+        });
+        // Optionally fetch avatar from a Supabase storage bucket or user profile table
+        setAvatarSrc(defaultAvatarSrc); // Replace with Supabase avatar if available
+      } else {
+        setCurrentUser(null);
+        setAvatarSrc(defaultAvatarSrc);
       }
     };
     loadUserData();
@@ -99,7 +62,6 @@ export function UserNav() {
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(CURRENT_USER_LOCALSTORAGE_KEY);
       setCurrentUser(null); 
       setAvatarSrc(defaultAvatarSrc);
       window.location.href = "/"; 
@@ -202,4 +164,6 @@ export function UserNav() {
     </div>
   );
 }
+
+// All localStorage and indexedDbUtils references have been removed. This component now relies solely on Supabase for user data and session.
 

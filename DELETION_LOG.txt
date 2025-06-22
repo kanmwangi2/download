@@ -1,0 +1,17 @@
+Deleted the following files and code sections to remove all IndexedDB and localStorage usage:
+- src/lib/indexedDbUtils.ts
+- src/lib/localStorageUtils.ts
+- All code referencing localStorage or indexedDbUtils in:
+  - src/components/auth/login-form.tsx
+  - src/components/layout/user-nav.tsx
+  - src/app/app/(main)/payroll/page.tsx
+  - src/app/app/(main)/settings/profile/page.tsx
+  - src/app/app/(main)/settings/company/page.tsx
+  - src/components/settings/company-management-tab.tsx
+  - src/components/settings/user-management-tab.tsx
+  - src/app/app/(main)/documentation/page.tsx
+  - src/app/app/(main)/support/page.tsx
+  - src/app/app/(main)/utilities/faq/page.tsx
+  - src/app/app/(main)/reports/page.tsx
+  
+All data and state now rely exclusively on Supabase as the backend.

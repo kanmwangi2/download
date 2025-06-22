@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { logAuditEvent } from '@/lib/indexedDbUtils'; // Import the audit logger
+import { getSupabaseClient } from '@/lib/supabase';
 
 interface CompanyContextType {
   selectedCompanyId: string | null;
@@ -19,49 +19,38 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingCompanyContext, setIsLoadingCompanyContext] = useState(true);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedCompanyId = localStorage.getItem("selectedCompanyId");
-      const storedCompanyName = localStorage.getItem("selectedCompanyName");
-      if (storedCompanyId) {
-        setSelectedCompanyIdState(storedCompanyId);
+    const fetchCompanyFromProfile = async () => {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Assume user_metadata contains selectedCompanyId and selectedCompanyName
+        setSelectedCompanyIdState(user.user_metadata?.selectedCompanyId || null);
+        setSelectedCompanyNameState(user.user_metadata?.selectedCompanyName || null);
       }
-      if (storedCompanyName) {
-        setSelectedCompanyNameState(storedCompanyName);
-      }
-      setIsLoadingCompanyContext(false); 
+      setIsLoadingCompanyContext(false);
+    };
+    fetchCompanyFromProfile();
+  }, []);
+
+  const setSelectedCompanyId = useCallback(async (companyId: string | null) => {
+    setSelectedCompanyIdState(companyId);
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.auth.updateUser({
+        data: { ...user.user_metadata, selectedCompanyId: companyId }
+      });
     }
   }, []);
 
-  const setSelectedCompanyId = useCallback((companyId: string | null) => {
-    const previousCompanyId = selectedCompanyId;
-    setSelectedCompanyIdState(companyId);
-    if (typeof window !== 'undefined') {
-      if (companyId) {
-        localStorage.setItem("selectedCompanyId", companyId);
-      } else {
-        localStorage.removeItem("selectedCompanyId");
-      }
-    }
-    // Log only if a new company is actually selected (not on initial load with same ID or clearing)
-    if (companyId && companyId !== previousCompanyId) {
-        const companyJustSelected = localStorage.getItem("selectedCompanyName"); // Get name that was just set
-        logAuditEvent(
-            "Company Selected", 
-            `User switched to company: ${companyJustSelected || companyId}.`,
-            companyId,
-            companyJustSelected
-        ).catch(err => console.error("Audit log error on company selection:", err));
-    }
-  }, [selectedCompanyId]); // Added selectedCompanyId to dependencies
-
-  const setSelectedCompanyName = useCallback((name: string | null) => {
+  const setSelectedCompanyName = useCallback(async (name: string | null) => {
     setSelectedCompanyNameState(name);
-    if (typeof window !== 'undefined') {
-      if (name) {
-        localStorage.setItem("selectedCompanyName", name);
-      } else {
-        localStorage.removeItem("selectedCompanyName");
-      }
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.auth.updateUser({
+        data: { ...user.user_metadata, selectedCompanyName: name }
+      });
     }
   }, []);
 
@@ -79,4 +68,4 @@ export const useCompany = (): CompanyContextType => {
   }
   return context;
 };
-    
+

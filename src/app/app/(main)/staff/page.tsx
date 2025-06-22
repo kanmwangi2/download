@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -54,7 +53,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { countries } from "@/lib/countries";
 import { StaffMember, StaffStatus, EmployeeCategory } from "@/lib/staffData";
 import { CustomFieldDefinition } from '@/lib/customFieldDefinitionData';
-import { getAllFromStore, putToStore, deleteFromStore, bulkPutToStore, STORE_NAMES, logAuditEvent } from '@/lib/indexedDbUtils';
+import { getSupabaseClient } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -123,7 +122,7 @@ export default function StaffPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (isLoadingCompanyContext || !selectedCompanyId || typeof window === 'undefined') {
+      if (isLoadingCompanyContext || !selectedCompanyId) {
         if (!isLoadingCompanyContext && !selectedCompanyId) {
             setAllStaffForCompany([]);
             setCustomFieldDefinitions([]);
@@ -131,21 +130,27 @@ export default function StaffPage() {
         }
         return;
       }
-
       setIsLoaded(false);
       setFeedback(null);
       try {
-        let staffData = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId);
-        setAllStaffForCompany(staffData);
-
-        let cfdData = await getAllFromStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, selectedCompanyId);
-        setCustomFieldDefinitions(cfdData.sort((a,b) => a.order - b.order));
-
+        // Fetch staff from Supabase
+        const { data: staff, error: staffError } = await getSupabaseClient()
+          .from('staff')
+          .select('*')
+          .eq('companyId', selectedCompanyId);
+        if (staffError) throw staffError;
+        setAllStaffForCompany(staff || []);
+        // Fetch custom field definitions from Supabase
+        const { data: cfds, error: cfdError } = await getSupabaseClient()
+          .from('custom_field_definitions')
+          .select('*')
+          .eq('companyId', selectedCompanyId);
+        if (cfdError) throw cfdError;
+        setCustomFieldDefinitions((cfds || []).sort((a, b) => a.order - b.order));
       } catch (error) {
-        console.error(`Error loading data for company ${selectedCompanyId} from IndexedDB:`, error);
         setAllStaffForCompany([]);
         setCustomFieldDefinitions([]);
-        setFeedback({ type: 'error', message: "Could not load company data.", details: (error as Error).message });
+        setFeedback({ type: 'error', message: 'Could not load company data.', details: (error as Error).message });
       }
       setIsLoaded(true);
     };
@@ -192,69 +197,70 @@ export default function StaffPage() {
   const handleAddStaff = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
-    if (!selectedCompanyId) { setFeedback({ type: 'error', message: "No company selected. Cannot add staff." }); return; }
-
+    if (!selectedCompanyId) { setFeedback({ type: 'error', message: 'No company selected. Cannot add staff.' }); return; }
     const formData = new FormData(event.currentTarget);
     const customFieldsData: Record<string, string> = {};
     customFieldDefinitions.forEach(cfd => {
-        const value = formData.get(`customField_${cfd.id}`) as string;
-        if (value !== null && value.trim() !== "") {
-            customFieldsData[cfd.id] = value.trim();
-        }
+      const value = formData.get(`customField_${cfd.id}`) as string;
+      if (value !== null && value.trim() !== '') {
+        customFieldsData[cfd.id] = value.trim();
+      }
     });
-
     const newStaff: StaffMember = {
-        id: `S${Date.now().toString().slice(-4)}` + Math.floor(Math.random()*100),
-        companyId: selectedCompanyId,
-        firstName: formData.get('firstName') as string, lastName: formData.get('lastName') as string,
-        staffNumber: formData.get('staffNumber') as string, email: formData.get('email') as string,
-        phone: formData.get('phone') as string, staffRssbNumber: formData.get('staffRssbNumber') as string,
-        employeeCategory: formData.get('employeeCategory') as EmployeeCategory || 'P',
-        gender: formData.get('gender') as StaffMember['gender'] || undefined,
-        birthDate: formData.get('birthDate') as string || undefined,
-        department: formData.get('department') as string,
-        designation: formData.get('designation') as string || undefined,
-        employmentDate: formData.get('employmentDate') as string || undefined,
-        nationality: formData.get('nationality') as string, idPassportNumber: formData.get('idPassportNumber') as string,
-        province: formData.get('province') as string, district: formData.get('district') as string,
-        sector: formData.get('sector') as string, cell: formData.get('cell') as string, village: formData.get('village') as string,
-        bankName: formData.get('bankName') as string, bankCode: formData.get('bankCode') as string, bankAccountNumber: formData.get('bankAccountNumber') as string,
-        bankBranch: formData.get('bankBranch') as string,
-        keyContactName: formData.get('keyContactName') as string, keyContactRelationship: formData.get('keyContactRelationship') as string,
-        keyContactPhone: formData.get('keyContactPhone') as string, status: formData.get('status') as StaffStatus,
-        customFields: customFieldsData,
+      id: `S${Date.now().toString().slice(-4)}` + Math.floor(Math.random() * 100),
+      companyId: selectedCompanyId,
+      firstName: formData.get('firstName') as string, lastName: formData.get('lastName') as string,
+      staffNumber: formData.get('staffNumber') as string, email: formData.get('email') as string,
+      phone: formData.get('phone') as string, staffRssbNumber: formData.get('staffRssbNumber') as string,
+      employeeCategory: formData.get('employeeCategory') as EmployeeCategory || 'P',
+      gender: formData.get('gender') as StaffMember['gender'] || undefined,
+      birthDate: formData.get('birthDate') as string || undefined,
+      department: formData.get('department') as string,
+      designation: formData.get('designation') as string || undefined,
+      employmentDate: formData.get('employmentDate') as string || undefined,
+      nationality: formData.get('nationality') as string, idPassportNumber: formData.get('idPassportNumber') as string,
+      province: formData.get('province') as string, district: formData.get('district') as string,
+      sector: formData.get('sector') as string, cell: formData.get('cell') as string, village: formData.get('village') as string,
+      bankName: formData.get('bankName') as string, bankCode: formData.get('bankCode') as string, bankAccountNumber: formData.get('bankAccountNumber') as string,
+      bankBranch: formData.get('bankBranch') as string,
+      keyContactName: formData.get('keyContactName') as string, keyContactRelationship: formData.get('keyContactRelationship') as string,
+      keyContactPhone: formData.get('keyContactPhone') as string, status: formData.get('status') as StaffStatus,
+      customFields: customFieldsData,
     };
-
-    if (typeof window !== 'undefined') {
-      try {
-        await putToStore<StaffMember>(STORE_NAMES.STAFF, newStaff, selectedCompanyId);
-        setAllStaffForCompany(prev => [newStaff, ...prev].sort((a,b) => a.id.localeCompare(b.id)));
-        await logAuditEvent("Staff Added", `New staff member ${newStaff.firstName} ${newStaff.lastName} (ID: ${newStaff.id}) added.`, selectedCompanyId, selectedCompanyName);
-        setFeedback({ type: 'success', message: `Staff Added`, details: `${newStaff.firstName} ${newStaff.lastName} has been added.` });
-        setIsAddStaffDialogOpen(false); event.currentTarget.reset(); resetSelectionAndPage();
-      } catch (error) { setFeedback({ type: 'error', message: "Save Failed", details: "Could not add staff member." }); }
+    try {
+      const { error } = await getSupabaseClient()
+        .from('staff')
+        .upsert([newStaff]);
+      if (error) throw error;
+      setAllStaffForCompany(prev => [newStaff, ...prev].sort((a, b) => a.id.localeCompare(b.id)));
+      setFeedback({ type: 'success', message: `Staff Added`, details: `${newStaff.firstName} ${newStaff.lastName} has been added.` });
+      setIsAddStaffDialogOpen(false); event.currentTarget.reset(); resetSelectionAndPage();
+    } catch (error) {
+      setFeedback({ type: 'error', message: 'Save Failed', details: 'Could not add staff member.' });
     }
   };
 
   const handleDeleteStaffs = async (staffIds: string[]) => {
     setFeedback(null);
     if (staffIds.length === 0 || !selectedCompanyId) return;
-    if (typeof window !== 'undefined') {
-      try {
-        for (const id of staffIds) { 
-            const staffMember = allStaffForCompany.find(s => s.id === id);
-            await deleteFromStore(STORE_NAMES.STAFF, id, selectedCompanyId); 
-            if (staffMember) {
-                 await logAuditEvent("Staff Deleted", `Staff member ${staffMember.firstName} ${staffMember.lastName} (ID: ${id}) deleted.`, selectedCompanyId, selectedCompanyName);
-            }
-        }
-        setAllStaffForCompany(prev => prev.filter(s => !staffIds.includes(s.id)));
-        setSelectedItems(prev => { const newSelected = new Set(prev); staffIds.forEach(id => newSelected.delete(id)); return newSelected; });
-        setFeedback({ type: 'success', message: "Staff Deleted", details: `Successfully deleted ${staffIds.length} staff member(s).` });
-        if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage - 2) * rowsPerPage, (currentPage - 1) * rowsPerPage).length > 0) { setCurrentPage(currentPage - 1); }
-        else if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage-1)*rowsPerPage).length === 0){ setCurrentPage( Math.max(1, currentPage -1)); }
-      } catch (error) { setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete ${staffIds.length} staff member(s).` }); }
-    }
+    try {
+      for (const id of staffIds) { 
+          const staffMember = allStaffForCompany.find(s => s.id === id);
+          await getSupabaseClient()
+            .from('staff')
+            .delete()
+            .eq('id', id)
+            .eq('companyId', selectedCompanyId);
+          if (staffMember) {
+               //await logAuditEvent("Staff Deleted", `Staff member ${staffMember.firstName} ${staffMember.lastName} (ID: ${id}) deleted.`, selectedCompanyId, selectedCompanyName);
+          }
+      }
+      setAllStaffForCompany(prev => prev.filter(s => !staffIds.includes(s.id)));
+      setSelectedItems(prev => { const newSelected = new Set(prev); staffIds.forEach(id => newSelected.delete(id)); return newSelected; });
+      setFeedback({ type: 'success', message: "Staff Deleted", details: `Successfully deleted ${staffIds.length} staff member(s).` });
+      if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage - 2) * rowsPerPage, (currentPage - 1) * rowsPerPage).length > 0) { setCurrentPage(currentPage - 1); }
+      else if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage-1)*rowsPerPage).length === 0){ setCurrentPage( Math.max(1, currentPage -1)); }
+    } catch (error) { setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete ${staffIds.length} staff member(s).` }); }
   };
   const handleDeleteSingleStaffClick = (staff: StaffMember) => { setFeedback(null); setStaffToDelete(staff); setIsDeleteStaffDialogOpen(true); };
   const confirmDeleteSingleStaff = async () => { if (staffToDelete) { await handleDeleteStaffs([staffToDelete.id]); } setIsDeleteStaffDialogOpen(false); setStaffToDelete(null); };
@@ -391,7 +397,7 @@ export default function StaffPage() {
                         if (isValidDate(parsedDate)) {
                             (staffObject as any)[mappedKey] = format(parsedDate, 'yyyy-MM-dd');
                         } else {
-                            validationSkippedLog.push(`Row ${originalLineNumber}: Invalid Date format for ${mappedKey} ('${value}'). Expected DD/MM/YYYY. Field cleared.`);
+                            validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Invalid Date format for ${mappedKey} ('${value}'). Expected DD/MM/YYYY. Field cleared.`);
                             (staffObject as any)[mappedKey] = undefined;
                         }
                     } else {
@@ -415,23 +421,85 @@ export default function StaffPage() {
     });
   };
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFeedback(null); if (!selectedCompanyId) { setFeedback({ type: 'error', message: "Error", details: "No company selected." }); return; } const file = event.target.files?.[0];
-    if (file) { const reader = new FileReader(); reader.onload = async (e) => { const text = e.target?.result as string; if (!text || text.trim() === "") { setFeedback({ type: 'info', message: "Import Note: CSV file is empty."}); return; }
+    setFeedback(null);
+    if (!selectedCompanyId) {
+      setFeedback({ type: 'error', message: 'Error', details: 'No company selected.' });
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        if (!text || text.trim() === '') {
+          setFeedback({ type: 'info', message: 'Import Note: CSV file is empty.' });
+          return;
+        }
         try {
           const { data: parsedStaffArray, processedDataRowCount, papaParseErrors, validationSkippedLog } = await parseCSVToStaff(text, selectedCompanyId, customFieldDefinitions);
-          let newCount = 0; let updatedCount = 0; const itemsToBulkPut: StaffMember[] = []; const currentStaffForCompany = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId);
-          for (const importedStaff of parsedStaffArray) { const existingStaff = currentStaffForCompany.find(s => s.id === importedStaff.id && s.companyId === selectedCompanyId); if (existingStaff) { const hasChanges = Object.keys(importedStaff).some(key => (importedStaff as any)[key] !== undefined && (importedStaff as any)[key] !== (existingStaff as any)[key]) || JSON.stringify(importedStaff.customFields) !== JSON.stringify(existingStaff.customFields); if (hasChanges) { itemsToBulkPut.push({ ...existingStaff, ...importedStaff, companyId: selectedCompanyId }); updatedCount++; } } else { itemsToBulkPut.push({ ...importedStaff, companyId: selectedCompanyId }); newCount++; } }
-          if (itemsToBulkPut.length > 0) { await bulkPutToStore<StaffMember>(STORE_NAMES.STAFF, itemsToBulkPut, selectedCompanyId); const updatedStaffList = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId); setAllStaffForCompany(updatedStaffList.sort((a,b) => a.id.localeCompare(b.id))); resetSelectionAndPage(); }
-          let fbMsg = ""; let fbTitle = "Import Processed"; let fbType: FeedbackMessage['type'] = "info"; const totalPapaErrors = papaParseErrors.length; const totalValidSkipped = validationSkippedLog.length;
-          if (newCount > 0 || updatedCount > 0) { fbTitle = "Import Successful"; fbMsg = `${newCount} staff added, ${updatedCount} staff updated.`; fbType = 'success'; }
-          else if (parsedStaffArray.length === 0 && processedDataRowCount > 0 && (totalPapaErrors > 0 || totalValidSkipped > 0)) { fbTitle = "Import Failed"; fbMsg = `All ${processedDataRowCount} data rows processed, but no valid records imported.`; fbType = 'error'; }
-          else if (parsedStaffArray.length === 0 && processedDataRowCount === 0 && (totalPapaErrors > 0 || text.split('\\n').filter(l=>l.trim()!=='').length > 1)) { fbTitle = "Import Failed"; fbMsg = `No data rows found or all had critical parsing errors.`; fbType = 'error'; }
-          else if (newCount === 0 && updatedCount === 0 && totalPapaErrors === 0 && totalValidSkipped === 0 && processedDataRowCount > 0) { fbTitle = "Import Note"; fbMsg = `CSV processed. ${processedDataRowCount} rows checked. No changes.`; }
-          else { fbTitle = "Import Note"; fbMsg = "No changes applied. CSV empty or data identical."; }
-          let details = ""; if (totalPapaErrors > 0 || totalValidSkipped > 0) { details += ` ${totalPapaErrors + totalValidSkipped} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First skip: ${validationSkippedLog[0]}`; else if (totalPapaErrors > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
+          let newCount = 0;
+          let updatedCount = 0;
+          const { data: currentStaffForCompany = [] } = await getSupabaseClient()
+            .from('staff')
+            .select('*')
+            .eq('companyId', selectedCompanyId);
+          for (const importedStaff of parsedStaffArray) {
+            const existingStaff = (currentStaffForCompany || []).find((s: StaffMember) => s.id === importedStaff.id && s.companyId === selectedCompanyId);
+            if (existingStaff) {
+              const hasChanges = Object.keys(importedStaff).some(key => (importedStaff as any)[key] !== undefined && (importedStaff as any)[key] !== (existingStaff as any)[key]) || JSON.stringify(importedStaff.customFields) !== JSON.stringify(existingStaff.customFields);
+              if (hasChanges) {
+                await getSupabaseClient().from('staff').upsert([ { ...existingStaff, ...importedStaff, companyId: selectedCompanyId } ]);
+                updatedCount++;
+              }
+            } else {
+              await getSupabaseClient().from('staff').upsert([ { ...importedStaff, companyId: selectedCompanyId } ]);
+              newCount++;
+            }
+          }
+          const { data: updatedStaffList = [] } = await getSupabaseClient()
+            .from('staff')
+            .select('*')
+            .eq('companyId', selectedCompanyId);
+          setAllStaffForCompany((updatedStaffList || []).sort((a: StaffMember, b: StaffMember) => a.id.localeCompare(b.id)));
+          resetSelectionAndPage();
+          let fbMsg = '';
+          let fbTitle = 'Import Processed';
+          let fbType: FeedbackMessage['type'] = 'info';
+          const totalPapaErrors = papaParseErrors.length;
+          const totalValidSkipped = validationSkippedLog.length;
+          if (newCount > 0 || updatedCount > 0) {
+            fbTitle = 'Import Successful';
+            fbMsg = `${newCount} staff added, ${updatedCount} staff updated.`;
+            fbType = 'success';
+          } else if (parsedStaffArray.length === 0 && processedDataRowCount > 0 && (totalPapaErrors > 0 || totalValidSkipped > 0)) {
+            fbTitle = 'Import Failed';
+            fbMsg = `All ${processedDataRowCount} data rows processed, but no valid records imported.`;
+            fbType = 'error';
+          } else if (parsedStaffArray.length === 0 && processedDataRowCount === 0 && (totalPapaErrors > 0 || text.split('\n').filter(l=>l.trim()!=='').length > 1)) {
+            fbTitle = 'Import Failed';
+            fbMsg = `No data rows found or all had critical parsing errors.`;
+            fbType = 'error';
+          } else if (newCount === 0 && updatedCount === 0 && totalPapaErrors === 0 && totalValidSkipped === 0 && processedDataRowCount > 0) {
+            fbTitle = 'Import Note';
+            fbMsg = `CSV processed. ${processedDataRowCount} rows checked. No changes.`;
+          } else {
+            fbTitle = 'Import Note';
+            fbMsg = 'No changes applied. CSV empty or data identical.';
+          }
+          let details = '';
+          if (totalPapaErrors > 0 || totalValidSkipped > 0) {
+            details += ` ${totalPapaErrors + totalValidSkipped} row(s) had issues.`;
+            if (validationSkippedLog.length > 0) details += ` First skip: ${validationSkippedLog[0]}`;
+            else if (totalPapaErrors > 0) details += ` First parsing error: ${papaParseErrors[0].message}`;
+          }
           setFeedback({ type: fbType, message: `${fbTitle}: ${fbMsg}`, details });
-        } catch (error: any) { setFeedback({ type: 'error', message: "Import Failed", details: `Error: ${error.message || "Could not parse CSV."}`}); }
-      }; reader.readAsText(file); if (event.target) event.target.value = ''; }
+        } catch (error: any) {
+          setFeedback({ type: 'error', message: 'Import Failed', details: `Error: ${error.message || 'Could not parse CSV.'}` });
+        }
+      };
+      reader.readAsText(file);
+      if (event.target) event.target.value = '';
+    }
   };
 
   const filteredCfdSource = useMemo(() => customFieldDefinitions.filter(cfd => cfd.name.toLowerCase().includes(cfdSearchTerm.toLowerCase()) || cfd.type.toLowerCase().includes(cfdSearchTerm.toLowerCase())), [customFieldDefinitions, cfdSearchTerm]);
@@ -455,7 +523,12 @@ export default function StaffPage() {
     if (actualIdsToDelete.length === 0 && skippedInUseCount > 0) { setFeedback({type: 'info', message: "Deletion Blocked", details: `${skippedInUseCount} custom field(s) are in use and were not deleted.`}); return; }
     if (actualIdsToDelete.length === 0) { setFeedback({type: 'info', message: "No fields to delete."}); return; }
     try {
-      for (const id of actualIdsToDelete) { await deleteFromStore(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, id, selectedCompanyId); }
+      for (const id of actualIdsToDelete) { await getSupabaseClient()
+          .from('custom_field_definitions')
+          .delete()
+          .eq('id', id)
+          .eq('companyId', selectedCompanyId);
+      }
       setCustomFieldDefinitions(prev => prev.filter(cfd => !actualIdsToDelete.includes(cfd.id)).sort((a,b) => a.order - b.order));
       setSelectedCfdItems(prev => { const newSelected = new Set(prev); actualIdsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       let msg = `Successfully deleted ${actualIdsToDelete.length} custom field(s).`; if (skippedInUseCount > 0) { msg += ` ${skippedInUseCount} field(s) were skipped as they are in use.`; }
@@ -472,8 +545,14 @@ export default function StaffPage() {
     const existingName = customFieldDefinitions.find(cfd => cfd.name.toLowerCase() === cfdFormData.name.trim().toLowerCase() && (!editingCfd || cfd.id !== editingCfd.id) && cfd.companyId === selectedCompanyId);
     if (existingName) { setFeedback({type: 'error', message: "Name Exists", details: "A custom field with this name already exists for this company."}); return; }
     try {
-      if (editingCfd) { const updatedCfd: CustomFieldDefinition = { ...editingCfd, ...cfdFormData, companyId: selectedCompanyId }; await putToStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, updatedCfd, selectedCompanyId); setCustomFieldDefinitions(prev => prev.map(cfd => cfd.id === editingCfd.id ? updatedCfd : cfd).sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Updated"});
-      } else { const maxOrder = customFieldDefinitions.reduce((max, cfd) => Math.max(max, cfd.order), 0); const newCfd: CustomFieldDefinition = { id: `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, ...cfdFormData, order: maxOrder + 1, isDeletable: true }; await putToStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, newCfd, selectedCompanyId); setCustomFieldDefinitions(prev => [...prev, newCfd].sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Added"}); }
+      if (editingCfd) { const updatedCfd: CustomFieldDefinition = { ...editingCfd, ...cfdFormData, companyId: selectedCompanyId }; await getSupabaseClient()
+          .from('custom_field_definitions')
+          .upsert([updatedCfd]);
+          setCustomFieldDefinitions(prev => prev.map(cfd => cfd.id === editingCfd.id ? updatedCfd : cfd).sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Updated"});
+      } else { const maxOrder = customFieldDefinitions.reduce((max, cfd) => Math.max(max, cfd.order), 0); const newCfd: CustomFieldDefinition = { id: `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, ...cfdFormData, order: maxOrder + 1, isDeletable: true }; await getSupabaseClient()
+          .from('custom_field_definitions')
+          .upsert([newCfd]);
+          setCustomFieldDefinitions(prev => [...prev, newCfd].sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Added"}); }
       setIsCfdDialogOpen(false);
     } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: (error as Error).message}); }
   };
@@ -520,18 +599,31 @@ export default function StaffPage() {
     setFeedback(null); if (!selectedCompanyId) { setFeedback({ type: 'error', message: "Error", details: "No company selected." }); return; } const file = event.target.files?.[0];
     if (file) { Papa.parse(file, { header: true, skipEmptyLines: true, complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results; if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: papaParseErrors[0].message}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: CustomFieldDefinition[] = []; const existingCfds = await getAllFromStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, selectedCompanyId); let maxOrder = existingCfds.reduce((max, cfd) => Math.max(max, cfd.order), 0);
-          for (const [index, rawRowUntyped] of rawData.entries()) {
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: CustomFieldDefinition[] = []; const { data: existingCfds = [] } = await getSupabaseClient()
+            .from('custom_field_definitions')
+            .select('*')
+            .eq('companyId', selectedCompanyId);
+          let maxOrder = (existingCfds || []).reduce((max: number, cfd: any) => Math.max(max, cfd.order), 0);
+          for (const [index, rawRowUntyped] of (rawData as any[]).entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const type = String(rawRow.Type || 'Text').trim() as "Text" | "Number" | "Date";
             if (!name) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name is required.`); continue; }
             if (!["Text", "Number", "Date"].includes(type)) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Invalid Type '${type}'. Must be Text, Number, or Date.`); continue; }
-            const existingByName = existingCfds.find(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== id && c.companyId === selectedCompanyId); if (existingByName) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Name already exists for this company.`); continue; }
-            const existingCfd = id ? existingCfds.find(c => c.id === id && c.companyId === selectedCompanyId) : null;
+            const existingByName = (existingCfds || []).find((c: any) => c.name.toLowerCase() === name.toLowerCase() && c.id !== id && c.companyId === selectedCompanyId); if (existingByName) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Name already exists for this company.`); continue; }
+            const existingCfd = id ? (existingCfds || []).find((c: any) => c.id === id && c.companyId === selectedCompanyId) : null;
             if (existingCfd) { itemsToBulkPut.push({ ...existingCfd, name, type }); updatedCount++; }
             else { maxOrder++; itemsToBulkPut.push({ id: id || `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, name, type, order: maxOrder, isDeletable: true }); newCount++; }
           }
-          if (itemsToBulkPut.length > 0) { await bulkPutToStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, itemsToBulkPut, selectedCompanyId); const updatedList = await getAllFromStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, selectedCompanyId); setCustomFieldDefinitions(updatedList.sort((a,b)=>a.order - b.order)); }
+          if (itemsToBulkPut.length > 0) {
+            for (const cfd of itemsToBulkPut) {
+              await getSupabaseClient().from('custom_field_definitions').upsert([cfd]);
+            }
+            const { data: updatedList = [] } = await getSupabaseClient()
+              .from('custom_field_definitions')
+              .select('*')
+              .eq('companyId', selectedCompanyId);
+            setCustomFieldDefinitions((updatedList || []).sort((a: any, b: any) => a.order - b.order));
+          }
           let fbMsg = ""; let fbTitle = "Import Processed"; let fbType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { fbTitle = "Import Successful"; fbMsg = `${newCount} fields added, ${updatedCount} updated.`; fbType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { fbMsg = `CSV processed. ${rawData.length} rows. No changes.`; } else { fbMsg = "No changes applied."; }
           let details = ""; if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
           setFeedback({type: fbType, message: `${fbTitle}: ${fbMsg}`, details});

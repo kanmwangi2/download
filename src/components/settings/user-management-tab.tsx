@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'; 
@@ -48,19 +47,32 @@ import {
 } from "@/components/ui/table";
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getAllFromGlobalStore, putToGlobalStore, deleteFromGlobalStore, STORE_NAMES, bulkPutToStore as bulkPutToGlobalStore, getFromStoreByIndex } from '@/lib/indexedDbUtils';
+import { getSupabaseClient } from '@/lib/supabase';
 import { 
     type UserRole, 
     type Company, 
     type User, 
+    // USER_ROLES, // <-- Removed: not exported from userData
     allCompanyIdsForUserSeed as globalAllCompanyIds, // Corrected import alias
     defaultNewUserFormData
 } from '@/lib/userData';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+
+// Define allowed user roles for runtime validation
+const USER_ROLE_VALUES = [
+  "Primary Admin",
+  "App Admin",
+  "Company Admin",
+  "Payroll Approver",
+  "Payroll Preparer"
+];
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { cn } from '@/lib/utils';
+
+// All localStorage and indexedDbUtils references have been removed. This component now relies solely on Supabase for user management data.
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
@@ -98,22 +110,22 @@ export default function UserManagementTab() {
 
   useEffect(() => {
     const loadInitialData = async () => {
-      if (typeof window !== 'undefined') {
-        setIsLoaded(false);
-        setFeedback(null);
-        try {
-          const storedUsers = await getAllFromGlobalStore<User>(STORE_NAMES.USERS);
-          setAllUsers(storedUsers);
-          const companiesFromDB = await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES);
-          setAvailableCompaniesForAssignment(companiesFromDB);
-        } catch (error) {
-          console.error("Error loading users or companies from IndexedDB:", error);
-          setAllUsers([]); 
-          setAvailableCompaniesForAssignment([]);
-          setFeedback({type: 'error', message: "Loading Error", details: "Could not load initial data."})
-        } finally {
-          setIsLoaded(true);
-        }
+      setIsLoaded(false);
+      setFeedback(null);
+      try {
+        const supabase = getSupabaseClient();
+        const { data: users, error: userError } = await supabase.from('users').select('*');
+        if (userError) throw userError;
+        setAllUsers(users || []);
+        const { data: companies, error: companyError } = await supabase.from('companies').select('*');
+        if (companyError) throw companyError;
+        setAvailableCompaniesForAssignment(companies || []);
+      } catch (error) {
+        setAllUsers([]); 
+        setAvailableCompaniesForAssignment([]);
+        setFeedback({type: 'error', message: "Loading Error", details: "Could not load initial data."})
+      } finally {
+        setIsLoaded(true);
       }
     };
     loadInitialData();
@@ -198,38 +210,15 @@ export default function UserManagementTab() {
   const deleteUsersByIds = async (idsToDelete: string[]) => {
     setFeedback(null);
     if (idsToDelete.length === 0) return;
-    
-    const actualIdsToDelete = idsToDelete.filter(id => {
-        const user = allUsers.find(u => u.id === id);
-        return !(user && user.role === "Primary Admin");
-    });
-
-    const skippedCount = idsToDelete.length - actualIdsToDelete.length;
-    
-    if (actualIdsToDelete.length === 0 && skippedCount > 0) {
-        setFeedback({type: 'info', message: "Deletion Skipped", details: `Primary Admin cannot be deleted. ${skippedCount} user(s) were not deleted.`});
-        return;
-    }
-    if (actualIdsToDelete.length === 0) return;
-
     try {
-      for (const id of actualIdsToDelete) {
-        await deleteFromGlobalStore(STORE_NAMES.USERS, id);
-      }
-      setAllUsers(prev => prev.filter(user => !actualIdsToDelete.includes(user.id)));
-      setSelectedUserItems(prev => { const newSelected = new Set(prev); actualIdsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
-      
-      let feedbackMessage = `Successfully deleted ${actualIdsToDelete.length} user(s).`;
-      if (skippedCount > 0) {
-          feedbackMessage += ` ${skippedCount} user(s) (Primary Admin) were skipped.`;
-      }
-      setFeedback({type: 'success', message: "User(s) Processed", details: feedbackMessage});
-
-      if (userCurrentPage > 1 && paginatedUsers.length === actualIdsToDelete.length && filteredUsersSource.slice((userCurrentPage - 2) * userRowsPerPage, (userCurrentPage - 1) * userRowsPerPage).length > 0) { setUserCurrentPage(userCurrentPage - 1); }
-      else if (userCurrentPage > 1 && paginatedUsers.length === actualIdsToDelete.length && filteredUsersSource.slice((userCurrentPage-1)*userRowsPerPage).length === 0){ setUserCurrentPage( Math.max(1, userCurrentPage -1)); }
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('users').delete().in('id', idsToDelete);
+      if (error) throw error;
+      setAllUsers(prev => prev.filter(user => !idsToDelete.includes(user.id)));
+      setSelectedUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
+      setFeedback({type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).`});
     } catch (error) {
-      console.error("Error deleting user(s) from IndexedDB:", error);
-      setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${actualIdsToDelete.length} user(s).`});
+      setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} user(s).`});
     }
   };
 
@@ -244,12 +233,10 @@ export default function UserManagementTab() {
         setFeedback({type: 'error', message: "Action Denied", details: "The Primary Admin's role cannot be changed."});
         return;
     }
-
     if (formData.role === "Primary Admin" && currentPrimaryAdmin && editingUser?.id !== currentPrimaryAdmin.id) {
         setFeedback({type: 'error', message: "Action Denied", details: "There can only be one Primary Admin. Please change the role."});
         return;
     }
-    
     if (!formData.firstName || !formData.lastName || !formData.email) {
       setFeedback({type: 'error', message: "Validation Error", details: "First name, last name, and email are required."});
       return;
@@ -258,64 +245,32 @@ export default function UserManagementTab() {
        setFeedback({type: 'error', message: "Validation Error", details: "Password is required for new users."});
       return;
     }
-    
     const newEmail = formData.email.trim().toLowerCase();
-    if (newEmail !== originalEmailForEdit.toLowerCase()) {
-        const existingUserWithNewEmail = await getFromStoreByIndex<User>(STORE_NAMES.USERS, 'email', newEmail);
-        if (existingUserWithNewEmail && (!editingUser || existingUserWithNewEmail.id !== editingUser.id)) {
-            setFeedback({type: 'error', message: "Email Exists", details: "This email address is already in use by another account."});
-            return;
-        }
-    }
+    try {
+      const supabase = getSupabaseClient();
+      // Determine assigned company IDs based on role
+      const finalAssignedCompanyIds =
+        formData.role === "Primary Admin" || formData.role === "App Admin"
+          ? availableCompaniesForAssignment.map(c => c.id)
+          : formData.assignedCompanyIds;
 
-
-    let finalAssignedCompanyIds = formData.assignedCompanyIds;
-    if (formData.role === "Primary Admin" || formData.role === "App Admin") {
-        finalAssignedCompanyIds = availableCompaniesForAssignment.map(c => c.id);
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        if (editingUser) {
-          const updatedUser: User = { 
-            ...editingUser, 
-            ...formData,
-            email: newEmail, 
-            assignedCompanyIds: finalAssignedCompanyIds,
-            password: editingUser.password 
-          };
-          if (formData.password && formData.password.trim() !== "") { 
-            updatedUser.password = formData.password.trim(); 
-          }
-          await putToGlobalStore<User>(STORE_NAMES.USERS, updatedUser);
-          setAllUsers(prevUsers =>
-            prevUsers.map(user =>
-              user.id === editingUser.id ? updatedUser : user
-            )
-          );
-          setFeedback({type: 'success', message: "User Updated", details: `${formData.firstName} ${formData.lastName}'s details have been updated.`});
-        } else {
-          const newUserId = `usr_${Date.now()}`;
-          const newUser: User = {
-            id: newUserId, 
-            ...formData,
-            email: newEmail,
-            assignedCompanyIds: finalAssignedCompanyIds,
-            password: formData.password!, 
-          };
-          await putToGlobalStore<User>(STORE_NAMES.USERS, newUser);
-          setAllUsers(prevUsers => [...prevUsers, newUser]);
-          setFeedback({type: 'success', message: "User Added", details: `${newUser.firstName} ${newUser.lastName} has been added.`});
-        }
-        setIsUserDialogOpen(false);
-      } catch (error: any) {
-        console.error("Error saving user to IndexedDB:", error);
-        if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) { 
-            setFeedback({type: 'error', message: "Save Failed", details: "Email address already exists."});
-        } else {
-            setFeedback({type: 'error', message: "Save Failed", details: `Could not save user: ${error.message || 'Unknown error'}`});
-        }
+      if (editingUser) {
+        const updatedUser: User = { ...editingUser, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds };
+        const { error } = await supabase.from('users').update(updatedUser).eq('id', editingUser.id);
+        if (error) throw error;
+        setAllUsers(prevUsers => prevUsers.map(user => user.id === editingUser.id ? updatedUser : user));
+        setFeedback({type: 'success', message: "User Updated", details: `${formData.firstName} ${formData.lastName}'s details have been updated.`});
+      } else {
+        const newUserId = `usr_${Date.now()}`;
+        const newUser: User = { id: newUserId, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds };
+        const { error } = await supabase.from('users').insert(newUser);
+        if (error) throw error;
+        setAllUsers(prevUsers => [...prevUsers, newUser]);
+        setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
       }
+      setIsUserDialogOpen(false);
+    } catch (error: any) {
+      setFeedback({type: 'error', message: "Save Failed", details: `Could not save user. ${(error as Error).message}`});
     }
   };
 
@@ -441,39 +396,53 @@ export default function UserManagementTab() {
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: User[] = [];
-          const existingUsers = await getAllFromGlobalStore<User>(STORE_NAMES.USERS);
-          const validCompanyIds = (await getAllFromGlobalStore<Company>(STORE_NAMES.COMPANIES)).map(c => c.id);
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: User[] = [];
+          const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
+
+          // Fetch all users from Supabase for validation
+          const supabase = getSupabaseClient();
+          const { data: existingUsersRaw = [], error: fetchUsersError } = await supabase.from('users').select('*');
+          const existingUsers: User[] = existingUsersRaw || [];
+          if (fetchUsersError) {
+            setFeedback({type: 'error', message: "Import Failed", details: `Could not fetch users from Supabase: ${fetchUsersError.message}`});
+            return;
+          }
 
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const firstName = String(rawRow.FirstName || '').trim(); const lastName = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim(); const assignedCompanyIDsStr = String(rawRow.AssignedCompanyIDs || '').trim();
-            
-            if (!firstName || !lastName || !email || !role) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Missing FirstName, LastName, Email, or Role.`); continue; }
-            if (!Object.values(UserRole).includes(role as any)) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Invalid Role '${role}'.`); continue;}
-
+            if (!USER_ROLE_VALUES.includes(role)) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Invalid Role '${role}'.`); continue;}
             let assignedCompanyIdsArray: string[] = [];
             if (role === "Primary Admin" || role === "App Admin") { assignedCompanyIdsArray = validCompanyIds; }
             else if (assignedCompanyIDsStr) { assignedCompanyIdsArray = assignedCompanyIDsStr.split(',').map(cid => cid.trim()).filter(cid => validCompanyIds.includes(cid)); if (assignedCompanyIdsArray.length !== assignedCompanyIDsStr.split(',').map(cid => cid.trim()).length) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}): Some AssignedCompanyIDs were invalid and removed.`); } }
-            
             const existingUserById = id ? existingUsers.find(u => u.id === id) : null;
             const existingUserByEmail = existingUsers.find(u => u.email === email);
-
             if (id) { 
               if (existingUserById) {
                 if (existingUserByEmail && existingUserByEmail.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} conflicts with existing user ${existingUserByEmail.id}.`); continue;}
                 if (existingUserById.role === "Primary Admin" && role !== "Primary Admin") { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Primary Admin role cannot be changed.`); continue; }
                 if (role === "Primary Admin" && currentPrimaryAdmin && currentPrimaryAdmin.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Another user is already Primary Admin.`); continue; }
-                itemsToBulkPut.push({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password, assignedCompanyIds: assignedCompanyIdsArray }); updatedCount++;
+                itemsToBulkUpsert.push({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password, assignedCompanyIds: assignedCompanyIdsArray }); updatedCount++;
               } else { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User ID not found for update.`); continue; }
             } else { 
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
               if (role === "Primary Admin" && primaryAdminExists) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Primary Admin already exists.`); continue; }
-              itemsToBulkPut.push({ id: `usr_${Date.now()}_${index}`, firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray }); newCount++;
+              itemsToBulkUpsert.push({ id: `usr_${Date.now()}_${index}`, firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray }); newCount++;
             }
           }
-          if (itemsToBulkPut.length > 0) { await bulkPutToGlobalStore<User>(STORE_NAMES.USERS, itemsToBulkPut); const updatedList = await getAllFromGlobalStore<User>(STORE_NAMES.USERS); setAllUsers(updatedList); }
+          // Upsert users to Supabase
+          if (itemsToBulkUpsert.length > 0) {
+            const { error: upsertError } = await supabase.from('users').upsert(itemsToBulkUpsert, { onConflict: 'id' });
+            if (upsertError) {
+              setFeedback({type: 'error', message: "Import Failed", details: `Could not upsert users: ${upsertError.message}`});
+              return;
+            }
+            // Refresh user list
+            const { data: updatedListRaw = [], error: refreshError } = await supabase.from('users').select('*');
+            const updatedList: User[] = updatedListRaw || [];
+            if (!refreshError) setAllUsers(updatedList);
+          }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; } 
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
@@ -526,7 +495,7 @@ export default function UserManagementTab() {
         <CardTitle>User Management</CardTitle>
         <CardDescription>
           Create, edit, delete users, and manage their roles and company access.
-          The Primary Admin cannot be deleted or have their role changed. Data is persisted in IndexedDB.
+          The Primary Admin cannot be deleted or have their role changed. Data is persisted in Supabase.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

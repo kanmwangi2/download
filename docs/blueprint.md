@@ -10,6 +10,14 @@
 - Payment Details: Payments page for editing individual staff payment details, including basic pay, allowances, and payment type (Gross or Net).
 - Payroll Processing: Payroll page to create and manage payroll runs for a specific month and year. Workflow includes statuses (Draft, To Approve, Rejected, Approved) and payroll calculation columns (Gross Salary, deductions, Net Pay).
 
+## Architecture & Technology (2025):
+
+- **Frontend:** Next.js (React, TypeScript)
+- **UI:** ShadCN UI (Radix UI, Tailwind CSS)
+- **Backend:** Supabase (PostgreSQL, Auth, Storage, Functions)
+- **Cloud-Native:** All data is securely stored in Supabase and accessible from any device with proper credentials. No data is stored in the browser or local device storage.
+- **Multi-User:** Supports multiple users, companies, and roles with secure authentication and authorization.
+
 ## Style Guidelines:
 
 - Primary color: Soft indigo (#667EEA) for a calm and professional feel. This hue aligns with feelings of security, intelligence, and order. While dark blue can sometimes feel cold, indigo contains some red to create a balance.

@@ -1,5 +1,37 @@
-# Firebase Studio
+# Cheetah Payroll
 
-This is a NextJS starter in Firebase Studio.
+Cheetah Payroll is a modern multi-company payroll management application built with Next.js, Supabase, and Tailwind CSS.
 
-To get started, take a look at src/app/page.tsx.
+## Features
+
+- Multi-company support
+- Staff and user management
+- Payroll runs and approvals
+- Custom payment and deduction types
+- Tax and statutory settings
+- Import/export staff and payroll data
+- Secure authentication (Supabase Auth)
+
+## Getting Started
+
+1. **Install dependencies:**
+   ```sh
+   npm install
+   ```
+2. **Configure environment variables:**
+   - Copy `.env.example` to `.env.local` and fill in your Supabase credentials.
+3. **Run the development server:**
+   ```sh
+   npm run dev
+   ```
+4. **Access the app:**
+   - Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Usage
+
+- Sign up or sign in with your credentials.
+- Select or create a company profile.
+- Add staff, configure payroll, and manage deductions/payments.
+- Run payroll, review reports, and export data as needed.
+
+For more details, see the documentation in the `docs/` folder.

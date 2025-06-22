@@ -89,14 +89,25 @@ export default function UserProfilePage() {
       .eq('id', userId)
       .single();
     if (error) return null;
-    return data;
+    // Map snake_case to camelCase for UI
+    return {
+      firstName: data.first_name || '',
+      lastName: data.last_name || '',
+      email: data.email || '',
+      phone: data.phone || '',
+    };
   }
 
   // Helper: update user profile in Supabase
   async function updateUserProfile(userId: string, profile: UserProfileDetails) {
     await supabase
       .from('user_profiles')
-      .update(profile)
+      .update({
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        email: profile.email,
+        phone: profile.phone,
+      })
       .eq('id', userId);
   }
 

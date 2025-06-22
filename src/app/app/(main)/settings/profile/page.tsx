@@ -42,6 +42,85 @@ type FeedbackMessage = {
   details?: string;
 };
 
+// Helper: get current user from Supabase
+async function getCurrentUserFromSupabase() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) return null;
+  const meta = data.user.user_metadata || {};
+  return {
+    id: data.user.id,
+    email: meta.email || data.user.email || '',
+    firstName: meta.firstName || '',
+    lastName: meta.lastName || '',
+    phone: meta.phone || '',
+  };
+}
+
+// --- Robust CRUD helpers for user profile ---
+
+// Helper: fetch user profile from Supabase (robust)
+async function fetchUserProfile(userId: string): Promise<UserProfileDetails> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error || !data) throw new Error(error?.message || 'User profile not found');
+  return {
+    firstName: data.first_name || '',
+    lastName: data.last_name || '',
+    email: data.email || '',
+    phone: data.phone || '',
+  };
+}
+
+// Helper: update user profile in Supabase (robust)
+async function updateUserProfile(userId: string, profile: UserProfileDetails): Promise<UserProfileDetails> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({
+      first_name: profile.firstName,
+      last_name: profile.lastName,
+      email: profile.email,
+      phone: profile.phone,
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error || !data) throw new Error(error?.message || 'Failed to update user profile');
+  return {
+    firstName: data.first_name || '',
+    lastName: data.last_name || '',
+    email: data.email || '',
+    phone: data.phone || '',
+  };
+}
+
+// Helper: update user password in Supabase (robust)
+async function updateUserPassword(userId: string, newPassword: string) {
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error || !data?.user) throw new Error(error?.message || 'Failed to update password');
+}
+
+// Helper: fetch avatar from Supabase (robust)
+async function fetchUserAvatar(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('user_avatars')
+    .select('avatar_url')
+    .eq('user_id', userId)
+    .single();
+  if (error) throw new Error(error.message);
+  return data?.avatar_url || null;
+}
+
+// Helper: update avatar in Supabase (robust)
+async function updateUserAvatar(userId: string, avatarUrl: string) {
+  const { error } = await supabase
+    .from('user_avatars')
+    .upsert({ user_id: userId, avatar_url: avatarUrl });
+  if (error) throw new Error(error.message);
+}
+
 export default function UserProfilePage() {
   const [userDetails, setUserDetails] = useState<UserProfileDetails>(initialProfileDetails);
   const [passwordDetails, setPasswordDetails] = useState({
@@ -66,74 +145,6 @@ export default function UserProfilePage() {
   const [passwordFeedback, setPasswordFeedback] = useState<FeedbackMessage | null>(null);
   const [avatarFeedback, setAvatarFeedback] = useState<FeedbackMessage | null>(null);
 
-
-  // Helper: get current user from Supabase
-  async function getCurrentUserFromSupabase() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data?.user) return null;
-    const meta = data.user.user_metadata || {};
-    return {
-      id: data.user.id,
-      email: meta.email || data.user.email || '',
-      firstName: meta.firstName || '',
-      lastName: meta.lastName || '',
-      phone: meta.phone || '',
-    };
-  }
-
-  // Helper: fetch user profile from Supabase
-  async function fetchUserProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (error) return null;
-    // Map snake_case to camelCase for UI
-    return {
-      firstName: data.first_name || '',
-      lastName: data.last_name || '',
-      email: data.email || '',
-      phone: data.phone || '',
-    };
-  }
-
-  // Helper: update user profile in Supabase
-  async function updateUserProfile(userId: string, profile: UserProfileDetails) {
-    await supabase
-      .from('user_profiles')
-      .update({
-        first_name: profile.firstName,
-        last_name: profile.lastName,
-        email: profile.email,
-        phone: profile.phone,
-      })
-      .eq('id', userId);
-  }
-
-  // Helper: update user password in Supabase
-  async function updateUserPassword(userId: string, newPassword: string) {
-    // You may need to use Supabase Auth API for password update
-    await supabase.auth.updateUser({ password: newPassword });
-  }
-
-  // Helper: fetch avatar from Supabase
-  async function fetchUserAvatar(userId: string): Promise<string | null> {
-    const { data, error } = await supabase
-      .from('user_avatars')
-      .select('avatar_url')
-      .eq('user_id', userId)
-      .single();
-    if (error) return null;
-    return data?.avatar_url || null;
-  }
-
-  // Helper: update avatar in Supabase
-  async function updateUserAvatar(userId: string, avatarUrl: string) {
-    await supabase
-      .from('user_avatars')
-      .upsert({ user_id: userId, avatar_url: avatarUrl });
-  }
 
   useEffect(() => {
     const loadProfile = async () => {

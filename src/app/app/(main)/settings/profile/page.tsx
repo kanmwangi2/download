@@ -148,36 +148,52 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      const user = await getCurrentUserFromSupabase();
-      if (!user) {
+      try {
+        const user = await getCurrentUserFromSupabase();
+        if (!user) {
+          setIsLoaded(true);
+          setFeedback({ type: 'error', message: 'User not authenticated', details: 'Please log in again.' });
+          return;
+        }
+        setCurrentUserId(user.id);
+        setOriginalEmail(user.email);
+        // Avatar
+        let avatar = null;
+        try {
+          avatar = await fetchUserAvatar(user.id);
+        } catch (avatarErr) {
+          setAvatarFeedback({ type: 'error', message: 'Avatar Load Failed', details: String(avatarErr) });
+        }
+        setCroppedImage(avatar || defaultPlaceholderImage);
+        // Profile
+        let profile = null;
+        try {
+          profile = await fetchUserProfile(user.id);
+        } catch (profileErr) {
+          setFeedback({ type: 'error', message: 'Profile Load Failed', details: String(profileErr) });
+        }
+        if (profile) {
+          setUserDetails({
+            firstName: profile.firstName || '',
+            lastName: profile.lastName || '',
+            email: profile.email || user.email || '',
+            phone: profile.phone || ''
+          });
+          setOriginalEmail(profile.email || user.email || '');
+        } else {
+          setUserDetails({
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email || '',
+            phone: user.phone || ''
+          });
+          setOriginalEmail(user.email || '');
+        }
+      } catch (err) {
+        setFeedback({ type: 'error', message: 'Profile Load Error', details: String(err) });
+      } finally {
         setIsLoaded(true);
-        return;
       }
-      setCurrentUserId(user.id);
-      setOriginalEmail(user.email);
-      // Avatar
-      const avatar = await fetchUserAvatar(user.id);
-      setCroppedImage(avatar || defaultPlaceholderImage);
-      // Profile
-      const profile = await fetchUserProfile(user.id);
-      if (profile) {
-        setUserDetails({
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          email: profile.email || user.email || '',
-          phone: profile.phone || ''
-        });
-        setOriginalEmail(profile.email || user.email || '');
-      } else {
-        setUserDetails({
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          phone: user.phone || ''
-        });
-        setOriginalEmail(user.email || '');
-      }
-      setIsLoaded(true);
     };
     loadProfile();
   }, []);

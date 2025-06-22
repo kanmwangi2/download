@@ -64,6 +64,9 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
+// --- STAFF TABLE NAME CONSTANT ---
+const STAFF_TABLE = 'staff_members';
+
 const statusColors: Record<StaffStatus, string> = {
   Active: "bg-green-500 hover:bg-green-600",
   Inactive: "bg-gray-500 hover:bg-gray-600",
@@ -135,7 +138,7 @@ export default function StaffPage() {
       try {
         // Fetch staff from Supabase (snake_case)
         const { data: staff, error: staffError } = await getSupabaseClient()
-          .from('staff')
+          .from(STAFF_TABLE)
           .select('*')
           .eq('company_id', selectedCompanyId);
         if (staffError) throw staffError;
@@ -232,7 +235,7 @@ export default function StaffPage() {
     };
     try {
       const { data: inserted, error } = await getSupabaseClient()
-        .from('staff')
+        .from(STAFF_TABLE)
         .insert(staffToBackend(newStaffUI))
         .select();
       if (error) throw error;
@@ -255,7 +258,7 @@ export default function StaffPage() {
       for (const id of staffIds) { 
           const staffMember = allStaffForCompany.find(s => s.id === id);
           await getSupabaseClient()
-            .from('staff')
+            .from(STAFF_TABLE)
             .delete()
             .eq('id', id)
             .eq('company_id', selectedCompanyId);
@@ -463,7 +466,7 @@ export default function StaffPage() {
           let newCount = 0;
           let updatedCount = 0;
           const { data: currentStaffForCompany = [] } = await getSupabaseClient()
-            .from('staff')
+            .from(STAFF_TABLE)
             .select('*')
             .eq('company_id', selectedCompanyId);
           for (const importedStaff of parsedStaffArray) {
@@ -471,16 +474,16 @@ export default function StaffPage() {
             if (existingStaff) {
               const hasChanges = Object.keys(importedStaff).some(key => (importedStaff as any)[key] !== undefined && (importedStaff as any)[key] !== (existingStaff as any)[key]) || JSON.stringify(importedStaff.custom_fields) !== JSON.stringify(existingStaff.custom_fields);
               if (hasChanges) {
-                await getSupabaseClient().from('staff').upsert([ staffToBackend({ ...existingStaff, ...importedStaff, companyId: selectedCompanyId }) ]);
+                await getSupabaseClient().from(STAFF_TABLE).upsert([ staffToBackend({ ...existingStaff, ...importedStaff, companyId: selectedCompanyId }) ]);
                 updatedCount++;
               }
             } else {
-              await getSupabaseClient().from('staff').upsert([ staffToBackend({ ...importedStaff, companyId: selectedCompanyId }) ]);
+              await getSupabaseClient().from(STAFF_TABLE).upsert([ staffToBackend({ ...importedStaff, companyId: selectedCompanyId }) ]);
               newCount++;
             }
           }
           const { data: updatedStaffList = [] } = await getSupabaseClient()
-            .from('staff')
+            .from(STAFF_TABLE)
             .select('*')
             .eq('company_id', selectedCompanyId);
           setAllStaffForCompany((updatedStaffList || []).map(staffFromBackend).sort((a: StaffMember, b: StaffMember) => a.id.localeCompare(b.id)));

@@ -13,21 +13,20 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Upload, Download, FileText, FileSpreadsheet, FileType, PlusCircle, Trash2, Edit, UserCog, Building, PercentCircle, Users, Search, Save, Info, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Eye, EyeOff, Edit, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Loader2, Building, Save, PercentCircle, Users, UserCog, PlusCircle, Trash2, Search, Upload, CheckCircle2, AlertTriangle, Info, Download, FileText, FileSpreadsheet, FileType } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import type { User, UserRole, Company as AppCompany } from '@/lib/userData';
-import { defaultNewUserFormData } from '@/lib/userData';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
-import { Eye, EyeOff } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import type { User as SupabaseUser, UserRole, Company as AppCompany } from '@/lib/userData';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export interface Department {
   id: string;
@@ -109,7 +108,6 @@ type FeedbackMessage = {
 // --- Supabase migration: Remove all legacy utility calls and constants ---
 // Replace all data access with Supabase queries. Example below:
 
-import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 // Helper: get current user from Supabase
@@ -141,14 +139,53 @@ async function fetchDepartments(companyId: string): Promise<Department[]> {
   return data as Department[];
 }
 
+// --- User type (frontend: camelCase only) ---
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  role: string;
+  assignedCompanyIds: string[];
+  password?: string;
+}
+
+// --- User mapping utilities ---
+function userFromBackend(data: any): User {
+  return {
+    id: data.id,
+    firstName: data.first_name,
+    lastName: data.last_name,
+    email: data.email,
+    phone: data.phone,
+    role: data.role,
+    assignedCompanyIds: data.assigned_company_ids || [],
+    password: data.password,
+  };
+}
+
+function userToBackend(user: User): any {
+  return {
+    id: user.id,
+    first_name: user.firstName,
+    last_name: user.lastName,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    assigned_company_ids: user.assignedCompanyIds || [],
+    password: user.password,
+  };
+}
+
 // Helper: fetch company users from Supabase
 async function fetchCompanyUsers(companyId: string): Promise<User[]> {
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .contains('assignedCompanyIds', [companyId]);
-  if (error) return [];
-  return data as User[];
+    .contains('assigned_company_ids', [companyId]);
+  if (error || !data) return [];
+  return data.map(userFromBackend);
 }
 
 // Helper: update company profile in Supabase
@@ -177,6 +214,17 @@ async function deleteDepartment(companyId: string, departmentId: string) {
     .eq('companyId', companyId);
 }
 
+// Remove export from defaultNewUserFormData to avoid export conflict
+const defaultNewUserFormData: Omit<User, 'id'> & { password?: string } = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  role: 'Payroll Preparer',
+  assignedCompanyIds: [],
+  password: '',
+};
+
 export default function CompanySettingsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
   const router = useRouter();
@@ -204,7 +252,7 @@ export default function CompanySettingsPage() {
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [isCompanyUserDialogOpen, setIsCompanyUserDialogOpen] = useState(false);
   const [editingCompanyUser, setEditingCompanyUser] = useState<User | null>(null);
-  const [companyUserFormData, setCompanyUserFormData] = useState<Omit<User, 'id' | 'password'> & { password?: string }>(defaultNewUserFormData);
+  const [companyUserFormData, setCompanyUserFormData] = useState<Omit<User, 'id'> & { password?: string }>(defaultNewUserFormData);
   const [originalEmailForEdit, setOriginalEmailForEdit] = useState<string>("");
   const [isDeleteCompanyUserDialogOpen, setIsDeleteCompanyUserDialogOpen] = useState(false);
   const [companyUserToDelete, setCompanyUserToDelete] = useState<User | null>(null);
@@ -313,9 +361,13 @@ export default function CompanySettingsPage() {
     setShowPasswordInCompanyUserDialog(false);
     if (editingCompanyUser) {
       setCompanyUserFormData({
-        firstName: editingCompanyUser.firstName, lastName: editingCompanyUser.lastName,
-        email: editingCompanyUser.email, role: editingCompanyUser.role,
-        assignedCompanyIds: [selectedCompanyId!], password: "", phone: editingCompanyUser.phone || "",
+        firstName: editingCompanyUser.firstName,
+        lastName: editingCompanyUser.lastName,
+        email: editingCompanyUser.email,
+        role: editingCompanyUser.role,
+        assignedCompanyIds: [selectedCompanyId!],
+        password: "",
+        phone: editingCompanyUser.phone || "",
       });
       setOriginalEmailForEdit(editingCompanyUser.email);
     } else {
@@ -496,12 +548,12 @@ export default function CompanySettingsPage() {
 
     const newEmail = companyUserFormData.email.trim().toLowerCase();
     if (newEmail !== originalEmailForEdit.toLowerCase()) {
-        const existingUserWithNewEmail = await supabase
+        const { data: existingUserWithNewEmail } = await supabase
           .from('users')
           .select('*')
           .eq('email', newEmail)
-          .single();
-        if (existingUserWithNewEmail.data && (!editingCompanyUser || existingUserWithNewEmail.data.id !== editingCompanyUser.id)) {
+          .maybeSingle();
+        if (existingUserWithNewEmail && (!editingCompanyUser || existingUserWithNewEmail.id !== editingCompanyUser.id)) {
             setFeedback({type: 'error', message: "Email Exists", details: "This email address is already in use by another account."});
             return;
         }
@@ -509,11 +561,11 @@ export default function CompanySettingsPage() {
 
     try {
       if (editingCompanyUser) {
-        const updatedUser: User = { ...editingCompanyUser, ...companyUserFormData, email: newEmail, assignedCompanyIds: [selectedCompanyId], password: editingCompanyUser.password };
+        const updatedUser: User = { ...editingCompanyUser, ...companyUserFormData, email: newEmail, assignedCompanyIds: [selectedCompanyId] };
         if (companyUserFormData.password && companyUserFormData.password.trim() !== "") { updatedUser.password = companyUserFormData.password.trim(); }
         await supabase
           .from('users')
-          .update(updatedUser)
+          .update(userToBackend(updatedUser))
           .eq('id', editingCompanyUser.id);
         setCompanyUsers(prev => prev.map(u => u.id === editingCompanyUser.id ? updatedUser : u));
         setFeedback({type: 'success', message: "User Updated", details: `Details for ${companyUserFormData.firstName} ${companyUserFormData.lastName} updated.`});
@@ -522,7 +574,7 @@ export default function CompanySettingsPage() {
         const newUser: User = { id: newUserId, ...companyUserFormData, email: newEmail, password: companyUserFormData.password!, assignedCompanyIds: [selectedCompanyId] };
         await supabase
           .from('users')
-          .insert(newUser);
+          .insert(userToBackend(newUser));
         setCompanyUsers(prev => [newUser, ...prev]);
         setFeedback({type: 'success', message: "User Added", details: `${newUser.firstName} ${newUser.lastName} added to this company.`});
       }
@@ -702,21 +754,21 @@ export default function CompanySettingsPage() {
             .select('*');
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
-            const id = String(rawRow.ID || '').trim(); const firstName = String(rawRow.FirstName || '').trim(); const lastName = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim();
-            if (!firstName || !lastName || !email) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Missing FirstName, LastName, or Email.`); continue; }
+            const id = String(rawRow.ID || '').trim(); const first_name = String(rawRow.FirstName || '').trim(); const last_name = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim();
+            if (!first_name || !last_name || !email) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Missing FirstName, LastName, or Email.`); continue; }
             if (role !== "Payroll Preparer" && role !== "Payroll Approver") { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Invalid Role '${role}'. Must be Payroll Preparer or Payroll Approver for company-level import.`); continue; }
             const existingUserByEmail = (allGlobalUsers.data ?? []).find((u: any) => u.email === email);
             const existingUserById = id ? (allGlobalUsers.data ?? []).find((u: any) => u.id === id) : null;
             if (id) {
               if (existingUserById) {
                 if (existingUserById.email !== email && existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} already used by another user.`); continue; }
-                if (!existingUserById.assignedCompanyIds.includes(selectedCompanyId) || (existingUserById.role !== "Payroll Preparer" && existingUserById.role !== "Payroll Approver")) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User not managed by this company or has an incompatible role for this import type.`); continue;}
-                itemsToBulkPut.push({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password }); updatedCount++;
+                if (!existingUserById.assigned_company_ids.includes(selectedCompanyId) || (existingUserById.role !== "Payroll Preparer" && existingUserById.role !== "Payroll Approver")) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User not managed by this company or has an incompatible role for this import type.`); continue;}
+                itemsToBulkPut.push(userFromBackend({ ...existingUserById, ...rawRow, password: password || existingUserById.password, assigned_company_ids: [selectedCompanyId] })); updatedCount++;
               } else { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User ID not found for update.`); continue; }
             } else {
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
-              itemsToBulkPut.push({ id: `usr_comp_${Date.now()}_${index}`, firstName, lastName, email, phone, role, password, assignedCompanyIds: [selectedCompanyId] }); newCount++;
+              itemsToBulkPut.push(userFromBackend({ id: `usr_comp_${Date.now()}_${index}`, first_name, last_name, email, phone, role, password, assigned_company_ids: [selectedCompanyId] })); newCount++;
             }
           }
           if (itemsToBulkPut.length > 0) { await supabase.from('users').upsert(itemsToBulkPut); const updatedGlobalUsers = await supabase.from('users').select('*'); setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: any) => u.assignedCompanyIds?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver"))); }
@@ -896,11 +948,6 @@ export default function CompanySettingsPage() {
       </Tabs>
 
       <Dialog open={isDepartmentDialogOpen} onOpenChange={(isOpen) => { setIsDepartmentDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingDepartment ? "Edit Department" : "Add New Department"}</DialogTitle><DialogDescription>{editingDepartment ? "Update department." : "Fill in details."}</DialogDescription></DialogHeader><div className="grid gap-4 py-4" tabIndex={0}><div className="space-y-2"><Label htmlFor="departmentName">Department Name *</Label><Input id="departmentName" name="name" value={departmentFormData.name} onChange={handleDepartmentInputChange} placeholder="e.g., Engineering" /></div><div className="space-y-2"><Label htmlFor="departmentDescription">Description</Label><Textarea id="departmentDescription" name="description" value={departmentFormData.description} onChange={handleDepartmentInputChange} placeholder="Briefly describe" /></div></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsDepartmentDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveDepartment}>Save</Button></DialogFooter></DialogContent></Dialog>
-
-      <AlertDialog open={isDeleteDepartmentDialogOpen} onOpenChange={setIsDeleteDepartmentDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Delete department: "{departmentToDelete?.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteDepartment} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isBulkDeleteDepartmentsDialogOpen} onOpenChange={setIsBulkDeleteDepartmentsDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedDepartmentItems.size} selected department(s)?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteDepartments} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-
-      <AlertDialog open={isTaxToggleAlertOpen} onOpenChange={setIsTaxToggleAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="mr-2 h-6 w-6 text-destructive" /> Confirm Tax Status Change</AlertDialogTitle><AlertDialogDescription>You are about to {taxToggleAction?.newState ? 'ACTIVATE' : 'DEACTIVATE'} <strong>{taxToggleAction?.taxName}</strong> for this company.<br/>{taxToggleAction?.newState ? `It WILL be included in payroll.` : `It will NOT be calculated (0%).`}<br/><br/>Are you sure?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setIsTaxToggleAlertOpen(false); setTaxToggleAction(null); }}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmTaxToggle}>{taxToggleAction?.newState ? 'Yes, Activate' : 'Yes, Deactivate'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
       <Dialog open={isCompanyUserDialogOpen} onOpenChange={(isOpen) => {setIsCompanyUserDialogOpen(isOpen); if(!isOpen) setFeedback(null);}}>
         <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{editingCompanyUser ? "Edit User" : "Add New User to Company"}</DialogTitle><DialogDescription>{editingCompanyUser ? "Update user details." : "Fill in details for the new user."}</DialogDescription></DialogHeader>

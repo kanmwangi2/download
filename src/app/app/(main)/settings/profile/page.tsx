@@ -220,10 +220,17 @@ export default function UserProfilePage() {
 
     try {
       await updateUserProfile(currentUserId, userDetails);
+      // --- Update Supabase Auth user metadata for name sync ---
+      await supabase.auth.updateUser({
+        data: {
+          first_name: userDetails.firstName,
+          last_name: userDetails.lastName,
+        }
+      });
       setOriginalEmail(userDetails.email);
       setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
     } catch (error: any) {
-      setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + error.message });
+      setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error?.message || String(error)) });
     }
   };
 
@@ -343,6 +350,24 @@ export default function UserProfilePage() {
   };
 
   if (!isLoaded) {
+    if (feedback && feedback.type === 'error' && feedback.message.toLowerCase().includes('user not authenticated')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <Alert variant="destructive" className="max-w-md w-full">
+            <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
+            <div>
+              <AlertTitle>Session Expired</AlertTitle>
+              <AlertDescription>
+                Your session has expired or you are not logged in.<br />
+                <Button className="mt-4" onClick={() => window.location.href = '/signin?returnUrl=' + encodeURIComponent(window.location.pathname)}>
+                  Go to Login
+                </Button>
+              </AlertDescription>
+            </div>
+          </Alert>
+        </div>
+      );
+    }
     return <div className="flex justify-center items-center h-64">Loading profile...</div>;
   }
 

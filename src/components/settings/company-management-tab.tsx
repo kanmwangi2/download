@@ -212,11 +212,15 @@ export default function CompanyManagementTab() {
         setAllCompanies(prevCompanies => prevCompanies.map(company => company.id === editingCompany.id ? updatedCompany : company));
         setFeedback({type: 'success', message: "Company Updated", details: `Company "${formData.name}" has been updated.`});
       } else {
-        const newCompany: Company = { id: `co_${Date.now()}`, ...formData };
-        const { error } = await supabase.from('companies').insert(newCompany);
+        // Remove manual id assignment; let Supabase/Postgres generate the UUID
+        const { data: inserted, error } = await supabase.from('companies').insert(formData).select();
         if (error) throw error;
-        setAllCompanies(prevCompanies => [...prevCompanies, newCompany]);
-        setFeedback({type: 'success', message: "Company Added", details: `Company "${newCompany.name}" has been added.`});
+        if (inserted && inserted.length > 0) {
+          setAllCompanies(prevCompanies => [...prevCompanies, inserted[0]]);
+          setFeedback({type: 'success', message: "Company Added", details: `Company "${inserted[0].name}" has been added.`});
+        } else {
+          setFeedback({type: 'success', message: "Company Added", details: `Company has been added.`});
+        }
       }
       setIsCompanyDialogOpen(false);
     } catch (error: any) {
@@ -330,7 +334,7 @@ export default function CompanyManagementTab() {
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Company[] = [];
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: (Company | Omit<Company, 'id'>)[] = [];
           // Fetch existing companies from Supabase
           const supabase = getSupabaseClient();
           const { data: existingCompanies, error: fetchError } = await supabase.from('companies').select('*');
@@ -338,15 +342,17 @@ export default function CompanyManagementTab() {
             setFeedback({type: 'error', message: "Import Failed", details: "Could not fetch existing companies from Supabase."});
             return;
           }
+          // --- Fix: Remove manual id assignment for upsert, let Supabase/Postgres generate UUID unless updating existing ---
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
-            const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const tin = String(rawRow.TINNumber || '').trim();
+            const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim();
+            const tin = String(rawRow.TINNumber || '').trim();
             const address = String(rawRow.Address || '').trim(); const email = String(rawRow.Email || '').trim(); const phone = String(rawRow.Phone || '').trim(); const primaryBusiness = String(rawRow.PrimaryBusiness || '').trim();
             if (!name || !tin) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Name and TINNumber are required.`); continue; }
             const companyData: Omit<Company, 'id'> = { name, tinNumber: tin, address, email, phone, primaryBusiness };
             const existingComp = id ? existingCompanies?.find((c: Company) => c.id === id) : null;
             if (existingComp) { itemsToBulkPut.push({ ...existingComp, ...companyData }); updatedCount++; }
-            else { itemsToBulkPut.push({ id: id || `co_${Date.now()}_${index}`, ...companyData }); newCount++; }
+            else { itemsToBulkPut.push(companyData); newCount++; } // Do not assign id manually
           }
           // Bulk upsert to Supabase
           if (itemsToBulkPut.length > 0) {

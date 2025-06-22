@@ -214,7 +214,7 @@ export default function UserManagementTab() {
       const supabase = getSupabaseClient();
       const { error } = await supabase.from('users').delete().in('id', idsToDelete);
       if (error) throw error;
-      setAllUsers(prev => prev.filter(user => !idsToDelete.includes(user.id)));
+      setAllUsers(prev => prev.filter((user) => !idsToDelete.includes(user.id)));
       setSelectedUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       setFeedback({type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).`});
     } catch (error) {
@@ -258,15 +258,22 @@ export default function UserManagementTab() {
         const updatedUser: User = { ...editingUser, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds };
         const { error } = await supabase.from('users').update(updatedUser).eq('id', editingUser.id);
         if (error) throw error;
-        setAllUsers(prevUsers => prevUsers.map(user => user.id === editingUser.id ? updatedUser : user));
+        setAllUsers(prevUsers => prevUsers.map((user) => user.id === editingUser.id ? updatedUser : user));
         setFeedback({type: 'success', message: "User Updated", details: `${formData.firstName} ${formData.lastName}'s details have been updated.`});
       } else {
-        const newUserId = `usr_${Date.now()}`;
-        const newUser: User = { id: newUserId, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds };
-        const { error } = await supabase.from('users').insert(newUser);
+        // Remove manual id assignment; let Supabase/Postgres generate the UUID
+        const { data: inserted, error } = await supabase.from('users').insert({
+          ...formData,
+          email: newEmail,
+          assignedCompanyIds: finalAssignedCompanyIds
+        }).select();
         if (error) throw error;
-        setAllUsers(prevUsers => [...prevUsers, newUser]);
-        setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
+        if (inserted && inserted.length > 0) {
+          setAllUsers(prevUsers => [...prevUsers, inserted[0]]);
+          setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
+        } else {
+          setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
+        }
       }
       setIsUserDialogOpen(false);
     } catch (error: any) {
@@ -396,7 +403,7 @@ export default function UserManagementTab() {
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: User[] = [];
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: (User | Omit<User, 'id'>)[] = [];
           const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
 
           // Fetch all users from Supabase for validation
@@ -428,7 +435,7 @@ export default function UserManagementTab() {
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
               if (role === "Primary Admin" && primaryAdminExists) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Primary Admin already exists.`); continue; }
-              itemsToBulkUpsert.push({ id: `usr_${Date.now()}_${index}`, firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray }); newCount++;
+              itemsToBulkUpsert.push({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray }); newCount++; // Do not assign id manually
             }
           }
           // Upsert users to Supabase

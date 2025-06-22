@@ -847,8 +847,20 @@ export default function PaymentsPage() {
                  updatedCount++;
               }
             } else {
-              itemsToBulkPut.push(importedPT);
-              newCount++;
+              // Remove manual id assignment; let Supabase/Postgres generate the UUID
+              const { data: inserted, error } = await getSupabaseClient().from('payment_types').insert({
+                companyId: selectedCompanyId,
+                name: importedPT.name,
+                type: importedPT.type,
+                order: importedPT.order,
+                isFixedName: false,
+                isDeletable: true
+              }).select();
+              if (error) throw error;
+              if (inserted && inserted.length > 0) {
+                itemsToBulkPut.push(inserted[0]);
+                newCount++;
+              }
             }
           }
           if (itemsToBulkPut.length > 0) {

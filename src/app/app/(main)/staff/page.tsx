@@ -206,8 +206,7 @@ export default function StaffPage() {
         customFieldsData[cfd.id] = value.trim();
       }
     });
-    const newStaff: StaffMember = {
-      id: `S${Date.now().toString().slice(-4)}` + Math.floor(Math.random() * 100),
+    const newStaff: Omit<StaffMember, 'id'> = {
       companyId: selectedCompanyId,
       firstName: formData.get('firstName') as string, lastName: formData.get('lastName') as string,
       staffNumber: formData.get('staffNumber') as string, email: formData.get('email') as string,
@@ -228,12 +227,17 @@ export default function StaffPage() {
       customFields: customFieldsData,
     };
     try {
-      const { error } = await getSupabaseClient()
+      const { data: inserted, error } = await getSupabaseClient()
         .from('staff')
-        .upsert([newStaff]);
+        .insert(newStaff)
+        .select();
       if (error) throw error;
-      setAllStaffForCompany(prev => [newStaff, ...prev].sort((a, b) => a.id.localeCompare(b.id)));
-      setFeedback({ type: 'success', message: `Staff Added`, details: `${newStaff.firstName} ${newStaff.lastName} has been added.` });
+      if (inserted && inserted.length > 0) {
+        setAllStaffForCompany(prev => [inserted[0], ...prev].sort((a, b) => a.id.localeCompare(b.id)));
+        setFeedback({ type: 'success', message: `Staff Added`, details: `${inserted[0].firstName} ${inserted[0].lastName} has been added.` });
+      } else {
+        setFeedback({ type: 'success', message: `Staff Added`, details: `Staff member has been added.` });
+      }
       setIsAddStaffDialogOpen(false); event.currentTarget.reset(); resetSelectionAndPage();
     } catch (error) {
       setFeedback({ type: 'error', message: 'Save Failed', details: 'Could not add staff member.' });

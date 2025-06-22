@@ -86,7 +86,7 @@ type FeedbackMessage = {
   details?: string;
 };
 
-const defaultCustomFieldDefinitionData: Omit<CustomFieldDefinition, 'id' | 'companyId' | 'order' | 'isDeletable'> = {
+const defaultCustomFieldDefinitionData: Omit<CustomFieldDefinition, 'id' | 'companyId' | 'orderNumber' | 'isDeletable'> = {
   name: "",
   type: "Text",
 };
@@ -149,7 +149,7 @@ export default function StaffPage() {
           .select('*')
           .eq('company_id', selectedCompanyId);
         if (cfdError) throw cfdError;
-        setCustomFieldDefinitions((cfds || []).sort((a, b) => a.order - b.order));
+        setCustomFieldDefinitions((cfds || []).map((cfd: any) => ({ ...cfd, orderNumber: cfd.order_number })).sort((a, b) => a.orderNumber - b.orderNumber));
       } catch (error) {
         setAllStaffForCompany([]);
         setCustomFieldDefinitions([]);
@@ -561,7 +561,7 @@ export default function StaffPage() {
           .eq('id', id)
           .eq('companyId', selectedCompanyId);
       }
-      setCustomFieldDefinitions(prev => prev.filter(cfd => !actualIdsToDelete.includes(cfd.id)).sort((a,b) => a.order - b.order));
+      setCustomFieldDefinitions(prev => prev.filter(cfd => !actualIdsToDelete.includes(cfd.id)).sort((a,b) => a.orderNumber - b.orderNumber));
       setSelectedCfdItems(prev => { const newSelected = new Set(prev); actualIdsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       let msg = `Successfully deleted ${actualIdsToDelete.length} custom field(s).`; if (skippedInUseCount > 0) { msg += ` ${skippedInUseCount} field(s) were skipped as they are in use.`; }
       setFeedback({type: 'success', message: "Deletion Processed", details: msg});
@@ -580,11 +580,11 @@ export default function StaffPage() {
       if (editingCfd) { const updatedCfd: CustomFieldDefinition = { ...editingCfd, ...cfdFormData, companyId: selectedCompanyId }; await getSupabaseClient()
           .from('custom_field_definitions')
           .upsert([updatedCfd]);
-          setCustomFieldDefinitions(prev => prev.map(cfd => cfd.id === editingCfd.id ? updatedCfd : cfd).sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Updated"});
-      } else { const maxOrder = customFieldDefinitions.reduce((max, cfd) => Math.max(max, cfd.order), 0); const newCfd: CustomFieldDefinition = { id: `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, ...cfdFormData, order: maxOrder + 1, isDeletable: true }; await getSupabaseClient()
+          setCustomFieldDefinitions(prev => prev.map(cfd => cfd.id === editingCfd.id ? updatedCfd : cfd).sort((a,b) => a.orderNumber - b.orderNumber)); setFeedback({type: 'success', message: "Field Updated"});
+      } else { const maxOrder = customFieldDefinitions.reduce((max, cfd) => Math.max(max, cfd.orderNumber), 0); const newCfd: CustomFieldDefinition = { id: `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, ...cfdFormData, orderNumber: maxOrder + 1, isDeletable: true }; await getSupabaseClient()
           .from('custom_field_definitions')
-          .upsert([newCfd]);
-          setCustomFieldDefinitions(prev => [...prev, newCfd].sort((a,b) => a.order - b.order)); setFeedback({type: 'success', message: "Field Added"}); }
+          .upsert([{ ...newCfd, order_number: newCfd.orderNumber }]);
+          setCustomFieldDefinitions(prev => [...prev, newCfd].sort((a,b) => a.orderNumber - b.orderNumber)); setFeedback({type: 'success', message: "Field Added"}); }
       setIsCfdDialogOpen(false);
     } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: (error as Error).message}); }
   };
@@ -635,7 +635,7 @@ export default function StaffPage() {
             .from('custom_field_definitions')
             .select('*')
             .eq('company_id', selectedCompanyId);
-          let maxOrder = (existingCfds || []).reduce((max: number, cfd: any) => Math.max(max, cfd.order), 0);
+          let maxOrder = (existingCfds || []).reduce((max: number, cfd: any) => Math.max(max, cfd.order_number), 0);
           for (const [index, rawRowUntyped] of (rawData as any[]).entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const name = String(rawRow.Name || '').trim(); const type = String(rawRow.Type || 'Text').trim() as "Text" | "Number" | "Date";
@@ -644,7 +644,7 @@ export default function StaffPage() {
             const existingByName = (existingCfds || []).find((c: any) => c.name.toLowerCase() === name.toLowerCase() && c.id !== id && c.company_id === selectedCompanyId); if (existingByName) { validationSkippedLog.push(`Row ${originalLineNumber} (Name: ${name}) skipped: Name already exists for this company.`); continue; }
             const existingCfd = id ? (existingCfds || []).find((c: any) => c.id === id && c.company_id === selectedCompanyId) : null;
             if (existingCfd) { itemsToBulkPut.push({ ...existingCfd, name, type }); updatedCount++; }
-            else { maxOrder++; itemsToBulkPut.push({ id: id || `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, name, type, order: maxOrder, isDeletable: true }); newCount++; }
+            else { maxOrder++; itemsToBulkPut.push({ id: id || `cf_${Date.now()}_${selectedCompanyId.substring(3)}`, companyId: selectedCompanyId, name, type, orderNumber: maxOrder, isDeletable: true }); newCount++; }
           }
           if (itemsToBulkPut.length > 0) {
             for (const cfd of itemsToBulkPut) {
@@ -654,7 +654,7 @@ export default function StaffPage() {
               .from('custom_field_definitions')
               .select('*')
               .eq('company_id', selectedCompanyId);
-            setCustomFieldDefinitions((updatedList || []).sort((a: any, b: any) => a.order - b.order));
+            setCustomFieldDefinitions((updatedList || []).map((cfd: any) => ({ ...cfd, orderNumber: cfd.order_number })).sort((a: any, b: any) => a.orderNumber - b.orderNumber));
           }
           let fbMsg = ""; let fbTitle = "Import Processed"; let fbType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { fbTitle = "Import Successful"; fbMsg = `${newCount} fields added, ${updatedCount} updated.`; fbType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { fbMsg = `CSV processed. ${rawData.length} rows. No changes.`; } else { fbMsg = "No changes applied."; }
           let details = ""; if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }

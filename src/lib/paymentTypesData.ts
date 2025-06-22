@@ -1,10 +1,9 @@
-
 export interface PaymentType {
   id: string; 
   companyId: string;
   name: string; 
   type: "Gross" | "Net"; 
-  order: number; 
+  orderNumber: number; // For display order in forms/tables
   isFixedName: boolean; 
   isDeletable: boolean; 
 }
@@ -18,7 +17,7 @@ export const initialPaymentTypesForCompanySeed = (companyId: string): PaymentTyp
     companyId,
     name: "Basic Pay",
     type: "Gross", 
-    order: 1,
+    orderNumber: 1,
     isFixedName: true,
     isDeletable: false,
   },
@@ -27,7 +26,7 @@ export const initialPaymentTypesForCompanySeed = (companyId: string): PaymentTyp
     companyId,
     name: "Transport Allowance",
     type: "Gross", 
-    order: 2,
+    orderNumber: 2,
     isFixedName: true,
     isDeletable: false,
   },
@@ -38,7 +37,7 @@ export const exampleUserDefinedPaymentTypesForUmoja: Omit<PaymentType, 'companyI
         id: "pt_house_co001", 
         name: "House Allowance",
         type: "Gross",
-        order: 3,
+        orderNumber: 3,
         isFixedName: false,
         isDeletable: true,
     },
@@ -46,7 +45,7 @@ export const exampleUserDefinedPaymentTypesForUmoja: Omit<PaymentType, 'companyI
         id: "pt_overtime_co001",
         name: "Overtime Allowance",
         type: "Gross",
-        order: 4,
+        orderNumber: 4,
         isFixedName: false,
         isDeletable: true,
     },
@@ -54,7 +53,7 @@ export const exampleUserDefinedPaymentTypesForUmoja: Omit<PaymentType, 'companyI
         id: "pt_other_co001",
         name: "Other Allowances",
         type: "Net", // Example of a Net payment type
-        order: 5,
+        orderNumber: 5,
         isFixedName: false,
         isDeletable: true,
     },
@@ -66,7 +65,7 @@ export const exampleUserDefinedPaymentTypesForIsoko: Omit<PaymentType, 'companyI
         id: "pt_sales_commission_co002",
         name: "Sales Commission",
         type: "Gross",
-        order: 3, // After Basic and Transport
+        orderNumber: 3, // After Basic and Transport
         isFixedName: false,
         isDeletable: true,
     },
@@ -74,8 +73,33 @@ export const exampleUserDefinedPaymentTypesForIsoko: Omit<PaymentType, 'companyI
         id: "pt_communication_co002",
         name: "Communication Allowance",
         type: "Net", // Example
-        order: 4,
+        orderNumber: 4,
         isFixedName: false,
         isDeletable: true,
     }
 ];
+
+// --- Mapping utilities for frontend/backend case conversion ---
+export function paymentTypeFromBackend(row: any): PaymentType {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    name: row.name,
+    type: row.type,
+    orderNumber: row.order_number, // snake_case to camelCase
+    isFixedName: row.is_fixed_name,
+    isDeletable: row.is_deletable,
+  };
+}
+
+export function paymentTypeToBackend(def: PaymentType): any {
+  return {
+    id: def.id,
+    company_id: def.companyId,
+    name: def.name,
+    type: def.type,
+    order_number: def.orderNumber, // camelCase to snake_case
+    is_fixed_name: def.isFixedName,
+    is_deletable: def.isDeletable,
+  };
+}

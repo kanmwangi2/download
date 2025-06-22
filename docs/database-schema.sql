@@ -110,6 +110,10 @@ CREATE TABLE public.payment_types (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  type TEXT NOT NULL, -- Added for type (Gross/Net)
+  order_number INTEGER NOT NULL DEFAULT 0, -- Added for ordering
+  is_fixed_name BOOLEAN DEFAULT false, -- Added for mapping
+  is_deletable BOOLEAN DEFAULT true, -- Added for mapping
   is_taxable BOOLEAN DEFAULT true,
   is_pensionable BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -124,6 +128,9 @@ CREATE TABLE public.deduction_types (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  order_number INTEGER NOT NULL DEFAULT 0, -- Added for ordering
+  is_fixed_name BOOLEAN DEFAULT false, -- Added for mapping
+  is_deletable BOOLEAN DEFAULT true, -- Added for mapping
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(company_id, name)
@@ -300,4 +307,4 @@ CREATE TRIGGER update_staff_members_updated_at BEFORE UPDATE ON staff_members FO
 CREATE TRIGGER update_staff_payment_configs_updated_at BEFORE UPDATE ON staff_payment_configs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_staff_deductions_updated_at BEFORE UPDATE ON staff_deductions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_tax_settings_updated_at BEFORE UPDATE ON tax_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_payroll_runs_updated_at BEFORE UPDATE ON payroll_runs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+CREATE TRIGGER update_payroll_runs_updated_at BEFORE UPDATE ON payroll_runs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -144,11 +144,15 @@ export async function ensureUserProfile() {
   const supabase = getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
+    // Fallbacks for missing names
+    const emailUsername = user.email?.split('@')[0] || '';
+    const firstName = user.user_metadata?.first_name || emailUsername;
+    const lastName = user.user_metadata?.last_name || '';
     await supabase.from('user_profiles').upsert({
       id: user.id,
       email: user.email,
-      first_name: user.user_metadata?.first_name ?? '',
-      last_name: user.user_metadata?.last_name ?? '',
+      first_name: firstName,
+      last_name: lastName,
       // Add more fields if needed
     });
   }

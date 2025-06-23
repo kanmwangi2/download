@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 // import { buttonVariants } from "@/components/ui/buttonVariants"
 // Update the import path below to where buttonVariants is actually exported from.
 // For example, if it's in "@/components/ui/buttonVariants":
-import { buttonVariants } from "@/components/ui/buttonVariants"
+import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 

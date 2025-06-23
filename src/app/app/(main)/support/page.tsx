@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { LifeBuoy, Mail, Phone, MessageSquare, BookOpenText, HelpCircle, Loader2 } from "lucide-react"; 
 import Link from "next/link";
-import { getFromGlobalStore, STORE_NAMES } from '@/lib/indexedDbUtils'; 
-import { type User, initialUsers } from '@/lib/userData'; 
+import { createClient } from '@/lib/supabase';
+import { type User } from '@/lib/userData';
 
 export default function SupportPage() {
   const [primaryAdminEmail, setPrimaryAdminEmail] = useState<string | null>(null);
   const [primaryAdminPhone, setPrimaryAdminPhone] = useState<string | null>(null);
   const [isLoadingAdminData, setIsLoadingAdminData] = useState(true);
-
   useEffect(() => {
     const fetchAdminDetails = async () => {
       if (typeof window === 'undefined') {
@@ -23,28 +22,25 @@ export default function SupportPage() {
       setIsLoadingAdminData(true);
 
       try {
-        let primaryAdmin = await getFromGlobalStore<User>(STORE_NAMES.USERS, 'usr_pa001');
+        const supabase = createClient();
         
-        if (primaryAdmin) {
+        // Query for primary admin user from Supabase
+        const { data: primaryAdmin, error } = await supabase
+          .from('users')
+          .select('email, phone')
+          .eq('role', 'Primary Admin')
+          .single();
+        
+        if (primaryAdmin && !error) {
           setPrimaryAdminEmail(primaryAdmin.email || 'support@cheetahpayroll.com');
-          
-          if (primaryAdmin.phone && primaryAdmin.phone.trim() !== "") {
-            setPrimaryAdminPhone(primaryAdmin.phone);
-          } else {
-            setPrimaryAdminPhone('Not Configured');
-          }
+          setPrimaryAdminPhone(primaryAdmin.phone || 'Not Configured');
         } else {
-          const primaryAdminFromInitial = initialUsers.find(u => u.role === 'Primary Admin');
-          if (primaryAdminFromInitial) {
-            setPrimaryAdminEmail(primaryAdminFromInitial.email);
-            setPrimaryAdminPhone(primaryAdminFromInitial.phone || 'Not Configured');
-          } else {
-            setPrimaryAdminEmail('support@cheetahpayroll.com');
-            setPrimaryAdminPhone('Not Configured');
-          }
+          // Fallback to default support contact
+          setPrimaryAdminEmail('support@cheetahpayroll.com');
+          setPrimaryAdminPhone('Not Configured');
         }
       } catch (error) {
-        console.error("Support Page: Error fetching primary admin details from IndexedDB:", error);
+        console.error("Support Page: Error fetching primary admin details from Supabase:", error);
         setPrimaryAdminEmail('support@cheetahpayroll.com'); 
         setPrimaryAdminPhone('Not Configured'); 
       }

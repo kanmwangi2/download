@@ -249,3 +249,14 @@ export function staffToBackend(staff: any): any {
     // ...other mappings as needed
   };
 }
+
+// Fix: Map backend staff fields to camelCase for frontend display
+// Helper function to convert StaffMember backend fields to camelCase for UI
+function staffMemberFromBackend(staff: StaffMember): { id: string; companyId: string; firstName: string; lastName: string; [key: string]: any } {
+  return {
+    ...staff,
+    companyId: staff.company_id,
+    firstName: staff.first_name,
+    lastName: staff.last_name,
+  };
+}

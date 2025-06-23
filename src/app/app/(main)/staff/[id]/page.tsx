@@ -21,18 +21,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StaffMember, StaffStatus, EmployeeCategory } from "@/lib/staffData";
 import { CustomFieldDefinition } from '@/lib/customFieldDefinitionData';
 import { countries } from "@/lib/countries";
-import { getFromStore, putToStore, getAllFromStore, STORE_NAMES } from '@/lib/indexedDbUtils';
+import { createClient } from '@/lib/supabase';
 import { useCompany } from '@/context/CompanyContext';
 import { cn } from '@/lib/utils';
 
 
-const defaultStaffFormData: Omit<StaffMember, 'id' | 'companyId' | 'customFields'> = {
-  firstName: "", lastName: "", staffNumber: "", email: "", phone: "", staffRssbNumber: "",
-  employeeCategory: "P",
-  gender: undefined, birthDate: undefined, department: "", designation: "", employmentDate: "",
-  nationality: "", idPassportNumber: "", province: "", district: "", sector: "", cell: "", village: "",
-  bankName: "", bankCode: "", bankAccountNumber: "", bankBranch: "",
-  keyContactName: "", keyContactRelationship: "", keyContactPhone: "", status: "Active",
+const defaultStaffFormData: Omit<StaffMember, 'id' | 'company_id' | 'custom_fields'> = {
+  first_name: "", last_name: "", staff_number: "", email: "", phone: "", staff_rssb_number: "",
+  employee_category: "P",
+  gender: undefined, birth_date: undefined, department: "", designation: "", employment_date: "",
+  nationality: "", id_passport_number: "", province: "", district: "", sector: "", cell: "", village: "",
+  bank_name: "", bank_code: "", bank_account_number: "", bank_branch: "",
+  key_contact_name: "", key_contact_relationship: "", key_contact_phone: "", status: "Active",
 };
 
 type FeedbackMessage = {
@@ -46,18 +46,16 @@ export default function StaffDetailPage() {
   const params = useParams();
   const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
   const staffId = typeof params.id === 'string' ? params.id : '';
-
-  const [staffData, setStaffData] = useState<Omit<StaffMember, 'id' | 'companyId'>>(defaultStaffFormData);
+  const [staffData, setStaffData] = useState<Omit<StaffMember, 'id' | 'company_id' | 'custom_fields'>>(defaultStaffFormData);
   const [customFieldsData, setCustomFieldsData] = useState<Record<string, string>>({});
   const [originalStaffDataForDisplay, setOriginalStaffDataForDisplay] = useState<StaffMember | null>(null);
   const [companyCustomFields, setCompanyCustomFields] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
 
-
   useEffect(() => {
     const loadStaffDetail = async () => {
-      if (isLoadingCompanyContext || !selectedCompanyId || !staffId || typeof window === 'undefined') {
+      if (isLoadingCompanyContext || !selectedCompanyId || !staffId) {
         if (!isLoadingCompanyContext && !selectedCompanyId && staffId) {
             // Handled by global redirect if no companyId
         }
@@ -67,21 +65,48 @@ export default function StaffDetailPage() {
       setIsLoading(true);
       setFeedback(null);
       try {
-        const staffMember = await getFromStore<StaffMember>(STORE_NAMES.STAFF, staffId, selectedCompanyId);
-        const cfdForCompany = await getAllFromStore<CustomFieldDefinition>(STORE_NAMES.CUSTOM_FIELD_DEFINITIONS, selectedCompanyId);
-        setCompanyCustomFields(cfdForCompany.sort((a,b) => a.order - b.order));
+        const supabase = createClient();
+        
+        // Fetch staff member data
+        const { data: staffMember, error: staffError } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('id', staffId)
+          .eq('company_id', selectedCompanyId)
+          .single();
+
+        if (staffError) throw staffError;
+
+        // Fetch custom field definitions for the company
+        const { data: customFieldDefinitions, error: cfdError } = await supabase
+          .from('custom_field_definitions')
+          .select('*')
+          .eq('company_id', selectedCompanyId)
+          .order('order_index');
+
+        if (cfdError) throw cfdError;        // Convert custom field definitions to frontend format
+        const convertedCustomFields: CustomFieldDefinition[] = (customFieldDefinitions || []).map(cfd => ({
+          id: cfd.id,
+          companyId: cfd.company_id,
+          name: cfd.name,
+          type: cfd.type,
+          orderNumber: cfd.order_index,
+          isDeletable: cfd.is_deletable ?? true
+        }));
+
+        setCompanyCustomFields(convertedCustomFields.sort((a,b) => a.orderNumber - b.orderNumber));
 
         if (staffMember) {
-          const { id, companyId: cId, customFields: staffMemberCustomFields, ...formData } = staffMember;
+          const { id, company_id, custom_fields, ...formData } = staffMember;
           setStaffData(formData);
-          setCustomFieldsData(staffMemberCustomFields || {});
+          setCustomFieldsData(custom_fields || {});
           setOriginalStaffDataForDisplay(staffMember);
         } else {
           setFeedback({ type: "error", message: "Error", details: `Staff ID ${staffId} not found.` });
           router.push("/app/staff");
         }
       } catch (error) {
-        console.error("Error loading staff detail from IndexedDB:", error);
+        console.error("Error loading staff detail from Supabase:", error);
         setFeedback({ type: "error", message: "Error", details: "Could not load staff details." });
         router.push("/app/staff");
       }
@@ -100,29 +125,38 @@ export default function StaffDetailPage() {
     setFeedback(null);
     setCustomFieldsData(prev => ({ ...prev, [cfdId]: value }));
   };
-
-  const handleSelectChange = (name: keyof Omit<StaffMember, 'id' | 'companyId' | 'customFields'>, value: string) => {
+  const handleSelectChange = (name: keyof Omit<StaffMember, 'id' | 'company_id' | 'custom_fields'>, value: string) => {
     setFeedback(null);
     setStaffData(prev => ({ ...prev, [name]: value }));
   };
-  
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
     if (!selectedCompanyId) { setFeedback({ type: 'error', message: "Error", details: "No company selected." }); return; }
 
-    if (originalStaffDataForDisplay && typeof window !== 'undefined') {
+    if (originalStaffDataForDisplay) {
         const updatedStaffMember: StaffMember = {
             ...originalStaffDataForDisplay, 
             ...staffData,
-            customFields: customFieldsData,
-            companyId: selectedCompanyId 
+            custom_fields: customFieldsData,
+            company_id: selectedCompanyId 
         };
         try {
-            await putToStore<StaffMember>(STORE_NAMES.STAFF, updatedStaffMember, selectedCompanyId);
+            const supabase = createClient();
+            const { error } = await supabase
+              .from('staff')
+              .update(updatedStaffMember)
+              .eq('id', originalStaffDataForDisplay.id)
+              .eq('company_id', selectedCompanyId);
+              
+            if (error) throw error;
+            
             setOriginalStaffDataForDisplay(updatedStaffMember); 
             setFeedback({ type: 'success', message: "Staff Details Saved", details: "Information has been updated." });
-        } catch (error) { setFeedback({ type: 'error', message: "Error", details: "Could not save staff details." }); }
+        } catch (error) { 
+            console.error("Error saving staff details:", error);
+            setFeedback({ type: 'error', message: "Error", details: "Could not save staff details." }); 
+        }
     } else { setFeedback({ type: 'error', message: "Error", details: "Could not save. Original data missing." }); }
   };
 
@@ -165,25 +199,24 @@ export default function StaffDetailPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-3xl font-bold tracking-tight font-headline">Edit Staff: {originalStaffDataForDisplay.firstName} {originalStaffDataForDisplay.lastName}</h1><p className="text-muted-foreground">Update details for staff ID: {staffId}.</p></div>
+        <div><h1 className="text-3xl font-bold tracking-tight font-headline">Edit Staff: {originalStaffDataForDisplay.first_name} {originalStaffDataForDisplay.last_name}</h1><p className="text-muted-foreground">Update details for staff ID: {staffId}.</p></div>
         <Button variant="outline" asChild><Link href="/app/staff"><ArrowLeft className="mr-2 h-4 w-4" />Back to Staff List</Link></Button>
       </div>
       {renderFeedbackMessage()}
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
           {/* Personal & Employment Card */}
-          <Card><CardHeader><CardTitle className="flex items-center"><User className="mr-2 h-5 w-5 text-primary" />Personal & Employment</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2"><Label htmlFor="firstName">First Name *</Label><Input id="firstName" name="firstName" value={staffData.firstName} onChange={handleInputChange} required /></div>
-                <div className="space-y-2"><Label htmlFor="lastName">Last Name *</Label><Input id="lastName" name="lastName" value={staffData.lastName} onChange={handleInputChange} required /></div>
-                <div className="space-y-2"><Label htmlFor="staffNumber">Staff Number</Label><Input id="staffNumber" name="staffNumber" value={staffData.staffNumber || ""} onChange={handleInputChange} /></div>
+          <Card><CardHeader><CardTitle className="flex items-center"><User className="mr-2 h-5 w-5 text-primary" />Personal & Employment</CardTitle></CardHeader>            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2"><Label htmlFor="first_name">First Name *</Label><Input id="first_name" name="first_name" value={staffData.first_name} onChange={handleInputChange} required /></div>
+                <div className="space-y-2"><Label htmlFor="last_name">Last Name *</Label><Input id="last_name" name="last_name" value={staffData.last_name} onChange={handleInputChange} required /></div>
+                <div className="space-y-2"><Label htmlFor="staff_number">Staff Number</Label><Input id="staff_number" name="staff_number" value={staffData.staff_number || ""} onChange={handleInputChange} /></div>
                 <div className="space-y-2"><Label htmlFor="email">Email *</Label><Input id="email" name="email" type="email" value={staffData.email} onChange={handleInputChange} required /></div>
                 <div className="space-y-2"><Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" type="tel" value={staffData.phone} onChange={handleInputChange}/></div>
-                <div className="space-y-2"><Label htmlFor="staffRssbNumber">RSSB Number</Label><Input id="staffRssbNumber" name="staffRssbNumber" value={staffData.staffRssbNumber || ""} onChange={handleInputChange}/></div>
+                <div className="space-y-2"><Label htmlFor="staff_rssb_number">RSSB Number</Label><Input id="staff_rssb_number" name="staff_rssb_number" value={staffData.staff_rssb_number || ""} onChange={handleInputChange}/></div>
                 <div className="space-y-2">
-                    <Label htmlFor="employeeCategory">Employee Category</Label>
-                    <Select name="employeeCategory" value={staffData.employeeCategory || ""} onValueChange={(v) => handleSelectChange('employeeCategory', v as EmployeeCategory)}>
-                      <SelectTrigger id="employeeCategory"><SelectValue placeholder="Select Category" /></SelectTrigger>
+                    <Label htmlFor="employee_category">Employee Category</Label>
+                    <Select name="employee_category" value={staffData.employee_category || ""} onValueChange={(v) => handleSelectChange('employee_category', v as EmployeeCategory)}>
+                      <SelectTrigger id="employee_category"><SelectValue placeholder="Select Category" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="P">P (Permanent)</SelectItem>
                         <SelectItem value="C">C (Casual)</SelectItem>
@@ -193,12 +226,12 @@ export default function StaffDetailPage() {
                     </Select>
                 </div>
                 <div className="space-y-2"><Label htmlFor="gender">Gender</Label><Select name="gender" value={staffData.gender || ""} onValueChange={(v) => handleSelectChange('gender', v as 'Male'|'Female'|'Other')}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label htmlFor="birthDate">Birth Date</Label><Input id="birthDate" name="birthDate" type="date" value={staffData.birthDate || ""} onChange={handleInputChange} /></div>
+                <div className="space-y-2"><Label htmlFor="birth_date">Birth Date</Label><Input id="birth_date" name="birth_date" type="date" value={staffData.birth_date || ""} onChange={handleInputChange} /></div>
                 <div className="space-y-2"><Label htmlFor="department">Department *</Label><Select name="department" value={staffData.department} onValueChange={(v) => handleSelectChange('department', v)} required><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="Engineering">Engineering</SelectItem><SelectItem value="Marketing">Marketing</SelectItem><SelectItem value="Sales">Sales</SelectItem><SelectItem value="Human Resources">HR</SelectItem><SelectItem value="Finance">Finance</SelectItem><SelectItem value="Operations">Operations</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label htmlFor="designation">Designation</Label><Input id="designation" name="designation" value={staffData.designation || ""} onChange={handleInputChange}/></div>
-                <div className="space-y-2"><Label htmlFor="employmentDate">Employment Date</Label><Input id="employmentDate" name="employmentDate" type="date" value={staffData.employmentDate || ""} onChange={handleInputChange} /></div>
+                <div className="space-y-2"><Label htmlFor="employment_date">Employment Date</Label><Input id="employment_date" name="employment_date" type="date" value={staffData.employment_date || ""} onChange={handleInputChange} /></div>
                 <div className="space-y-2"><Label htmlFor="nationality">Nationality</Label><Select name="nationality" value={staffData.nationality || ""} onValueChange={(v) => handleSelectChange('nationality', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent className="max-h-60">{countries.map(c => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}</SelectContent></Select></div>
-                <div className="space-y-2"><Label htmlFor="idPassportNumber">ID/Passport No.</Label><Input id="idPassportNumber" name="idPassportNumber" value={staffData.idPassportNumber || ""} onChange={handleInputChange} /></div>
+                <div className="space-y-2"><Label htmlFor="id_passport_number">ID/Passport No.</Label><Input id="id_passport_number" name="id_passport_number" value={staffData.id_passport_number || ""} onChange={handleInputChange} /></div>
             </CardContent>
           </Card>
           {/* Address Card */}
@@ -212,20 +245,18 @@ export default function StaffDetailPage() {
             </CardContent>
           </Card>
           {/* Bank Details Card */}
-          <Card><CardHeader><CardTitle className="flex items-center"><Landmark className="mr-2 h-5 w-5 text-primary" />Bank Details</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="bankName">Bank Name</Label><Input id="bankName" name="bankName" value={staffData.bankName || ""} onChange={handleInputChange} /></div>
-                <div className="space-y-2"><Label htmlFor="bankCode">Bank Code</Label><Input id="bankCode" name="bankCode" value={staffData.bankCode || ""} onChange={handleInputChange} /></div>
-                <div className="space-y-2"><Label htmlFor="bankAccountNumber">Account No.</Label><Input id="bankAccountNumber" name="bankAccountNumber" value={staffData.bankAccountNumber || ""} onChange={handleInputChange}/></div>
-                <div className="space-y-2"><Label htmlFor="bankBranch">Branch</Label><Input id="bankBranch" name="bankBranch" value={staffData.bankBranch || ""} onChange={handleInputChange}/></div>
+          <Card><CardHeader><CardTitle className="flex items-center"><Landmark className="mr-2 h-5 w-5 text-primary" />Bank Details</CardTitle></CardHeader>            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label htmlFor="bank_name">Bank Name</Label><Input id="bank_name" name="bank_name" value={staffData.bank_name || ""} onChange={handleInputChange} /></div>
+                <div className="space-y-2"><Label htmlFor="bank_code">Bank Code</Label><Input id="bank_code" name="bank_code" value={staffData.bank_code || ""} onChange={handleInputChange} /></div>
+                <div className="space-y-2"><Label htmlFor="bank_account_number">Account No.</Label><Input id="bank_account_number" name="bank_account_number" value={staffData.bank_account_number || ""} onChange={handleInputChange}/></div>
+                <div className="space-y-2"><Label htmlFor="bank_branch">Branch</Label><Input id="bank_branch" name="bank_branch" value={staffData.bank_branch || ""} onChange={handleInputChange}/></div>
             </CardContent>
           </Card>
           {/* Emergency Contact Card */}
-          <Card><CardHeader><CardTitle className="flex items-center"><Users2 className="mr-2 h-5 w-5 text-primary" />Emergency Contact</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2"><Label htmlFor="keyContactName">Name</Label><Input id="keyContactName" name="keyContactName" value={staffData.keyContactName || ""} onChange={handleInputChange}/></div>
-                <div className="space-y-2"><Label htmlFor="keyContactRelationship">Relationship</Label><Select name="keyContactRelationship" value={staffData.keyContactRelationship || ""} onValueChange={(v) => handleSelectChange('keyContactRelationship', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="child">Child</SelectItem><SelectItem value="friend">Friend</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label htmlFor="keyContactPhone">Phone</Label><Input id="keyContactPhone" name="keyContactPhone" type="tel" value={staffData.keyContactPhone || ""} onChange={handleInputChange}/></div>
+          <Card><CardHeader><CardTitle className="flex items-center"><Users2 className="mr-2 h-5 w-5 text-primary" />Emergency Contact</CardTitle></CardHeader>            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2"><Label htmlFor="key_contact_name">Name</Label><Input id="key_contact_name" name="key_contact_name" value={staffData.key_contact_name || ""} onChange={handleInputChange}/></div>
+                <div className="space-y-2"><Label htmlFor="key_contact_relationship">Relationship</Label><Select name="key_contact_relationship" value={staffData.key_contact_relationship || ""} onValueChange={(v) => handleSelectChange('key_contact_relationship', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="child">Child</SelectItem><SelectItem value="friend">Friend</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label htmlFor="key_contact_phone">Phone</Label><Input id="key_contact_phone" name="key_contact_phone" type="tel" value={staffData.key_contact_phone || ""} onChange={handleInputChange}/></div>
             </CardContent>
           </Card>
           

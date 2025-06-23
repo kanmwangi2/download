@@ -25,7 +25,7 @@ export interface User {
 }
 
 // This will be dynamically populated by initialCompaniesDataForSeed from company-management-tab.tsx
-// during IndexedDB seeding.
+// during database seeding.
 export const all_company_ids_for_user_seed: string[] = ["co_001", "co_002"];
 
 

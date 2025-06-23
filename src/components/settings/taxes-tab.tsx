@@ -202,7 +202,7 @@ export default function TaxesTab() {
           <CardTitle>Global Tax Settings</CardTitle>
           <CardDescription>
             Manage statutory tax rates, contributions, and limits for the entire application. These settings apply to all companies.
-            Changes saved here will persist in your browser via IndexedDB. Default values are from <code>src/lib/taxConfig.ts</code>. All monetary values are in RWF.
+            Changes saved here will persist in Supabase. Default values are from <code>src/lib/taxConfig.ts</code>. All monetary values are in RWF.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">

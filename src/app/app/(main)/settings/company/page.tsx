@@ -470,7 +470,7 @@ export default function CompanySettingsPage() {
       if (deptCurrentPage > 1 && paginatedDepartments.length === idsToDelete.length && filteredDepartmentsSource.slice((deptCurrentPage - 2) * deptRowsPerPage, (deptCurrentPage - 1) * deptRowsPerPage).length > 0) { setDeptCurrentPage(deptCurrentPage - 1); }
       else if (deptCurrentPage > 1 && paginatedDepartments.length === idsToDelete.length && filteredDepartmentsSource.slice((deptCurrentPage-1)*deptRowsPerPage).length === 0){ setDeptCurrentPage( Math.max(1, deptCurrentPage -1)); }
     } catch (error) {
-      console.error("Error deleting department(s) from IndexedDB:", error);
+      console.error("Error deleting department(s) from Supabase:", error);
       setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} department(s). ${(error as Error).message}`});
     }
   };
@@ -717,6 +717,7 @@ export default function CompanySettingsPage() {
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Department[] = [];
           const existingDepts = await fetchDepartments(selectedCompanyId);
+          let upsertError: any = null;
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const idKey = Object.keys(rawRow).find(k => k.trim().toLowerCase() === 'id');
@@ -728,8 +729,29 @@ export default function CompanySettingsPage() {
             if (existingDept) { itemsToBulkPut.push({ ...existingDept, name, description }); updatedCount++; }
             else { itemsToBulkPut.push({ id: id || `dept_${Date.now()}_${index}`, companyId: selectedCompanyId, name, description }); newCount++; }
           }
-          if (itemsToBulkPut.length > 0) { await supabase.from('departments').upsert(itemsToBulkPut); const updatedList = await fetchDepartments(selectedCompanyId); setAllDepartments(updatedList); }
-          let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} departments added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
+          if (itemsToBulkPut.length > 0) {
+            const { error } = await supabase.from('departments').upsert(itemsToBulkPut);
+            if (error) upsertError = error;
+            const updatedList = await fetchDepartments(selectedCompanyId); setAllDepartments(updatedList);
+          }
+          let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info';
+          if (upsertError) {
+            feedbackTitle = 'Import Failed';
+            feedbackMessage = `Database error: ${upsertError.message || upsertError}`;
+            feedbackType = 'error';
+          } else if (newCount > 0 || updatedCount > 0) {
+            feedbackTitle = "Import Successful";
+            feedbackMessage = `${newCount} departments added, ${updatedCount} updated.`;
+            feedbackType = 'success';
+          } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) {
+            feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`;
+          } else if (newCount === 0 && updatedCount === 0 && rawData.length > 0) {
+            feedbackTitle = 'Import Failed';
+            feedbackMessage = `No departments imported or updated. All rows may have been skipped or identical to existing records.`;
+            feedbackType = 'error';
+          } else {
+            feedbackMessage = "No changes applied.";
+          }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
@@ -752,6 +774,7 @@ export default function CompanySettingsPage() {
           const allGlobalUsers = await supabase
             .from('users')
             .select('*');
+          let upsertError: any = null;
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const first_name = String(rawRow.FirstName || '').trim(); const last_name = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim();
@@ -771,8 +794,30 @@ export default function CompanySettingsPage() {
               itemsToBulkPut.push(userFromBackend({ id: `usr_comp_${Date.now()}_${index}`, first_name, last_name, email, phone, role, password, assigned_company_ids: [selectedCompanyId] })); newCount++;
             }
           }
-          if (itemsToBulkPut.length > 0) { await supabase.from('users').upsert(itemsToBulkPut); const updatedGlobalUsers = await supabase.from('users').select('*'); setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: any) => u.assignedCompanyIds?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver"))); }
-          let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated for this company.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
+          if (itemsToBulkPut.length > 0) {
+            const { error } = await supabase.from('users').upsert(itemsToBulkPut);
+            if (error) upsertError = error;
+            const updatedGlobalUsers = await supabase.from('users').select('*');
+            setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: any) => u.assignedCompanyIds?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver")));
+          }
+          let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info';
+          if (upsertError) {
+            feedbackTitle = 'Import Failed';
+            feedbackMessage = `Database error: ${upsertError.message || upsertError}`;
+            feedbackType = 'error';
+          } else if (newCount > 0 || updatedCount > 0) {
+            feedbackTitle = "Import Successful";
+            feedbackMessage = `${newCount} users added, ${updatedCount} updated for this company.`;
+            feedbackType = 'success';
+          } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) {
+            feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`;
+          } else if (newCount === 0 && updatedCount === 0 && rawData.length > 0) {
+            feedbackTitle = 'Import Failed';
+            feedbackMessage = `No users imported or updated. All rows may have been skipped or identical to existing records.`;
+            feedbackType = 'error';
+          } else {
+            feedbackMessage = "No changes applied.";
+          }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});

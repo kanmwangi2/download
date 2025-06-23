@@ -51,15 +51,16 @@ const documentationContent: DocSectionData[] = [
             "Backend: Supabase (PostgreSQL, Auth, Storage, Functions)",
           ]}
         ]
-      },
-      {
+      },      {
         type: 'subsection',
-        subTitle: "Data Persistence & Reset",
+        subTitle: "Data Persistence & Management",
         subContent: [
           "Cheetah Payroll uses Supabase as its exclusive backend. All application data (staff records, payroll runs, company settings including payment types, deduction types, custom field definitions, tax configurations, user profiles, audit logs, etc.) is securely stored in the cloud and accessible from any device.",
           { type: 'list', items: [
-            "<strong>Data Location:</strong> All data resides in Supabase; nothing is stored locally in the browser.",
+            "<strong>Data Location:</strong> All data resides in Supabase PostgreSQL; nothing is stored locally in the browser.",
             "<strong>Data Scoping:</strong> Operational data is scoped per company. Global data includes the overall list of companies, user accounts, and tax settings.",
+            "<strong>Cloud-Native:</strong> Complete migration from IndexedDB to Supabase has been completed. The application is now fully cloud-native.",
+            "<strong>Real-time Sync:</strong> Data synchronizes in real-time across all user sessions through Supabase.",
             "<strong>Resetting the Application:</strong> To reset your company or user data, contact your system administrator or use the admin tools in the application settings (if available).",
             "<strong>Suitability:</strong> This cloud-native setup is suitable for production, multi-user, and collaborative scenarios.",
             "<strong>Initial Data:</strong> The application is seeded with initial default data (for users and the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', including their respective staff, payment types, deduction types, custom fields, departments, company profiles, and payroll history) to allow for immediate exploration and use.",
@@ -237,7 +238,7 @@ const documentationContent: DocSectionData[] = [
           { type: 'list', items: [
             "<strong>Profile Picture Tab:</strong> Upload, crop, and save a profile picture.",
             "<strong>Personal Information Tab:</strong> Update first name, last name, email, phone.",
-            "<strong>Change Password Tab:</strong> Update your login password. Saves to IndexedDB.",
+            "<strong>Change Password Tab:</strong> Update your login password. Saves to Supabase.",
           ]}
         ]
       },

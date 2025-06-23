@@ -18,8 +18,6 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Download, FileText, FileSpreadsheet, FileType, Edit2, CheckCircle, XCircle, AlertTriangle, Hourglass, Users, Banknote, MinusCircle, PlayCircle, Send, Save, Eye, SlidersHorizontal, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, InfoIcon, FileSpreadsheet as FileSpreadsheetIcon, FileType as FileTypePdfIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -27,29 +25,122 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { 
+  ArrowLeft, Download, FileText, FileSpreadsheet, FileType, Edit2,
+  CheckCircle, XCircle, AlertTriangle, Hourglass, Users, Banknote, 
+  MinusCircle, PlayCircle, Send, Save, Eye, SlidersHorizontal,
+  Loader2, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  InfoIcon, FileSpreadsheet as FileSpreadsheetIcon, FileType as FileTypePdfIcon
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StaffMember } from '@/lib/staffData';
-import { StaffPaymentDetails } from '@/lib/paymentData';
-import type { TaxSettingsData } from '@/components/settings/taxes-tab';
-import type { CompanyProfileData } from '@/app/app/(main)/settings/company/page';
-import type { PayrollRunSummary, PayrollStatus } from '@/app/app/(main)/payroll/page';
-import {
-    getCompanySingletonData, getFromStore, putToStore,
-    getAllFromStore, getAllPaymentConfigsForCompany, STORE_NAMES,
-    putCompanySingletonData, getFromGlobalStore, getGlobalSingletonData,
-    logAuditEvent, getAllFromGlobalStore 
-} from '@/lib/indexedDbUtils';
-import { PAYE_BANDS as DEFAULT_PAYE_BANDS, PENSION_EMPLOYER_RATE as DEFAULT_PENSION_EMPLOYER_RATE, PENSION_EMPLOYEE_RATE as DEFAULT_PENSION_EMPLOYEE_RATE, MATERNITY_EMPLOYER_RATE as DEFAULT_MATERNITY_EMPLOYER_RATE, MATERNITY_EMPLOYEE_RATE as DEFAULT_MATERNITY_EMPLOYEE_RATE, CBHI_RATE as DEFAULT_CBHI_RATE, RAMA_EMPLOYER_RATE as DEFAULT_RAMA_EMPLOYER_RATE, RAMA_EMPLOYEE_RATE as DEFAULT_RAMA_EMPLOYEE_RATE } from "@/lib/taxConfig";
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { format, parseISO } from 'date-fns';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useCompany } from '@/context/CompanyContext';
-import type { Deduction as FullDeductionRecord } from '@/app/app/(main)/deductions/page';
 import type { PaymentType } from '@/lib/paymentTypesData';
 import { DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID, initialPaymentTypesForCompanySeed } from '@/lib/paymentTypesData';
 import type { DeductionType as CompanyDeductionType } from '@/lib/deductionTypesData';
 import { initialDeductionTypesForCompanySeed as initialCompanyDeductionTypesSeed } from '@/lib/deductionTypesData';
-import { cn } from "@/lib/utils";
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { format, parseISO } from 'date-fns';
+
+// Missing type definitions - these need to be created or imported from the correct modules
+interface StaffPaymentDetails {
+  [paymentTypeId: string]: number;
+}
+
+interface TaxSettingsData {
+  payeBand1Limit: number;
+  payeBand2Limit: number;
+  payeBand3Limit: number;
+  payeRate1: number;
+  payeRate2: number;
+  payeRate3: number;
+  payeRate4: number;
+  pensionEmployerRate: number;
+  pensionEmployeeRate: number;
+  maternityEmployerRate: number;
+  maternityEmployeeRate: number;
+  cbhiRate: number;
+  ramaEmployerRate: number;
+  ramaEmployeeRate: number;
+}
+
+interface CompanyProfileData {
+  name: string;
+  address: string;
+  registrationNumber: string;
+  taxId: string;
+  contactEmail: string;
+  contactPhone: string;
+  currency: string;
+  isPayeActive: boolean;
+  isPensionActive: boolean;
+  isMaternityActive: boolean;
+  isCbhiActive: boolean;
+  isRamaActive: boolean;
+  primaryBusiness: string;
+}
+
+interface PayrollRunSummary {
+  id: string;
+  companyId: string;
+  month: string;
+  year: number;
+  employees: number;
+  grossSalary: number;
+  deductions: number;
+  netPay: number;
+  status: PayrollStatus;
+  rejectionReason?: string;
+}
+
+interface Deduction {
+  id: string;
+  staffId: string;
+  companyId: string;
+  deductionTypeId: string;
+  monthlyDeduction: number;
+  balance: number;
+  startDate: string;
+  deductedSoFar?: number;
+  originalAmount?: number;
+}
+
+// Use the same type for FullDeductionRecord
+type FullDeductionRecord = Deduction;
+
+// Tax configuration constants - these would normally come from @/lib/taxConfig
+const DEFAULT_PAYE_BANDS = {
+  BAND1_LIMIT: 30000,
+  BAND2_LIMIT: 100000,
+  BAND3_LIMIT: 500000,
+  RATE1: 0,
+  RATE2: 0.2,
+  RATE3: 0.3,
+  RATE4: 0.4
+};
+
+const DEFAULT_PENSION_EMPLOYER_RATE = 0.03;
+const DEFAULT_PENSION_EMPLOYEE_RATE = 0.03;
+const DEFAULT_MATERNITY_EMPLOYER_RATE = 0.003;
+const DEFAULT_MATERNITY_EMPLOYEE_RATE = 0.003;
+const DEFAULT_CBHI_RATE = 0.075;
+const DEFAULT_RAMA_EMPLOYER_RATE = 0.01;
+const DEFAULT_RAMA_EMPLOYEE_RATE = 0.01;
+
+// Utility function that would normally come from @/lib/utils
+function cn(...classes: (string | undefined | null | boolean)[]): string {
+  return classes.filter(Boolean).join(' ');
+}
+
+// Supabase client - using the correct function name
+const createClient = getSupabaseClient;
+
+// Types
+export type PayrollStatus = "Draft" | "To Approve" | "Rejected" | "Approved";
 
 interface GlobalApplicationCompany {
   id: string;
@@ -61,7 +152,6 @@ interface GlobalApplicationCompany {
   primaryBusiness?: string;
 }
 
-
 interface AppliedDeductionDetail {
   deductionId: string;
   deductionTypeId: string;
@@ -69,18 +159,30 @@ interface AppliedDeductionDetail {
 }
 
 export interface EmployeePayrollRecord {
-  employeeId: string; firstName: string; lastName: string; staffNumber?: string; rssbNumber?: string; designation?: string;
-
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  staffNumber?: string;
+  rssbNumber?: string;
+  designation?: string;
   dynamicGrossEarnings: Record<string, number>;
   appliedDeductionAmounts: Record<string, number>;
-
   grossSalary: number;
-  employerRssb: number; employeeRssb: number; employerPension: number; employeePension: number;
-  employerMaternity: number; employeeMaternity: number; totalPension: number; totalMaternity: number; paye: number;
+  employerRssb: number;
+  employeeRssb: number;
+  employerPension: number;
+  employeePension: number;
+  employerMaternity: number;
+  employeeMaternity: number;
+  totalPension: number;
+  totalMaternity: number;
+  paye: number;
   employerRama: number;
   employeeRama: number;
   totalRama: number;
-  netPayBeforeCbhi: number; cbhiDeduction: number; netPayAfterCbhi: number;
+  netPayBeforeCbhi: number;
+  cbhiDeduction: number;
+  netPayAfterCbhi: number;
   totalDeductionsAppliedThisRun: number;
   finalNetPay: number;
   appliedDeductions: AppliedDeductionDetail[];
@@ -217,7 +319,7 @@ const calculateMockEmployeeRecord = (
 ): EmployeePayrollRecord => {
     const dynamicCalculatedGrossEarnings: Record<string, number> = {};
     let accumulatedGrossSalaryForAllComponents = 0; let accumulatedGrossTransportComponentSum = 0; let accumulatedBasicPayComponentSum = 0;
-    const sortedPaymentTypes = [...companyPaymentTypes].sort((a, b) => a.order - b.order);
+    const sortedPaymentTypes = [...companyPaymentTypes].sort((a, b) => a.orderNumber - b.orderNumber);
     for (const paymentType of sortedPaymentTypes) {
         const componentAmountFromConfig = paymentConfig[paymentType.id] || 0;
         let calculatedGrossAmountForThisComponent = 0;
@@ -263,7 +365,7 @@ const calculateMockEmployeeRecord = (
 
     const appliedDeductionAmounts: Record<string, number> = {}; const allAppliedDeductionDetailsThisRun: AppliedDeductionDetail[] = [];
     let remainingNetPayForDeductions = netACbhi; let totalDeductionsAppliedThisRun = 0;
-    const sortedDeductionTypes = [...companyDeductionTypes].sort((a,b) => a.order - b.order);
+    const sortedDeductionTypes = [...companyDeductionTypes].sort((a,b) => a.orderNumber - b.orderNumber);
     for (const dedType of sortedDeductionTypes) {
         const typeSpecificStaffDeductions = activeDeductionsForStaff.filter(d => d.deductionTypeId === dedType.id && (d.balance || 0) > 0 && d.companyId === companyId)
                                                 .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -283,7 +385,7 @@ const calculateMockEmployeeRecord = (
     }
     const finalNet = (netACbhi || 0) - totalDeductionsAppliedThisRun;
     return {
-        employeeId: staffMember.id, companyId, firstName: staffMember.firstName, lastName: staffMember.lastName, staffNumber: staffMember.staffNumber, rssbNumber: staffMember.staffRssbNumber, designation: staffMember.designation || "N/A",
+        employeeId: staffMember.id, companyId, firstName: staffMember.first_name, lastName: staffMember.last_name, staffNumber: staffMember.staff_number, rssbNumber: staffMember.staff_rssb_number, designation: staffMember.designation || "N/A",
         dynamicGrossEarnings: dynamicCalculatedGrossEarnings, 
         appliedDeductionAmounts, 
         grossSalary: finalTotalGrossSalary || 0, employerRssb: empRssb || 0, employeeRssb: eeRssb || 0,
@@ -377,16 +479,12 @@ export default function PayrollRunDetailPage() {
         setActiveStatutoryColumns([]);
         return;
     }
-    const totalsForRun = calculateRunTotals(run.employees, cPaymentTypes, cDeductionTypes);
-
-    const activePayTypesInRun = cPaymentTypes
+    const totalsForRun = calculateRunTotals(run.employees, cPaymentTypes, cDeductionTypes);    const activePayTypesInRun = cPaymentTypes
         .filter(pt => (totalsForRun.dynamicTotalGrossEarnings?.[pt.id] ?? 0) > 0)
-        .sort((a, b) => a.order - b.order);
-    setActivePaymentTypeColumns(activePayTypesInRun);
-
-    const activeDedTypesInRun = cDeductionTypes
+        .sort((a, b) => a.orderNumber - b.orderNumber);
+    setActivePaymentTypeColumns(activePayTypesInRun);    const activeDedTypesInRun = cDeductionTypes
         .filter(dt => (totalsForRun.dynamicTotalDeductionAmounts?.[dt.id] ?? 0) > 0)
-        .sort((a, b) => a.order - b.order);
+        .sort((a, b) => a.orderNumber - b.orderNumber);
     setActiveDeductionTypeColumns(activeDedTypesInRun);
     
     const allPossibleStatutoryKeys: (keyof EmployeePayrollRecord)[] = [
@@ -403,7 +501,6 @@ export default function PayrollRunDetailPage() {
     });
     setActiveStatutoryColumns(activeStats);
   };
-
   useEffect(() => {
     const loadInitialData = async () => {
         if (isLoadingCompanyContext || !selectedCompanyId || !runId) {
@@ -414,15 +511,52 @@ export default function PayrollRunDetailPage() {
         setPageFeedback(null);
         setPayrollJustProcessedMessage(null);
         try {
-            const taxSettings = await getGlobalSingletonData<TaxSettingsData>(STORE_NAMES.TAX_SETTINGS) || getDefaultTaxSettings(); setCurrentTaxSettings(taxSettings);
-            const staffFromDB = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId) || []; setAllStaff(staffFromDB);
-            const paymentConfigsFromDB = await getAllPaymentConfigsForCompany<StaffPaymentDetails>(selectedCompanyId); setAllPaymentConfigs(paymentConfigsFromDB);
-            const deductionsFromDB = await getAllFromStore<FullDeductionRecord>(STORE_NAMES.DEDUCTIONS, selectedCompanyId) || []; setAllDeductions(deductionsFromDB);
+            const supabase = createClient();
             
-            let profileFromDB = await getCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, selectedCompanyId);
+            // Load tax settings from Supabase
+            const { data: taxSettings } = await supabase
+                .from('tax_settings')
+                .select('*')
+                .limit(1)
+                .single();
+            setCurrentTaxSettings(taxSettings || getDefaultTaxSettings());
+            
+            // Load staff data
+            const { data: staffFromDB } = await supabase
+                .from('staff')
+                .select('*')
+                .eq('company_id', selectedCompanyId);
+            setAllStaff(staffFromDB || []);
+              // Load payment configurations - convert array to Record
+            const { data: paymentConfigsFromDB } = await supabase
+                .from('staff_payment_details')
+                .select('*')
+                .eq('company_id', selectedCompanyId);
+            const paymentConfigsRecord: Record<string, StaffPaymentDetails> = {};
+            (paymentConfigsFromDB || []).forEach((config: any) => {
+                paymentConfigsRecord[config.staff_id] = config;
+            });
+            setAllPaymentConfigs(paymentConfigsRecord);
+            
+            // Load deductions
+            const { data: deductionsFromDB } = await supabase
+                .from('deductions')
+                .select('*')
+                .eq('company_id', selectedCompanyId);
+            setAllDeductions(deductionsFromDB || []);
+            
+            // Load company profile
+            const { data: profileFromDB } = await supabase
+                .from('company_profiles')
+                .select('*')
+                .eq('id', selectedCompanyId)
+                .single();
+                
             if (!profileFromDB && selectedCompanyId) {
-              const globalCompanies = await getAllFromGlobalStore<GlobalApplicationCompany>(STORE_NAMES.COMPANIES);
-              const currentGlobalCompany = globalCompanies.find(c => c.id === selectedCompanyId);
+              const { data: globalCompanies } = await supabase
+                  .from('companies')
+                  .select('*');
+              const currentGlobalCompany = globalCompanies?.find((c: GlobalApplicationCompany) => c.id === selectedCompanyId);
               const newProfileForCompany: CompanyProfileData = {
                 name: selectedCompanyName || currentGlobalCompany?.name || `Company ${selectedCompanyId}`,
                 address: currentGlobalCompany?.address || "",
@@ -434,37 +568,71 @@ export default function PayrollRunDetailPage() {
                 isPayeActive: true, isPensionActive: true, isMaternityActive: true, isCbhiActive: true, isRamaActive: true,
                 primaryBusiness: currentGlobalCompany?.primaryBusiness || "",
               };
-              await putCompanySingletonData<CompanyProfileData>(STORE_NAMES.COMPANY_PROFILE, newProfileForCompany, selectedCompanyId);
-              profileFromDB = newProfileForCompany;
+              await supabase
+                  .from('company_profiles')
+                  .upsert({ id: selectedCompanyId, ...newProfileForCompany });
+              setCompanyProfile(newProfileForCompany);
+            } else {
+                if (profileFromDB && typeof profileFromDB.isRamaActive === 'undefined') {
+                    profileFromDB.isRamaActive = true;
+                }
+                setCompanyProfile(profileFromDB || null);
             }
-            if (profileFromDB && typeof profileFromDB.isRamaActive === 'undefined') {
-                profileFromDB.isRamaActive = true;
+
+            // Load payment types
+            let { data: paymentTypesFromDB } = await supabase
+                .from('payment_types')
+                .select('*')
+                .eq('company_id', selectedCompanyId);
+                
+            if ((!paymentTypesFromDB || paymentTypesFromDB.length === 0) && selectedCompanyId) { 
+                const defaultTypes = initialPaymentTypesForCompanySeed(selectedCompanyId); 
+                await supabase.from('payment_types').upsert(defaultTypes);
+                paymentTypesFromDB = defaultTypes; 
             }
-            setCompanyProfile(profileFromDB || null);
+            setCompanyPaymentTypes((paymentTypesFromDB || []).sort((a: PaymentType, b: PaymentType) => a.orderNumber - b.orderNumber));
 
-            let paymentTypesFromDB = await getAllFromStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, selectedCompanyId);
-            if (paymentTypesFromDB.length === 0 && selectedCompanyId) { const defaultTypes = initialPaymentTypesForCompanySeed(selectedCompanyId); for (const type of defaultTypes) { await putToStore<PaymentType>(STORE_NAMES.PAYMENT_TYPES, type, selectedCompanyId); } paymentTypesFromDB = defaultTypes; }
-            setCompanyPaymentTypes(paymentTypesFromDB.sort((a,b) => a.order - b.order));
+            // Load deduction types
+            let { data: dedTypesFromDB } = await supabase
+                .from('deduction_types')
+                .select('*')
+                .eq('company_id', selectedCompanyId);
+                
+            if ((!dedTypesFromDB || dedTypesFromDB.length === 0) && selectedCompanyId) { 
+                const defaultDedTypes = initialCompanyDeductionTypesSeed(selectedCompanyId); 
+                await supabase.from('deduction_types').upsert(defaultDedTypes);
+                dedTypesFromDB = defaultDedTypes; 
+            }
+            setCompanyDeductionTypes((dedTypesFromDB || []).sort((a: CompanyDeductionType, b: CompanyDeductionType) => a.orderNumber - b.orderNumber));
 
-            let dedTypesFromDB = await getAllFromStore<CompanyDeductionType>(STORE_NAMES.DEDUCTION_TYPES, selectedCompanyId);
-            if (dedTypesFromDB.length === 0 && selectedCompanyId) { const defaultDedTypes = initialCompanyDeductionTypesSeed(selectedCompanyId); for (const type of defaultDedTypes) { await putToStore<CompanyDeductionType>(STORE_NAMES.DEDUCTION_TYPES, type, selectedCompanyId); } dedTypesFromDB = defaultDedTypes; }
-            setCompanyDeductionTypes(dedTypesFromDB.sort((a,b) => a.order - b.order));
-
-            let runDetail = await getFromStore<PayrollRunDetail>(STORE_NAMES.PAYROLL_RUN_DETAILS, runId, selectedCompanyId);
+            // Load payroll run details
+            const { data: runDetail } = await supabase
+                .from('payroll_run_details')
+                .select('*')
+                .eq('id', runId)
+                .eq('company_id', selectedCompanyId)
+                .single();
+                
             if (runDetail) {
                 setPayrollRun(runDetail);
                 const processed = runDetail.employees && runDetail.employees.length > 0;
                 setIsPayrollProcessed(processed);
                 if (processed) {
-                    setDynamicColumnsBasedOnRun(runDetail, dedTypesFromDB, paymentTypesFromDB);
+                    setDynamicColumnsBasedOnRun(runDetail, dedTypesFromDB || [], paymentTypesFromDB || []);
                     setIsDetailViewOpen(true);
                 }
             } else {
-                const summary = await getFromStore<PayrollRunSummary>(STORE_NAMES.PAYROLL_SUMMARIES, runId, selectedCompanyId);
+                const { data: summary } = await supabase
+                    .from('payroll_summaries')
+                    .select('*')
+                    .eq('id', runId)
+                    .eq('company_id', selectedCompanyId)
+                    .single();
+                    
                 if (summary) {
                     const newDetailShell: PayrollRunDetail = {
                         id: summary.id, companyId: selectedCompanyId, month: summary.month, year: summary.year,
-                        status: summary.status, employees: [], ...(calculateRunTotals([], paymentTypesFromDB, dedTypesFromDB) as any),
+                        status: summary.status, employees: [], ...(calculateRunTotals([], paymentTypesFromDB || [], dedTypesFromDB || []) as any),
                         rejectionReason: summary.rejectionReason
                     };
                     setPayrollRun(newDetailShell); setIsPayrollProcessed(false);
@@ -476,11 +644,14 @@ export default function PayrollRunDetailPage() {
     };
     loadInitialData();
   }, [runId, selectedCompanyId, isLoadingCompanyContext, router, selectedCompanyName]);
-
   const updatePayrollRunStateAndStorage = async (updatedRun: PayrollRunDetail) => {
     if (!selectedCompanyId) return;
     try {
-        await putToStore<PayrollRunDetail>(STORE_NAMES.PAYROLL_RUN_DETAILS, updatedRun, selectedCompanyId);
+        const supabase = createClient();
+        await supabase
+            .from('payroll_run_details')
+            .upsert(updatedRun);
+            
         const runTotalsForSummary = calculateRunTotals(updatedRun.employees, companyPaymentTypes, companyDeductionTypes);
         const updatedSummary: PayrollRunSummary = {
             id: updatedRun.id, companyId: selectedCompanyId, month: updatedRun.month, year: updatedRun.year, employees: updatedRun.employees.length,
@@ -488,7 +659,9 @@ export default function PayrollRunDetailPage() {
             deductions: (runTotalsForSummary.totalEmployeeRssb || 0) + (runTotalsForSummary.totalPaye || 0) + (runTotalsForSummary.totalCbhiDeduction || 0) + (runTotalsForSummary.totalTotalDeductionsAppliedThisRun || 0),
             netPay: runTotalsForSummary.totalFinalNetPay || 0, status: updatedRun.status, rejectionReason: updatedRun.rejectionReason,
         };
-        await putToStore<PayrollRunSummary>(STORE_NAMES.PAYROLL_SUMMARIES, updatedSummary, selectedCompanyId);
+        await supabase
+            .from('payroll_summaries')
+            .upsert(updatedSummary);
         setPayrollRun(updatedRun);
     } catch (error) { console.error("Error saving payroll run data:", error); throw error; }
   };
@@ -504,7 +677,7 @@ export default function PayrollRunDetailPage() {
         setPageFeedback({type: 'error', message: `Error: Company profile for ${selectedCompanyName || 'the selected company'} is missing or incomplete.`, details: "Please go to 'Company Settings' to configure it, especially tax exemptions, before running payroll."});
         return;
     }
-    const activeStaffForCompany = allStaff.filter(s => s.status === "Active" && s.companyId === selectedCompanyId);
+    const activeStaffForCompany = allStaff.filter(s => s.status === "Active" && s.company_id === selectedCompanyId);
     if (activeStaffForCompany.length === 0) {
         setPageFeedback({type: 'error', message: "Error: No active staff members found for this company.", details: "Please add or activate staff before running payroll."});
         return;
@@ -559,7 +732,8 @@ export default function PayrollRunDetailPage() {
     const draftToSave: PayrollRunDetail = { ...payrollRun, status: "Draft", rejectionReason: undefined, companyId: selectedCompanyId };
     try { 
         await updatePayrollRunStateAndStorage(draftToSave); 
-        await logAuditEvent("Payroll Draft Saved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} saved as Draft.`, selectedCompanyId, selectedCompanyName);
+        // TODO: Add audit logging to Supabase
+        // await logAuditEvent("Payroll Draft Saved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} saved as Draft.`, selectedCompanyId, selectedCompanyName);
         setPageFeedback({type: 'success', message: "Payroll draft saved successfully."}); 
     } catch (error) { 
         setPageFeedback({type: 'error', message: "Error: Could not save payroll draft.", details: (error as Error).message}); 
@@ -577,47 +751,65 @@ export default function PayrollRunDetailPage() {
         await updatePayrollRunStateAndStorage(draftData); 
         const forApprovalData: PayrollRunDetail = { ...draftData, status: "To Approve" as PayrollStatus }; 
         await updatePayrollRunStateAndStorage(forApprovalData); 
-        await logAuditEvent("Payroll Sent for Approval", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} sent for approval.`, selectedCompanyId, selectedCompanyName);
+        // TODO: Add audit logging to Supabase
+        // await logAuditEvent("Payroll Sent for Approval", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} sent for approval.`, selectedCompanyId, selectedCompanyName);
         setPageFeedback({type: 'success', message: "Payroll sent for approval successfully."}); 
     } catch (error) { 
         setPageFeedback({type: 'error', message: "Error: Could not send payroll for approval.", details: (error as Error).message}); 
     }
-  };
-  const handleApproveRun = async () => {
+  };  const handleApproveRun = async () => {
     setPageFeedback(null);
     setPayrollJustProcessedMessage(null);
     if (!payrollRun || !selectedCompanyId) return;
     const updatedRunData = { ...payrollRun, status: "Approved" as PayrollStatus, rejectionReason: undefined, companyId: selectedCompanyId };
     try {
       await updatePayrollRunStateAndStorage(updatedRunData);
-      await logAuditEvent("Payroll Approved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} approved.`, selectedCompanyId, selectedCompanyName);
+      // TODO: Add audit logging to Supabase
+      // await logAuditEvent("Payroll Approved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} approved.`, selectedCompanyId, selectedCompanyName);
       setPageFeedback({type: 'success', message: "Payroll approved successfully."});
-      const approvedRunDetails = await getFromStore<PayrollRunDetail>(STORE_NAMES.PAYROLL_RUN_DETAILS, updatedRunData.id, selectedCompanyId);
+      
+      const supabase = createClient();
+      const { data: approvedRunDetails } = await supabase
+          .from('payroll_run_details')
+          .select('*')
+          .eq('id', updatedRunData.id)
+          .eq('company_id', selectedCompanyId)
+          .single();
+          
       if (!approvedRunDetails || !approvedRunDetails.employees) { 
           console.warn("Could not fetch approved run details for deduction update."); 
-          setPageFeedback(prev => ({...prev, details: (prev?.details || "") + " Warning: Could not fetch approved run details for deduction update."}));
+          setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + " Warning: Could not fetch approved run details for deduction update."} : {type: 'info', message: 'Warning', details: 'Could not fetch approved run details for deduction update.'});
           return; 
       }
-      const allCurrentDeductionRecords = await getAllFromStore<FullDeductionRecord>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
+      
+      const { data: allCurrentDeductionRecords } = await supabase
+          .from('deductions')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+          
       const deductionsToActuallyUpdateInDB: FullDeductionRecord[] = []; let deductionsUpdatedCount = 0;
       for (const empRecord of approvedRunDetails.employees) {
         if (empRecord.appliedDeductions && empRecord.appliedDeductions.length > 0) {
-            for (const appliedDed of empRecord.appliedDeductions) {
-                const dedRecordToUpdate = allCurrentDeductionRecords.find(d => d.id === appliedDed.deductionId && d.companyId === selectedCompanyId);
+            for (const appliedDed of empRecord.appliedDeductions) {                const dedRecordToUpdate = (allCurrentDeductionRecords || []).find((d: FullDeductionRecord) => d.id === appliedDed.deductionId && d.companyId === selectedCompanyId);
                 if (dedRecordToUpdate) {
                     let recordInBatch = deductionsToActuallyUpdateInDB.find(d => d.id === dedRecordToUpdate.id);
-                    if (!recordInBatch) { recordInBatch = { ...dedRecordToUpdate }; deductionsToActuallyUpdateInDB.push(recordInBatch); }
-                    recordInBatch.deductedSoFar = (recordInBatch.deductedSoFar || 0) + (appliedDed.amountApplied || 0);
-                    recordInBatch.balance = Math.max(0, (recordInBatch.originalAmount || 0) - recordInBatch.deductedSoFar);
-                    deductionsUpdatedCount++;
+                    if (!recordInBatch) { 
+                        recordInBatch = { ...dedRecordToUpdate };
+                        deductionsToActuallyUpdateInDB.push(recordInBatch as FullDeductionRecord);
+                    }                    // At this point recordInBatch is guaranteed to exist, so we can safely update it
+                    if (recordInBatch) {
+                        recordInBatch.deductedSoFar = (recordInBatch.deductedSoFar || 0) + (appliedDed.amountApplied || 0);
+                        recordInBatch.balance = Math.max(0, (recordInBatch.originalAmount || 0) - (recordInBatch.deductedSoFar || 0));
+                        deductionsUpdatedCount++;
+                    }
                 }
             }
         }
       }
       if (deductionsToActuallyUpdateInDB.length > 0) {
-        for (const dedToSave of deductionsToActuallyUpdateInDB) { await putToStore<FullDeductionRecord>(STORE_NAMES.DEDUCTIONS, dedToSave, selectedCompanyId); }
+        await supabase.from('deductions').upsert(deductionsToActuallyUpdateInDB);
         setAllDeductions(prevDeds => { const updatedMap = new Map(prevDeds.map(d => [d.id, d])); deductionsToActuallyUpdateInDB.forEach(updated => updatedMap.set(updated.id, updated)); return Array.from(updatedMap.values()); });
-        setPageFeedback(prev => ({...prev, details: (prev?.details || "") + ` ${deductionsUpdatedCount} deduction record(s) reconciled.`}));
+        setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + ` ${deductionsUpdatedCount} deduction record(s) reconciled.`} : {type: 'info', message: 'Success', details: `${deductionsUpdatedCount} deduction record(s) reconciled.`});
       }
     } catch (error) { 
         setPageFeedback({type: 'error', message: "Error: Could not approve payroll.", details: (error as Error).message}); 
@@ -631,7 +823,8 @@ export default function PayrollRunDetailPage() {
           const updatedRun = { ...payrollRun, status: "Rejected" as PayrollStatus, rejectionReason: rejectionReason.trim(), companyId: selectedCompanyId }; 
           try { 
               await updatePayrollRunStateAndStorage(updatedRun); 
-              await logAuditEvent("Payroll Rejected", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} rejected. Reason: ${rejectionReason.trim()}`, selectedCompanyId, selectedCompanyName);
+              // TODO: Add audit logging to Supabase
+              // await logAuditEvent("Payroll Rejected", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} rejected. Reason: ${rejectionReason.trim()}`, selectedCompanyId, selectedCompanyName);
               setIsPayrollProcessed(true); 
               setPageFeedback({type: 'success', message: "Payroll rejected successfully."}); 
               setIsRejectDialogOpen(false); 
@@ -656,20 +849,27 @@ export default function PayrollRunDetailPage() {
         }
     }
   };
+type PayrollColumnDefinition = {
+  key: string;
+  label: string;
+  isNumeric: boolean;
+  isIdLike?: boolean;
+  accessor?: (emp: EmployeePayrollRecord) => any;
+};
 
-  const memoizedPayrollDetailColumns = useMemo(() => {
-    const baseColumns = [
+  const memoizedPayrollDetailColumns = useMemo((): PayrollColumnDefinition[] => {
+    const baseColumns: PayrollColumnDefinition[] = [
       { key: 'firstName', label: 'First Name', isNumeric: false }, { key: 'lastName', label: 'Last Name', isNumeric: false },
       { key: 'staffNumber', label: 'Staff No.', isNumeric: false, isIdLike: true }, { key: 'rssbNumber', label: 'RSSB No.', isNumeric: false, isIdLike: true }
     ];
 
-    const dynamicEarningsColumns = activePaymentTypeColumns.map(pt => ({
+    const dynamicEarningsColumns: PayrollColumnDefinition[] = activePaymentTypeColumns.map(pt => ({
       key: `dyn_earn_${pt.id}`, label: `${pt.name}`,
       accessor: (emp: EmployeePayrollRecord) => emp.dynamicGrossEarnings?.[pt.id] || 0,
       isNumeric: true
     }));
     
-    const statutoryColumnsBeforeDeductions = [
+    const statutoryColumnsBeforeDeductions: PayrollColumnDefinition[] = [
         { key: 'grossSalary', label: 'Total Gross', isNumeric: true }, 
         { key: 'employerRssb', label: 'Empr. RSSB', isNumeric: true },
         { key: 'employeeRssb', label: 'Empe. RSSB', isNumeric: true }, 
@@ -688,7 +888,7 @@ export default function PayrollRunDetailPage() {
         { key: 'netPayAfterCbhi', label: 'Net (Aft. CBHI)', isNumeric: true },
     ];
     
-    const statutoryColumnsAfterDeductions = [
+    const statutoryColumnsAfterDeductions: PayrollColumnDefinition[] = [
         { key: 'totalDeductionsAppliedThisRun', label: 'Total Applied Ded.', isNumeric: true },
         { key: 'finalNetPay', label: 'Final Net Pay', isNumeric: true },
     ];
@@ -696,7 +896,7 @@ export default function PayrollRunDetailPage() {
     const visibleStatutoryBefore = statutoryColumnsBeforeDeductions.filter(col => activeStatutoryColumns.includes(col.key));
     const visibleStatutoryAfter = statutoryColumnsAfterDeductions.filter(col => activeStatutoryColumns.includes(col.key));
 
-    const dynamicDeductionCols = activeDeductionTypeColumns.map(dt => ({
+    const dynamicDeductionCols: PayrollColumnDefinition[] = activeDeductionTypeColumns.map(dt => ({
       key: `dyn_ded_${dt.id}`, label: dt.name,
       accessor: (emp: EmployeePayrollRecord) => emp.appliedDeductionAmounts?.[dt.id] || 0,
       isNumeric: true
@@ -772,12 +972,12 @@ export default function PayrollRunDetailPage() {
     } else if (fileType === "pdf") {
         const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
         const margin = 36; const pageWidth = doc.internal.pageSize.getWidth();
-        doc.setFontSize(14).setFont(undefined, 'bold');
+        doc.setFontSize(14).setFont('helvetica', 'bold');
         doc.text(companyProfile?.name || "Company", margin, margin);
-        doc.setFontSize(10).setFont(undefined, 'normal');
+        doc.setFontSize(10).setFont('helvetica', 'normal');
         if(companyProfile?.address) doc.text(companyProfile.address, margin, margin + 12);
         if(companyProfile?.taxId) doc.text(`TIN: ${companyProfile.taxId}`, margin, margin + 24);
-        doc.setFontSize(12).setFont(undefined, 'bold');
+        doc.setFontSize(12).setFont('helvetica', 'bold');
         doc.text(`Payroll Run: ${payrollRun.id} (${payrollRun.month} ${payrollRun.year})`, margin, margin + 40);
       
         const columnStylesForPdf: {[key: number]: any} = {};
@@ -816,9 +1016,9 @@ export default function PayrollRunDetailPage() {
                 doc.setFontSize(8);
                 doc.text(str, data.settings.margin.left, pageHeightInner - (margin / 2));
                 doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth - data.settings.margin.right, pageHeightInner - (margin / 2), { align: 'right' });
-                doc.setFont(undefined, 'italic').setTextColor(150);
+                doc.setFont('helvetica', 'italic').setTextColor(150);
                 doc.text("Powered by Cheetah Payroll", pageWidth / 2, pageHeightInner - (margin / 2) + 10, { align: 'center' });
-                doc.setFont(undefined, 'normal').setTextColor(0);
+                doc.setFont('helvetica', 'normal').setTextColor(0);
             }
         });
         doc.save(fileName);
@@ -1015,7 +1215,7 @@ export default function PayrollRunDetailPage() {
         </DialogContent>
       </Dialog>
       <Dialog open={isRejectDialogOpen} onOpenChange={(isOpen) => { setIsRejectDialogOpen(isOpen); if (!isOpen) setPageFeedback(null);}}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Reject Payroll Run</DialogTitle><DialogDescription>Provide reason for rejecting {payrollRun?.id}.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="space-y-2"><Label htmlFor="rejectionReason">Rejection Reason *</Label><Input id="rejectionReason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="e.g., Incorrect overtime"/></div></div><DialogFooter><Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Cancel</Button><Button variant="destructive" onClick={handleConfirmRejectRun}>Confirm Rejection</Button></DialogFooter></DialogContent></Dialog>
-      <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8"><p className="font-semibold text-primary/90">Notes:</p><ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1"><li>Tax settings apply globally unless company-specific exemptions are set. Staff data, payment configs, and deductions are company-specific.</li><li>Payment Types (e.g. Basic Pay, Allowances) defined in 'Payments Configuration' determine earnings. "Net" components are grossed-up sequentially.</li><li>Deductions are applied based on the order of Deduction Types defined in 'Deductions Management', after statutory deductions. Insufficient net pay may result in partial or skipped deductions.</li><li>Saving a draft, approving, or rejecting updates this run in IndexedDB. Approved runs update staff deduction balances.</li></ul></div>
+      <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8"><p className="font-semibold text-primary/90">Notes:</p><ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1"><li>Tax settings apply globally unless company-specific exemptions are set. Staff data, payment configs, and deductions are company-specific.</li><li>Payment Types (e.g. Basic Pay, Allowances) defined in 'Payments Configuration' determine earnings. "Net" components are grossed-up sequentially.</li><li>Deductions are applied based on the order of Deduction Types defined in 'Deductions Management', after statutory deductions. Insufficient net pay may result in partial or skipped deductions.</li><li>Saving a draft, approving, or rejecting updates this run in Supabase. Approved runs update staff deduction balances.</li></ul></div>
     </div>
   );
 }

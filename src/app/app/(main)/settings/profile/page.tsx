@@ -376,10 +376,9 @@ export default function UserProfilePage() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <UserCircle className="h-7 w-7 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight font-headline">User Profile</h1>
-        </div>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">User Profile</h1>        </div>
         <p className="text-muted-foreground">
-          Manage your personal information, password, and profile picture. Data persists in your browser's storage.
+          Manage your personal information, password, and profile picture. Data is securely stored in Supabase.
         </p>
       </div>
        {renderFeedbackMessage(feedback) || renderFeedbackMessage(avatarFeedback) || renderFeedbackMessage(passwordFeedback)}
@@ -398,7 +397,7 @@ export default function UserProfilePage() {
                 <Camera className="mr-2 h-6 w-6 text-primary" />
                 Profile Picture
               </CardTitle>
-              <CardDescription>Upload, crop, and manage your profile picture. Saved to IndexedDB.</CardDescription>
+              <CardDescription>Upload, crop, and manage your profile picture. Saved to Supabase.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <input
@@ -478,7 +477,7 @@ export default function UserProfilePage() {
                   Personal Information
                 </CardTitle>
                 <CardDescription>
-                  Update your first name, last name, email address, and phone number. Saved to IndexedDB.
+                  Update your first name, last name, email address, and phone number. Saved to Supabase.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -547,7 +546,7 @@ export default function UserProfilePage() {
                   Change Password
                 </CardTitle>
                 <CardDescription>
-                  Update your account password. Your password is saved securely in IndexedDB.
+                  Update your account password. Your password is saved securely in Supabase.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">

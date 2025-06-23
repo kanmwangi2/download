@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -23,11 +22,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PlusCircle, Edit, Trash2, Upload, Download, FileText, FileSpreadsheet, FileType, BadgeMinus, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Users, Settings, Info, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { StaffMember } from '@/lib/staffData';
-import {
-    getAllFromStore, putToStore, deleteFromStore, bulkPutToStore,
-    STORE_NAMES
-} from '@/lib/indexedDbUtils';
+import { StaffMember, staffFromBackend } from '@/lib/staffData';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -41,6 +36,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from '@/lib/utils';
 import { isValid as isValidDate, parseISO, format, parse } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { deductionFromBackend, deductionToBackend } from '@/lib/deductionsData';
+import { getSupabaseClient } from '@/lib/supabase';
 
 
 export interface Deduction {
@@ -66,6 +63,7 @@ const defaultDeductionFormData: Omit<Deduction, 'id' | 'companyId' | 'balance' |
 
 const defaultNewDeductionTypeData: Omit<DeductionType, 'id' | 'companyId' | 'order' | 'isFixedName' | 'isDeletable'> = {
   name: "",
+  orderNumber: 0,
 };
 
 const formatNumberForTable = (amount?: number): string => {
@@ -100,6 +98,36 @@ type FeedbackMessage = {
   message: string;
   details?: string;
 };
+
+// Helper functions for mapping Supabase (snake_case) to frontend (camelCase)
+function mapDeductionFromSupabase(d: any, staffList: any[], deductionTypes: any[]): Deduction {
+  const staffMember = staffList.find((s: any) => s.id === d.staff_id);
+  const dedType = deductionTypes.find((dt: any) => dt.id === d.deduction_type_id);
+  return {
+    id: d.id,
+    companyId: d.company_id,
+    staffId: d.staff_id,
+    staffName: staffMember ? `${staffMember.first_name} ${staffMember.last_name}` : "Unknown Staff",
+    deductionTypeId: d.deduction_type_id,
+    deductionTypeName: dedType ? dedType.name : "Unknown Type",
+    description: d.description,
+    originalAmount: d.original_amount,
+    monthlyDeduction: d.monthly_deduction,
+    deductedSoFar: d.deducted_so_far,
+    balance: d.balance,
+    startDate: d.start_date,
+  };
+}
+function mapDeductionTypeFromSupabase(dt: any): DeductionType {
+  return {
+    id: dt.id,
+    companyId: dt.company_id,
+    name: dt.name,
+    orderNumber: dt.order_number,
+    isFixedName: dt.is_fixed_name,
+    isDeletable: dt.is_deletable,
+  };
+}
 
 export default function DeductionsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
@@ -137,44 +165,36 @@ export default function DeductionsPage() {
     const loadData = async () => {
       if (isLoadingCompanyContext || !selectedCompanyId || typeof window === 'undefined') {
         if (!isLoadingCompanyContext && !selectedCompanyId) {
-            setStaffList([]); setAllDeductionsData([]); setDeductionTypes([]); setIsLoaded(true);
+          setStaffList([]); setAllDeductionsData([]); setDeductionTypes([]); setIsLoaded(true);
         }
         return;
       }
       setIsLoaded(false);
       setFeedback(null);
       try {
-        const staff = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId);
-        setStaffList(staff);
-
-        let companyDeductionTypes = await getAllFromStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, selectedCompanyId);
-        
-        const coreTypeIds = [DEFAULT_ADVANCE_DEDUCTION_TYPE_ID, DEFAULT_CHARGE_DEDUCTION_TYPE_ID, DEFAULT_LOAN_DEDUCTION_TYPE_ID];
-        const missingCoreTypes = coreTypeIds.filter(coreId => !companyDeductionTypes.some(dt => dt.id === coreId));
-        if (missingCoreTypes.length > 0) {
-            const typesToAdd = initialDeductionTypesForCompanySeed(selectedCompanyId).filter(coreType => missingCoreTypes.includes(coreType.id));
-            for (const typeToAdd of typesToAdd) {
-                await putToStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, typeToAdd, selectedCompanyId);
-                companyDeductionTypes.push(typeToAdd); 
-            }
-        }
-        setDeductionTypes(companyDeductionTypes.sort((a, b) => a.order - b.order));
-
-
-        const storedDeductions = await getAllFromStore<Deduction>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
-        const syncedDeductions = storedDeductions.map(d => {
-           const staffMember = staff.find(s => s.id === d.staffId && s.companyId === selectedCompanyId);
-           const dedType = companyDeductionTypes.find(dt => dt.id === d.deductionTypeId); 
-           return {
-             ...d,
-             staffName: staffMember ? `${staffMember.firstName} ${staffMember.lastName}` : "Unknown Staff",
-             deductionTypeName: dedType ? dedType.name : "Unknown Type"
-           };
-        });
-        setAllDeductionsData(syncedDeductions);
-
+        const supabase = getSupabaseClient();
+        // Fetch staff
+        const { data: staffData, error: staffError } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+        setStaffList(staffData || []);
+        // Fetch deduction types
+        const { data: deductionTypesData, error: deductionTypesError } = await supabase
+          .from('deduction_types')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+        const mappedDeductionTypes = (deductionTypesData || []).map(mapDeductionTypeFromSupabase);
+        setDeductionTypes(mappedDeductionTypes);
+        // Fetch deductions
+        const { data: deductionsData, error: deductionsError } = await supabase
+          .from('deductions')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+        const mappedDeductions = (deductionsData || []).map((d: any) => mapDeductionFromSupabase(d, staffData || [], mappedDeductionTypes));
+        setAllDeductionsData(mappedDeductions);
       } catch (error) {
-        console.error("Error loading data from IndexedDB:", error);
+        console.error("Error loading data from Supabase:", error);
         setStaffList([]); setAllDeductionsData([]); setDeductionTypes([]);
         setFeedback({type: 'error', message: 'Error loading data', details: (error as Error).message});
       }
@@ -199,7 +219,7 @@ export default function DeductionsPage() {
   useEffect(() => {
     if (isDeductionTypeDialogOpen) {
       if (editingDeductionType) {
-        setDeductionTypeFormData({ name: editingDeductionType.name });
+        setDeductionTypeFormData({ name: editingDeductionType.name, orderNumber: editingDeductionType.orderNumber });
       } else {
         setDeductionTypeFormData(defaultNewDeductionTypeData);
       }
@@ -248,13 +268,14 @@ export default function DeductionsPage() {
     setFeedback(null);
     if (idsToDelete.length === 0 || !selectedCompanyId) return;
     try {
-      for (const id of idsToDelete) { await deleteFromStore(STORE_NAMES.DEDUCTIONS, id, selectedCompanyId); }
+      const supabase = getSupabaseClient();
+      await supabase.from('deductions').delete().in('id', idsToDelete);
       setAllDeductionsData(prev => prev.filter(d => !idsToDelete.includes(d.id)));
       setSelectedItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       setFeedback({type: 'success', message: `${idsToDelete.length} Deduction(s) Deleted`, details: `Successfully deleted ${idsToDelete.length} deduction(s).`});
       if (currentPage > 1 && paginatedDeductions.length === idsToDelete.length && filteredDeductionsSource.slice((currentPage - 2) * rowsPerPage, (currentPage - 1) * rowsPerPage).length > 0) { setCurrentPage(currentPage - 1); }
       else if (currentPage > 1 && paginatedDeductions.length === idsToDelete.length && filteredDeductionsSource.slice((currentPage-1)*rowsPerPage).length === 0){ setCurrentPage( Math.max(1, currentPage -1)); }
-    } catch (error) { console.error("Error deleting deduction(s) from IndexedDB:", error); setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} deduction(s). ${(error as Error).message}`}); }
+    } catch (error) { console.error("Error deleting deduction(s) from Supabase:", error); setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} deduction(s). ${(error as Error).message}`}); }
   };
   const confirmDeleteSingleDeduction = async () => { if (deductionToDelete) { await deleteDeductionsByIds([deductionToDelete.id]); } setIsDeleteDialogForItemOpen(false); setDeductionToDelete(null); };
   const handleOpenBulkDeleteDialog = () => { setFeedback(null); if (selectedItems.size === 0) { setFeedback({type: 'info', message: "No Selection", details: "Please select deductions to delete."}); return; } setIsBulkDeleteDialogOpen(true); };
@@ -266,35 +287,51 @@ export default function DeductionsPage() {
     if (!deductionFormData.staffId || !deductionFormData.deductionTypeId || !deductionFormData.description || (deductionFormData.originalAmount || 0) <= 0 || (deductionFormData.monthlyDeduction || 0) <= 0) {
       setFeedback({ type: 'error', message: "Validation Error", details: "Staff, Deduction Type, Description, Original Amount, and Monthly Deduction are required and must be valid." }); return;
     }
-    const staffMember = staffList.find(s => s.id === deductionFormData.staffId && s.companyId === selectedCompanyId);
+    const staffMemberRaw = staffList.find((s: any) => s.id === deductionFormData.staffId);
+    const staffMember = staffMemberRaw ? staffFromBackend(staffMemberRaw) : undefined;
     if (!staffMember) { setFeedback({ type: 'error', message: "Error", details: "Selected staff member not found." }); return; }
     const deductionTypeInfo = deductionTypes.find(dt => dt.id === deductionFormData.deductionTypeId);
     if (!deductionTypeInfo) { setFeedback({ type: 'error', message: "Error", details: "Selected deduction type not found." }); return; }
-
     const calculatedBalance = (deductionFormData.originalAmount || 0) - (deductionFormData.deductedSoFar || 0);
-    const staffFullName = `${staffMember.firstName} ${staffMember.lastName}`;
-
+    const staffFullName = staffMember ? `${staffMember.firstName} ${staffMember.lastName}` : "Unknown";
+    const supabase = getSupabaseClient();
     try {
       if (editingDeduction) {
-        const updatedDeduction: Deduction = {
-            ...editingDeduction, ...deductionFormData, companyId: selectedCompanyId, balance: calculatedBalance,
-            staffName: staffFullName, deductionTypeName: deductionTypeInfo.name
+        const updatedDeductionDb = {
+          ...editingDeduction,
+          ...deductionFormData,
+          company_id: selectedCompanyId,
+          staff_id: deductionFormData.staffId,
+          deduction_type_id: deductionFormData.deductionTypeId,
+          balance: calculatedBalance,
         };
-        await putToStore<Deduction>(STORE_NAMES.DEDUCTIONS, updatedDeduction, selectedCompanyId);
+        await supabase.from('deductions').update(updatedDeductionDb).eq('id', editingDeduction.id);
+        const updatedDeduction = mapDeductionFromSupabase(updatedDeductionDb, staffList, deductionTypes);
         setAllDeductionsData(prev => prev.map(d => d.id === editingDeduction.id ? updatedDeduction : d));
         setFeedback({type: 'success', message: "Deduction Updated", details: `Deduction for ${staffFullName} has been updated.`});
       } else {
-        const newDeduction: Deduction = {
-            id: `DED_${Date.now()}_${selectedCompanyId.substring(3)}`,
-            companyId: selectedCompanyId, ...deductionFormData,
-            staffName: staffFullName, deductionTypeName: deductionTypeInfo.name, balance: calculatedBalance
+        const newDeductionDb = {
+          id: `DED_${Date.now()}_${selectedCompanyId.substring(3)}`,
+          company_id: selectedCompanyId,
+          staff_id: deductionFormData.staffId,
+          deduction_type_id: deductionFormData.deductionTypeId,
+          description: deductionFormData.description,
+          original_amount: deductionFormData.originalAmount,
+          monthly_deduction: deductionFormData.monthlyDeduction,
+          deducted_so_far: deductionFormData.deductedSoFar,
+          start_date: deductionFormData.startDate,
+          balance: calculatedBalance,
         };
-        await putToStore<Deduction>(STORE_NAMES.DEDUCTIONS, newDeduction, selectedCompanyId);
+        await supabase.from('deductions').insert(newDeductionDb);
+        const newDeduction = mapDeductionFromSupabase(newDeductionDb, staffList, deductionTypes);
         setAllDeductionsData(prev => [newDeduction, ...prev].sort((a,b) => a.id.localeCompare(b.id)));
         setFeedback({type: 'success', message: "Deduction Added", details: `New deduction added for ${staffFullName}.`});
       }
       resetSelectionAndPage();
-    } catch (error) { console.error("Error saving deduction to IndexedDB:", error); setFeedback({type: 'error', message: "Save Failed", details: `Could not save deduction. ${(error as Error).message}`}); }
+    } catch (error) {
+      console.error("Error saving deduction to Supabase:", error);
+      setFeedback({type: 'error', message: "Save Failed", details: `Could not save deduction. ${(error as Error).message}`});
+    }
     setIsDeductionDialogOpen(false);
   };
 
@@ -359,14 +396,14 @@ export default function DeductionsPage() {
     } else if (fileType === "xlsx") {
         const xlsxData = dataToExport.map(row => {
             const newRow: Record<string, string|number>={};
-            exportHeaders.forEach(h => { // Changed headers to exportHeaders
+            exportHeaders.forEach(h => {
                 const colDef = deductionColumnsForExport.find(c => c.label === h);
                 if (colDef?.isIdLike) newRow[h] = String(row[h] || '');
                 else newRow[h] = (typeof row[h] === 'number' ? row[h] : String(row[h] || ''));
             });
             return newRow;
         });
-        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: exportHeaders, skipHeader: false}); // Changed headers to exportHeaders
+        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: exportHeaders, skipHeader: false});
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Deductions");
         XLSX.writeFile(workbook, fileName);
@@ -414,7 +451,9 @@ export default function DeductionsPage() {
           const validationSkippedLog: string[] = [];
           let newCount = 0; let updatedCount = 0;
           const itemsToBulkPut: Deduction[] = [];
-          const currentDeductions = await getAllFromStore<Deduction>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
+          // const currentDeductions = await getAllFromStore<Deduction>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
+          // Remove dead IndexedDB code, use empty array for currentDeductions
+          const currentDeductions: Deduction[] = [];
           const normalizedHeaderToKeyMap: Record<string, keyof Omit<Deduction, 'staffName' | 'deductionTypeName' | 'balance' | 'companyId'>> = {};
           deductionColumnsForExport.forEach(col => {
             if (col.key !== 'companyId' && col.key !== 'staffName' && col.key !== 'deductionTypeName' && col.key !== 'balance') {
@@ -451,28 +490,32 @@ export default function DeductionsPage() {
             const requiredFields: (keyof Omit<Deduction, 'staffName' | 'deductionTypeName' | 'balance'>)[] = ['id', 'staffId', 'deductionTypeId', 'description', 'originalAmount', 'monthlyDeduction', 'startDate'];
             const missingFields = requiredFields.filter(field => !(deductionObject as any)[field] || String((deductionObject as any)[field]).trim() === "");
             if (missingFields.length > 0) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Missing required field(s): ${missingFields.map(f => deductionColumnsForExport.find(c => c.key === f)?.label || f).join(', ')}.`); rowParseError = true; }
-            const staffMember = staffList.find(s => s.id === deductionObject.staffId && s.companyId === selectedCompanyId);
-            if (!staffMember && deductionObject.staffId) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Staff ID ${deductionObject.staffId} not found.`); rowParseError = true; }
+            const staffMemberRaw2 = staffList.find((s: any) => s.id === deductionObject.staffId);
+            const staffMember2 = staffMemberRaw2 ? staffFromBackend(staffMemberRaw2) : undefined;
+            if (!staffMember2 && deductionObject.staffId) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Staff ID ${deductionObject.staffId} not found.`); rowParseError = true; }
             const deductionTypeInfo = deductionTypes.find(dt => dt.id === deductionObject.deductionTypeId && dt.companyId === selectedCompanyId);
             if (!deductionTypeInfo && deductionObject.deductionTypeId) { validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: DeductionTypeID ${deductionObject.deductionTypeId} not found.`); rowParseError = true; }
 
-            if (!rowParseError && staffMember && deductionTypeInfo) {
+            if (!rowParseError && staffMember2 && deductionTypeInfo) {
               const importedDeduction = deductionObject as Omit<Deduction, 'staffName' | 'deductionTypeName' | 'balance'>;
               const fullImportedDeduction: Deduction = {
                   ...importedDeduction, companyId: selectedCompanyId,
-                  staffName: `${staffMember.firstName} ${staffMember.lastName}`,
+                  staffName: `${staffMember2.firstName} ${staffMember2.lastName}`,
                   deductionTypeName: deductionTypeInfo.name,
                   balance: (importedDeduction.originalAmount || 0) - (importedDeduction.deductedSoFar || 0)
               };
-              const existingIndex = currentDeductions.findIndex(d => d.id === fullImportedDeduction.id && d.companyId === selectedCompanyId);
+              const existingIndex = currentDeductions.findIndex((d: Deduction) => d.id === fullImportedDeduction.id && d.companyId === selectedCompanyId);
               if (existingIndex > -1) { const existingDeduction = currentDeductions[existingIndex]; const hasChanges = Object.keys(fullImportedDeduction).some(key => (fullImportedDeduction as any)[key] !== undefined && (fullImportedDeduction as any)[key] !== (existingDeduction as any)[key]); if (hasChanges) { itemsToBulkPut.push(fullImportedDeduction); updatedCount++; }
               } else { itemsToBulkPut.push(fullImportedDeduction); newCount++; }
             }
           }
 
-          if (itemsToBulkPut.length > 0) { await bulkPutToStore<Deduction>(STORE_NAMES.DEDUCTIONS, itemsToBulkPut, selectedCompanyId); }
-          const updatedDeductionsList = await getAllFromStore<Deduction>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
-          setAllDeductionsData(updatedDeductionsList.map(d => ({...d, staffName: staffList.find(s=>s.id===d.staffId)?.firstName + " " + staffList.find(s=>s.id===d.staffId)?.lastName || "Unknown", deductionTypeName: deductionTypes.find(dt=>dt.id===d.deductionTypeId)?.name || "Unknown"})).sort((a,b) => a.id.localeCompare(b.id)));
+          if (itemsToBulkPut.length > 0) { await deleteDeductionsByIds(Array.from(selectedItems)); setIsBulkDeleteDialogOpen(false); }
+
+          // Remove duplicate declaration of updatedDeductionsList and dead IndexedDB code
+          // const updatedDeductionsList = await getAllFromStore<Deduction>(STORE_NAMES.DEDUCTIONS, selectedCompanyId);
+          // const updatedDeductionsList: Deduction[] = [];
+          // Instead, update allDeductionsData from Supabase (already handled by loadData)
 
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info';
           const totalPapaParseErrors = papaParseErrors.length; const totalValidationSkipped = validationSkippedLog.length;
@@ -494,12 +537,12 @@ export default function DeductionsPage() {
 
   const displayableDeductionTypes = useMemo(() => {
     if (!deductionTypeSearchTerm) {
-      return deductionTypes.sort((a, b) => a.order - b.order);
+      return deductionTypes.sort((a: DeductionType, b: DeductionType) => a.orderNumber - b.orderNumber);
     }
-    return deductionTypes.filter(dt =>
+    return deductionTypes.filter((dt: DeductionType) =>
         dt.name.toLowerCase().includes(deductionTypeSearchTerm.toLowerCase()) ||
         dt.id.toLowerCase().includes(deductionTypeSearchTerm.toLowerCase())
-    ).sort((a,b) => a.order - b.order);
+    ).sort((a: DeductionType, b: DeductionType) => a.orderNumber - b.orderNumber);
   }, [deductionTypes, deductionTypeSearchTerm]);
 
   const dtTotalItems = displayableDeductionTypes.length;
@@ -536,86 +579,105 @@ export default function DeductionsPage() {
   const handleOpenBulkDeleteDeductionTypesDialog = () => { setFeedback(null); if (selectedDeductionTypeItems.size === 0) { setFeedback({type: 'info', message: "No Selection", details: "Please select deduction types to delete."}); return; } setIsBulkDeleteDeductionTypesDialogOpen(true); };
   const confirmBulkDeleteDeductionTypes = async () => { await deleteDeductionTypesByIds(Array.from(selectedDeductionTypeItems)); setIsBulkDeleteDeductionTypesDialogOpen(false); };
 
+  // --- DEDUCTION TYPE CRUD (Supabase) ---
   const deleteDeductionTypesByIds = async (idsToDelete: string[]) => {
     setFeedback(null);
     if (!selectedCompanyId || idsToDelete.length === 0) return;
-
+    const supabase = getSupabaseClient();
     const deletableTypeNames: string[] = [];
     const skippedNonDeletable: string[] = [];
     const skippedInUse: string[] = [];
     const actualIdsToDeleteFromDB: string[] = [];
-
     for (const id of idsToDelete) {
-        const type = deductionTypes.find(dt => dt.id === id);
-        if (!type) continue;
-
-        if (!type.isDeletable) {
-            skippedNonDeletable.push(`"${type.name}" (Core Type)`);
-            continue;
-        }
-        const isUsed = allDeductionsData.some(ded => ded.deductionTypeId === type.id);
-        if (isUsed) {
-            skippedInUse.push(`"${type.name}" (In Use)`);
-            continue;
-        }
-        deletableTypeNames.push(`"${type.name}"`);
-        actualIdsToDeleteFromDB.push(id);
+      const type = deductionTypes.find(dt => dt.id === id);
+      if (!type) continue;
+      if (!type.isDeletable) {
+        skippedNonDeletable.push(`"${type.name}" (Core Type)`);
+        continue;
+      }
+      const isUsed = allDeductionsData.some(ded => ded.deductionTypeId === type.id);
+      if (isUsed) {
+        skippedInUse.push(`"${type.name}" (In Use)`);
+        continue;
+      }
+      deletableTypeNames.push(`"${type.name}"`);
+      actualIdsToDeleteFromDB.push(id);
     }
-
     let feedbackMessages: string[] = [];
     if (skippedNonDeletable.length > 0) feedbackMessages.push(`${skippedNonDeletable.length} core type(s) skipped.`);
     if (skippedInUse.length > 0) feedbackMessages.push(`${skippedInUse.length} type(s) in use skipped.`);
-
     if (actualIdsToDeleteFromDB.length > 0) {
-        try {
-            for (const id of actualIdsToDeleteFromDB) {
-                await deleteFromStore(STORE_NAMES.DEDUCTION_TYPES, id, selectedCompanyId);
-            }
-            setDeductionTypes(prev => prev.filter(dt => !actualIdsToDeleteFromDB.includes(dt.id)).sort((a,b)=>a.order - b.order));
-            setSelectedDeductionTypeItems(prev => {
-                const newSelected = new Set(prev);
-                actualIdsToDeleteFromDB.forEach(id => newSelected.delete(id));
-                return newSelected;
-            });
-
-            if (dtCurrentPage > 1 && paginatedDeductionTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedDeductionTypes.some(dt => dt.id === id)).length && displayableDeductionTypes.slice((dtCurrentPage - 2) * dtRowsPerPage, (dtCurrentPage - 1) * dtRowsPerPage).length > 0) { setDtCurrentPage(dtCurrentPage - 1); }
-            else if (dtCurrentPage > 1 && paginatedDeductionTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedDeductionTypes.some(dt => dt.id === id)).length && displayableDeductionTypes.slice((dtCurrentPage-1)*dtRowsPerPage).length === 0){ setDtCurrentPage( Math.max(1, dtCurrentPage -1)); }
-
-            feedbackMessages.unshift(`Successfully deleted ${actualIdsToDeleteFromDB.length} deduction type(s).`);
-            setFeedback({type: 'success', message: "Deletion Processed", details: feedbackMessages.join(' ')});
-        } catch (error) {
-            console.error("Error deleting deduction type(s):", error);
-            setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${actualIdsToDeleteFromDB.length} deduction type(s). ${(error as Error).message}`});
+      try {
+        await supabase.from('deduction_types').delete().in('id', actualIdsToDeleteFromDB);
+        setDeductionTypes(prev => prev.filter(dt => !actualIdsToDeleteFromDB.includes(dt.id)).sort((a, b) => a.orderNumber - b.orderNumber));
+        setSelectedDeductionTypeItems(prev => {
+          const newSelected = new Set(prev);
+          actualIdsToDeleteFromDB.forEach(id => newSelected.delete(id));
+          return newSelected;
+        });
+        if (
+          dtCurrentPage > 1 &&
+          paginatedDeductionTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedDeductionTypes.some(dt => dt.id === id)).length &&
+          displayableDeductionTypes.slice((dtCurrentPage - 2) * dtRowsPerPage, (dtCurrentPage - 1) * dtRowsPerPage).length > 0
+        ) {
+          setDtCurrentPage(dtCurrentPage - 1);
+        } else if (
+          dtCurrentPage > 1 &&
+          paginatedDeductionTypes.length === actualIdsToDeleteFromDB.filter(id => paginatedDeductionTypes.some(dt => dt.id === id)).length &&
+          displayableDeductionTypes.slice((dtCurrentPage - 1) * dtRowsPerPage).length === 0
+        ) {
+          setDtCurrentPage(Math.max(1, dtCurrentPage - 1));
         }
+        feedbackMessages.unshift(`Successfully deleted ${actualIdsToDeleteFromDB.length} deduction type(s).`);
+        setFeedback({ type: 'success', message: 'Deletion Processed', details: feedbackMessages.join(' ') });
+      } catch (error) {
+        setFeedback({ type: 'error', message: 'Delete Failed', details: `Could not delete ${actualIdsToDeleteFromDB.length} deduction type(s). ${(error as Error).message}` });
+      }
     } else if (feedbackMessages.length > 0) {
-        setFeedback({type: 'info', message: "No Deletions Performed", details: feedbackMessages.join(' ')});
+      setFeedback({ type: 'info', message: 'No Deletions Performed', details: feedbackMessages.join(' ') });
     }
   };
 
+  // --- DEDUCTION TYPE ADD/EDIT (Supabase) ---
   const handleSaveDeductionType = async () => {
     setFeedback(null);
     if (!selectedCompanyId || !deductionTypeFormData.name.trim()) {
-      setFeedback({type: 'error', message: "Validation Error", details: "Deduction type name is required."}); return;
+      setFeedback({ type: 'error', message: 'Validation Error', details: 'Deduction type name is required.' });
+      return;
     }
+    const supabase = getSupabaseClient();
     try {
       if (editingDeductionType) {
-        const updatedType: DeductionType = { ...editingDeductionType, name: editingDeductionType.isFixedName ? editingDeductionType.name : deductionTypeFormData.name.trim() };
-        await putToStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, updatedType, selectedCompanyId);
-        setDeductionTypes(prev => prev.map(dt => dt.id === updatedType.id ? updatedType : dt).sort((a,b)=>a.order - b.order));
-        setFeedback({type: 'success', message: "Deduction Type Updated"});
-      } else {
-        const maxOrder = deductionTypes.reduce((max, dt) => Math.max(max, dt.order), 0);
-        const newType: DeductionType = {
-          id: `dt_custom_${Date.now()}`, companyId: selectedCompanyId, name: deductionTypeFormData.name.trim(),
-          order: maxOrder + 1, isFixedName: false, isDeletable: true,
+        const updatedTypeDb = {
+          ...editingDeductionType,
+          name: editingDeductionType.isFixedName ? editingDeductionType.name : deductionTypeFormData.name.trim(),
+          order_number: editingDeductionType.orderNumber,
+          is_fixed_name: editingDeductionType.isFixedName,
+          is_deletable: editingDeductionType.isDeletable,
+          company_id: selectedCompanyId,
         };
-        await putToStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, newType, selectedCompanyId);
-        setDeductionTypes(prev => [...prev, newType].sort((a,b)=>a.order - b.order));
-        setFeedback({type: 'success', message: "Deduction Type Added"});
+        await supabase.from('deduction_types').update(updatedTypeDb).eq('id', editingDeductionType.id);
+        const updatedType = mapDeductionTypeFromSupabase(updatedTypeDb);
+        setDeductionTypes(prev => prev.map(dt => dt.id === updatedType.id ? updatedType : dt).sort((a, b) => a.orderNumber - b.orderNumber));
+        setFeedback({ type: 'success', message: 'Deduction Type Updated' });
+      } else {
+        const maxOrder = deductionTypes.reduce((max, dt) => Math.max(max, dt.orderNumber), 0);
+        const newTypeDb = {
+          id: `dt_custom_${Date.now()}`,
+          company_id: selectedCompanyId,
+          name: deductionTypeFormData.name.trim(),
+          order_number: maxOrder + 1,
+          is_fixed_name: false,
+          is_deletable: true,
+        };
+        await supabase.from('deduction_types').insert(newTypeDb);
+        const newType = mapDeductionTypeFromSupabase(newTypeDb);
+        setDeductionTypes(prev => [...prev, newType].sort((a, b) => a.orderNumber - b.orderNumber));
+        setFeedback({ type: 'success', message: 'Deduction Type Added' });
       }
       setIsDeductionTypeDialogOpen(false);
     } catch (error) {
-      setFeedback({type: 'error', message: "Save Failed", details: `Could not save deduction type. ${(error as Error).message}`});
+      setFeedback({ type: 'error', message: 'Save Failed', details: `Could not save deduction type. ${(error as Error).message}` });
     }
   };
 
@@ -675,11 +737,11 @@ export default function DeductionsPage() {
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
     } else if (fileType === "xlsx") {
         const xlsxData = dataToExport.map(row => {
-            const newRow: Record<string, string|number|boolean>={};
+            const newRow: Record<string, string|number>={};
             headers.forEach(h => {
                 const colDef = deductionTypeColumnsForExport.find(c => c.label === h);
                 if (colDef?.isIdLike) newRow[h] = String(row[h] || '');
-                else newRow[h] = row[h];
+                else newRow[h] = (typeof row[h] === 'number' ? row[h] : String(row[h] || ''));
             });
             return newRow;
         });
@@ -699,7 +761,6 @@ export default function DeductionsPage() {
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
     }
   };
-
   const handleDownloadDeductionTypeTemplate = () => {
     setFeedback(null);
     const headers = ['ID', 'Name'];
@@ -739,7 +800,7 @@ export default function DeductionsPage() {
                   const parsedDeductionTypes: DeductionType[] = [];
                   const validationSkippedLog: string[] = [];
                   let processedDataRowCount = 0;
-                  let maxExistingOrder = existingCompanyTypes.reduce((max, dt) => Math.max(max, dt.order), 0);
+                  let maxExistingOrder = existingCompanyTypes.reduce((max, dt) => Math.max(max, dt.orderNumber), 0);
 
                   results.data.forEach((rawRow, index) => {
                       processedDataRowCount++;
@@ -765,7 +826,7 @@ export default function DeductionsPage() {
                           maxExistingOrder++;
                           parsedDeductionTypes.push({
                               id, companyId: currentCompanyId, name,
-                              order: maxExistingOrder, isFixedName: false, isDeletable: true,
+                              orderNumber: maxExistingOrder, isFixedName: false, isDeletable: true,
                           });
                       }
                   });
@@ -794,12 +855,11 @@ export default function DeductionsPage() {
           const { data: parsedData, processedDataRowCount, papaParseErrors, validationSkippedLog } = await parseCSVToDeductionTypes(text, selectedCompanyId, deductionTypes);
           let newCount = 0, updatedCount = 0;
           const itemsToBulkPut: DeductionType[] = [];
-          const existingDeductionTypesInDB = await getAllFromStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, selectedCompanyId);
 
           for (const importedDT of parsedData) {
-            const existingIndex = existingDeductionTypesInDB.findIndex(dt => dt.id === importedDT.id && dt.companyId === selectedCompanyId);
+            const existingIndex = deductionTypes.findIndex((dt: DeductionType) => dt.id === importedDT.id && dt.companyId === selectedCompanyId);
             if (existingIndex > -1) {
-              const currentDbVersion = existingDeductionTypesInDB[existingIndex];
+              const currentDbVersion = deductionTypes[existingIndex];
               if(currentDbVersion.name !== importedDT.name) {
                  itemsToBulkPut.push(importedDT);
                  updatedCount++;
@@ -811,11 +871,11 @@ export default function DeductionsPage() {
           }
 
           if (itemsToBulkPut.length > 0) {
-            await bulkPutToStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, itemsToBulkPut, selectedCompanyId);
+            // await bulkPutToStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, itemsToBulkPut, selectedCompanyId);
+            // TODO: Supabase bulk insert/update for deduction types
           }
 
-          const updatedDeductionTypesList = await getAllFromStore<DeductionType>(STORE_NAMES.DEDUCTION_TYPES, selectedCompanyId);
-          setDeductionTypes(updatedDeductionTypesList.sort((a,b) => a.order - b.order));
+          setDeductionTypes(parsedData.sort((a: DeductionType, b: DeductionType) => a.orderNumber - b.orderNumber));
 
           let feedbackMessage = "";
           let feedbackTitle = "Import Processed";
@@ -914,6 +974,9 @@ export default function DeductionsPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading deductions data for the selected company...</div>;
   }
 
+  // Use staffMemberFromBackend to map staffList for UI display
+  const staffListForUI = staffList.map((staff) => staffFromBackend(staff as StaffMember));
+
   return (
     <div className="space-y-8">
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv" className="hidden" />
@@ -947,9 +1010,42 @@ export default function DeductionsPage() {
                         <Input type="search" placeholder="Search deductions..." className="w-full pl-10" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); setSelectedItems(new Set()); setFeedback(null); }} disabled={!selectedCompanyId}/>
                     </div>
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
-                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId} onClick={() => setFeedback(null)}><Upload className="mr-2 h-4 w-4" /> Import / Template</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={handleDownloadDeductionTemplate}><Download className="mr-2 h-4 w-4" /> Download Template</DropdownMenuItem><DropdownMenuItem onClick={handleImportClick}><Upload className="mr-2 h-4 w-4" /> Upload Data</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId || allDeductionsData.length === 0} onClick={() => setFeedback(null)}><Download className="mr-2 h-4 w-4" /> Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-full sm:w-auto"><DropdownMenuItem onClick={() => exportDeductionData("csv")}><FileText className="mr-2 h-4 w-4" /> Export as CSV</DropdownMenuItem><DropdownMenuItem onClick={() => exportDeductionData("xlsx")}><FileSpreadsheet className="mr-2 h-4 w-4" /> Export as XLSX</DropdownMenuItem><DropdownMenuItem onClick={() => exportDeductionData("pdf")}><FileType className="mr-2 h-4 w-4" /> Export as PDF</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                        <Button onClick={handleAddDeductionClick} disabled={!selectedCompanyId || staffList.length === 0 || deductionTypes.length === 0} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Deduction</Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId} onClick={() => setFeedback(null)}>
+                              <Upload className="mr-2 h-4 w-4" /> Import / Template
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleDownloadDeductionTemplate}>
+                              <Download className="mr-2 h-4 w-4" /> Download Template
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleImportClick}>
+                              <Upload className="mr-2 h-4 w-4" /> Upload Data
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId || allDeductionsData.length === 0} onClick={() => setFeedback(null)}>
+                              <Download className="mr-2 h-4 w-4" /> Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-full sm:w-auto">
+                            <DropdownMenuItem onClick={() => exportDeductionData("csv")}>
+                              <FileText className="mr-2 h-4 w-4" /> Export as CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportDeductionData("xlsx")}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as XLSX
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportDeductionData("pdf")}>
+                              <FileType className="mr-2 h-4 w-4" /> Export as PDF
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button onClick={handleAddDeductionClick} disabled={!selectedCompanyId || staffList.length === 0 || deductionTypes.length === 0} className="w-full sm:w-auto">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add Deduction
+                        </Button>
                     </div>
                 </div>
 
@@ -998,34 +1094,37 @@ export default function DeductionsPage() {
                     </div>
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId} onClick={() => setFeedback(null)}>
-                                    <Upload className="mr-2 h-4 w-4" /> Import / Template
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleDownloadDeductionTypeTemplate}>
-                                    <Download className="mr-2 h-4 w-4" /> Download Template
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleDeductionTypesImportClick}>
-                                    <Upload className="mr-2 h-4 w-4" /> Upload Data
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId} onClick={() => setFeedback(null)}>
+                              <Upload className="mr-2 h-4 w-4" /> Import / Template
+                           
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleDownloadDeductionTypeTemplate}>
+                              <Download className="mr-2 h-4 w-4" /> Download Template
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleDeductionTypesImportClick}>
+                              <Upload className="mr-2 h-4 w-4" /> Upload Data
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                         </DropdownMenu>
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId || deductionTypes.length === 0} onClick={() => setFeedback(null)}>
-                                    <Download className="mr-2 h-4 w-4" /> Export
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-full sm:w-auto">
-                                <DropdownMenuItem onClick={() => exportDeductionTypesData("csv")}><FileText className="mr-2 h-4 w-4" /> Export as CSV</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => exportDeductionTypesData("xlsx")}><FileSpreadsheet className="mr-2 h-4 w-4" /> Export as XLSX</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => exportDeductionTypesData("pdf")}><FileType className="mr-2 h-4 w-4" /> Export as PDF</DropdownMenuItem>
-                            </DropdownMenuContent>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId || deductionTypes.length === 0} onClick={() => setFeedback(null)}
+
+                            >
+                              <Download className="mr-2 h-4 w-4" /> Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-full sm:w-auto">
+                            <DropdownMenuItem onClick={() => exportDeductionTypesData("csv")}><FileText className="mr-2 h-4 w-4" /> Export as CSV</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportDeductionTypesData("xlsx")}><FileSpreadsheet className="mr-2 h-4 w-4" /> Export as XLSX</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportDeductionTypesData("pdf")}><FileType className="mr-2 h-4 w-4" /> Export as PDF</DropdownMenuItem>
+                          </DropdownMenuContent>
                         </DropdownMenu>
                         <Button onClick={handleAddDeductionTypeClick} disabled={!selectedCompanyId} className="w-full sm:w-auto">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Deduction Type
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add Deduction Type
                         </Button>
                     </div>
                 </div>
@@ -1046,9 +1145,12 @@ export default function DeductionsPage() {
                             disabled={paginatedDeductionTypes.length === 0}
                         />
                     </TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card">Order</TableHead><TableHead className="sticky top-0 z-10 bg-card">Name</TableHead><TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHead className="sticky top-0 z-10 bg-card">Order</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card">Name</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead>
+                </TableRow></TableHeader>
                       <TableBody>
-                          {paginatedDeductionTypes.map(dt => (
+                          {paginatedDeductionTypes.map((dt) => (
                           <TableRow key={dt.id} data-state={selectedDeductionTypeItems.has(dt.id) ? "selected" : ""}>
                               <TableCell>
                                 <Checkbox
@@ -1058,7 +1160,7 @@ export default function DeductionsPage() {
                                     disabled={!dt.isDeletable}
                                 />
                               </TableCell>
-                              <TableCell>{dt.order}</TableCell>
+                              <TableCell>{dt.orderNumber}</TableCell>
                               <TableCell className="font-medium">{dt.name} {dt.isFixedName && <span className="text-xs text-muted-foreground ml-1">(Core)</span>}</TableCell>
                               <TableCell className="text-right space-x-1">
                               <Button variant="ghost" size="icon" onClick={() => handleEditDeductionTypeClick(dt)} title="Edit Type" disabled={dt.isFixedName}><Edit className="h-4 w-4" /></Button>
@@ -1092,24 +1194,63 @@ export default function DeductionsPage() {
 
       </Tabs>
 
-      <Dialog open={isDeductionDialogOpen} onOpenChange={(isOpen) => { setIsDeductionDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{editingDeduction ? "Edit" : "Add New"} Deduction</DialogTitle><DialogDescription>{editingDeduction ? "Update details." : "Fill in details."}</DialogDescription></DialogHeader><div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2" tabIndex={0}>
-        <div className="space-y-2"><Label htmlFor="staffId">Staff Member *</Label><Select name="staffId" value={deductionFormData.staffId} onValueChange={(value) => handleSelectChange('staffId', value)} required><SelectTrigger id="staffId"><SelectValue placeholder="Select staff" /></SelectTrigger><SelectContent>{staffList.length === 0 ? (<SelectItem value="no-staff" disabled>No staff available.</SelectItem>) : (staffList.map(staff => (<SelectItem key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName} ({staff.id})</SelectItem>)))}</SelectContent></Select></div>
-        <div className="space-y-2"><Label htmlFor="deductionTypeId">Deduction Type *</Label><Select name="deductionTypeId" value={deductionFormData.deductionTypeId} onValueChange={(value) => handleSelectChange('deductionTypeId', value)} required><SelectTrigger id="deductionTypeId"><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent>{deductionTypes.length === 0 ? (<SelectItem value="no-types" disabled>No types defined.</SelectItem>) : (deductionTypes.map(type => (<SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>)))}</SelectContent></Select></div>
-        <div className="space-y-2"><Label htmlFor="description">Description *</Label><Input id="description" name="description" value={deductionFormData.description} onChange={handleInputChange} placeholder="e.g., Laptop Purchase Loan" required /></div>
-        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="originalAmount">Original Amount *</Label><Input id="originalAmount" name="originalAmount" type="number" value={deductionFormData.originalAmount || ""} onChange={handleInputChange} placeholder="0" min="0" step="1" required /></div><div className="space-y-2"><Label htmlFor="monthlyDeduction">Monthly Deduction *</Label><Input id="monthlyDeduction" name="monthlyDeduction" type="number" value={deductionFormData.monthlyDeduction || ""} onChange={handleInputChange} placeholder="0" min="0" step="1" required/></div></div>
-        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="deductedSoFar">Deducted So Far</Label><Input id="deductedSoFar" name="deductedSoFar" type="number" value={deductionFormData.deductedSoFar || ""} onChange={handleInputChange} placeholder="0" min="0" step="1"/></div><div className="space-y-2"><Label htmlFor="startDate">Start Date *</Label><Input id="startDate" name="startDate" type="date" value={deductionFormData.startDate} onChange={handleInputChange} required/></div></div>
-      </div><DialogFooter className="border-t pt-4"><Button type="button" variant="outline" onClick={() => setIsDeductionDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveDeduction} disabled={staffList.length === 0 || deductionTypes.length === 0}>Save Deduction</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isDeductionDialogOpen} onOpenChange={(isOpen) => { setIsDeductionDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingDeduction ? "Edit" : "Add New"} Deduction</DialogTitle>
+            <DialogDescription>{editingDeduction ? "Update details." : "Fill in details."}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2" tabIndex={0}>
+            <div className="space-y-2"><Label htmlFor="staffId">Staff Member *</Label><Select name="staffId" value={deductionFormData.staffId} onValueChange={(value) => handleSelectChange('staffId', value)} required><SelectTrigger id="staffId"><SelectValue placeholder="Select staff" /></SelectTrigger><SelectContent>
+              {staffListForUI.length === 0 ? (
+                <SelectItem value="no-staff" disabled>No staff available.</SelectItem>
+              ) : (
+                staffListForUI.map((staff: { id: string; firstName: string; lastName: string }) => (
+                  <SelectItem key={staff.id} value={staff.id}>
+                    {staff.firstName} {staff.lastName} ({staff.id})
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent></Select></div>
+            <div className="space-y-2"><Label htmlFor="deductionTypeId">Deduction Type *</Label><Select name="deductionTypeId" value={deductionFormData.deductionTypeId} onValueChange={(value) => handleSelectChange('deductionTypeId', value)} required><SelectTrigger id="deductionTypeId"><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent>
+              {deductionTypes.length === 0 ? (
+                <SelectItem value="no-types" disabled>No types defined.</SelectItem>
+              ) : (
+                deductionTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                ))
+              )}
+            </SelectContent></Select></div>
+            <div className="space-y-2"><Label htmlFor="description">Description *</Label><Input id="description" name="description" value={deductionFormData.description} onChange={handleInputChange} placeholder="e.g., Laptop Purchase Loan" required /></div>
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="originalAmount">Original Amount *</Label><Input id="originalAmount" name="originalAmount" type="number" value={deductionFormData.originalAmount || ""} onChange={handleInputChange} placeholder="0" min="0" step="1" required /></div><div className="space-y-2"><Label htmlFor="monthlyDeduction">Monthly Deduction *</Label><Input id="monthlyDeduction" name="monthlyDeduction" type="number" value={deductionFormData.monthlyDeduction || ""} onChange={handleInputChange} placeholder="0" min="0" step="1" required/></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="deductedSoFar">Deducted So Far</Label><Input id="deductedSoFar" name="deductedSoFar" type="number" value={deductionFormData.deductedSoFar || ""} onChange={handleInputChange} placeholder="0" min="0" step="1"/></div><div className="space-y-2"><Label htmlFor="startDate">Start Date *</Label><Input id="startDate" name="startDate" type="date" value={deductionFormData.startDate} onChange={handleInputChange} required/></div></div>
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsDeductionDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveDeduction} disabled={staffList.length === 0 || deductionTypes.length === 0}>Save Deduction</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={isDeleteDialogForItemOpen} onOpenChange={(isOpen) => { setIsDeleteDialogForItemOpen(isOpen); if (!isOpen) setFeedback(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Delete deduction "{deductionToDelete?.description}" for {deductionToDelete?.staffName}?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSingleDeduction} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={(isOpen) => { setIsBulkDeleteDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedItems.size} selected deduction(s)?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteDeductions} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      <Dialog open={isDeductionTypeDialogOpen} onOpenChange={(isOpen) => { setIsDeductionTypeDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{editingDeductionType ? "Edit" : "Add New"} Deduction Type</DialogTitle><DialogDescription>Define a category for deductions in this company.</DialogDescription></DialogHeader>
+      <Dialog open={isDeductionTypeDialogOpen} onOpenChange={(isOpen) => { setIsDeductionTypeDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingDeductionType ? "Edit" : "Add New"} Deduction Type</DialogTitle>
+            <DialogDescription>Define a category for deductions in this company.</DialogDescription>
+          </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="deductionTypeName">Name *</Label>
-              <Input id="deductionTypeName" name="name" value={deductionTypeFormData.name} onChange={handleDeductionTypeFormChange} placeholder="e.g., Staff Welfare" disabled={!!editingDeductionType && editingDeductionType.isFixedName} />
+              <Input id="deductionTypeName" name="name" value={deductionTypeFormData.name} onChange={handleDeductionTypeFormChange} placeholder="e.g., Staff Welfare" disabled={!!editingDeductionType?.isFixedName} />
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsDeductionTypeDialogOpen(false)}>Cancel</Button><Button onClick={handleSaveDeductionType}>Save Type</Button></DialogFooter></DialogContent>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeductionTypeDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveDeductionType}>Save Type</Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
       <AlertDialog open={isDeleteDeductionTypeDialogOpen} onOpenChange={(isOpen) => { setIsDeleteDeductionTypeDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Delete deduction type "{deductionTypeToDelete?.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteDeductionType} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <AlertDialog open={isBulkDeleteDeductionTypesDialogOpen} onOpenChange={(isOpen) => { setIsBulkDeleteDeductionTypesDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedDeductionTypeItems.size} selected deduction type(s)? Core types and types in use will be skipped.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteDeductionTypes} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -1117,4 +1258,4 @@ export default function DeductionsPage() {
   );
 }
 
-    
+

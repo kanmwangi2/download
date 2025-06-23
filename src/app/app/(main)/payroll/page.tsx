@@ -84,8 +84,6 @@ interface CurrentUser {
   assignedCompanyIds: string[];
 }
 
-const CURRENT_USER_LOCALSTORAGE_KEY = "cheetahPayrollCurrentUser";
-
 const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementType; textColor?: string }> = {
   Draft: { color: "bg-gray-500 hover:bg-gray-600", icon: Hourglass, textColor: "text-white" },
   "To Approve": { color: "bg-blue-500 hover:bg-blue-600", icon: AlertTriangle, textColor: "text-white" },
@@ -518,7 +516,7 @@ export default function PayrollPage() {
             <h1 className="text-3xl font-bold tracking-tight font-headline">Payroll Processing</h1>
           </div>
           <p className="text-muted-foreground">
-            Create, manage, and approve payroll runs for the current company. Data persists in your browser via IndexedDB.
+            Create, manage, and approve payroll runs for the current company. Data persists in Supabase.
           </p>
         </div>
       </div>
@@ -785,7 +783,7 @@ export default function PayrollPage() {
         <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
           <li>Only one payroll run can be in a non-"Approved" state (Draft, To Approve, Rejected) at any given time per company.</li>
           <li>You must complete or delete the current non-approved run before creating a new one.</li>
-          <li>Payroll run summaries and details are persisted using your browser's IndexedDB, scoped to the selected company.</li>
+          <li>Payroll run summaries and details are persisted using Supabase, scoped to the selected company.</li>
           <li>Deleting a payroll run will attempt to reverse any deductions that were applied as part of that specific run.</li>
         </ul>
       </div>

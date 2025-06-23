@@ -42,7 +42,7 @@ const formatNumberForTable = (amount?: number): string => {
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
-const defaultNewPaymentTypeData: Omit<PaymentType, 'id' | 'companyId' | 'order' | 'isFixedName' | 'isDeletable'> = {
+const defaultNewPaymentTypeData: Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'> = {
   name: "",
   type: "Gross",
 };
@@ -155,7 +155,7 @@ export default function PaymentsPage() {
           if (!safePaymentTypes.some(t => t.id === id)) {
             const coreType: PaymentType = {
               id, companyId: selectedCompanyId, name,
-              type: "Gross", order, isFixedName: true, isDeletable: false,
+              type: "Gross", orderNumber: order, isFixedName: true, isDeletable: false,
             };
             await upsertPaymentType(coreType);
             coreTypesModified = true;
@@ -298,16 +298,16 @@ export default function PaymentsPage() {
       if (editingPaymentType) {
         const updatedType: PaymentType = { ...editingPaymentType, name: editingPaymentType.isFixedName ? editingPaymentType.name : paymentTypeFormData.name.trim(), type: paymentTypeFormData.type };
         await upsertPaymentType(updatedType);
-        setPaymentTypes(prev => prev.map(pt => pt.id === updatedType.id ? updatedType : pt).sort((a,b)=>a.order - b.order));
+        setPaymentTypes(prev => prev.map(pt => pt.id === updatedType.id ? updatedType : pt).sort((a,b)=>a.orderNumber - b.orderNumber));
         setFeedback({type: 'success', message: "Payment Type Updated"});
       } else {
-        const maxOrder = paymentTypes.reduce((max, pt) => Math.max(max, pt.order), 0);
+        const maxOrder = paymentTypes.reduce((max, pt) => Math.max(max, pt.orderNumber), 0);
         const newType: PaymentType = {
           id: `pt_custom_${Date.now()}`, companyId: selectedCompanyId, name: paymentTypeFormData.name.trim(),
-          type: paymentTypeFormData.type, order: maxOrder + 1, isFixedName: false, isDeletable: true,
+          type: paymentTypeFormData.type, orderNumber: maxOrder + 1, isFixedName: false, isDeletable: true,
         };
         await upsertPaymentType(newType);
-        setPaymentTypes(prev => [...prev, newType].sort((a,b)=>a.order - b.order));
+        setPaymentTypes(prev => [...prev, newType].sort((a,b)=>a.orderNumber - b.orderNumber));
         setFeedback({type: 'success', message: "Payment Type Added"});
       }
       setIsPaymentTypeDialogOpen(false);
@@ -377,7 +377,7 @@ export default function PaymentsPage() {
         .select('*')
         .eq('companyId', selectedCompanyId);
       setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
-      setFeedback({type: 'success', message: "Staff Payments Saved", details: `Details for ${editingStaffForPayments.firstName} ${editingStaffForPayments.lastName} updated.`});
+      setFeedback({type: 'success', message: "Staff Payments Saved", details: `Details for ${editingStaffForPayments.first_name} ${editingStaffForPayments.last_name} updated.`});
     } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: `Could not save staff payment details. ${(error as Error).message}`}); }
     setIsStaffPaymentFormDialogOpen(false);
   };
@@ -395,20 +395,20 @@ export default function PaymentsPage() {
         .eq('companyId', selectedCompanyId);
       setPaymentDataStore(Object.fromEntries((updatedPaymentStore || []).map((config: any) => [config.staffId, config])));
       const staffMember = staffList.find(s => s.id === selectedStaffIdForNewConfig);
-      setFeedback({type: 'success', message: "Payment Configuration Added", details: `Payment details added for ${staffMember?.firstName} ${staffMember?.lastName}.`});
+      setFeedback({type: 'success', message: "Payment Configuration Added", details: `Payment details added for ${staffMember?.first_name} ${staffMember?.last_name}.`});
       setIsAddStaffPaymentDialogOpen(false);
     } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: `Could not save new payment configuration. ${(error as Error).message}`}); }
   };
 
   const displayablePaymentTypes = useMemo(() => {
     if (!paymentTypeSearchTerm) {
-      return paymentTypes.sort((a, b) => a.order - b.order);
+      return paymentTypes.sort((a, b) => a.orderNumber - b.orderNumber);
     }
     return paymentTypes.filter(pt =>
         pt.name.toLowerCase().includes(paymentTypeSearchTerm.toLowerCase()) ||
         pt.type.toLowerCase().includes(paymentTypeSearchTerm.toLowerCase()) ||
         pt.id.toLowerCase().includes(paymentTypeSearchTerm.toLowerCase())
-    ).sort((a,b) => a.order - b.order);
+    ).sort((a,b) => a.orderNumber - b.orderNumber);
   }, [paymentTypes, paymentTypeSearchTerm]);
 
 
@@ -422,7 +422,7 @@ export default function PaymentsPage() {
   const isAllPaymentTypesOnPageSelected = paginatedPaymentTypes.length > 0 && paginatedPaymentTypes.every(item => selectedPaymentTypeItems.has(item.id));
 
 
-  const staffPaymentTableData = useMemo(() => staffList.filter(staff => staff.firstName.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase()) || staff.lastName.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase()) || staff.id.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase())).map(staff => ({ staffId: staff.id, staffName: `${staff.firstName} ${staff.lastName}`, isConfigured: !!paymentDataStore[staff.id] })), [paymentDataStore, staffList, staffPaymentSearchTerm]);
+  const staffPaymentTableData = useMemo(() => staffList.filter(staff => staff.first_name.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase()) || staff.last_name.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase()) || staff.id.toLowerCase().includes(staffPaymentSearchTerm.toLowerCase())).map(staff => ({ staffId: staff.id, staffName: `${staff.first_name} ${staff.last_name}`, isConfigured: !!paymentDataStore[staff.id] })), [paymentDataStore, staffList, staffPaymentSearchTerm]);
   const spTotalItems = staffPaymentTableData.length;
   const spTotalPages = Math.ceil(spTotalItems / spRowsPerPage) || 1;
   const spStartIndex = (spCurrentPage - 1) * spRowsPerPage;
@@ -437,11 +437,11 @@ export default function PaymentsPage() {
   const exportStaffPaymentData = (fileType: "csv" | "xlsx" | "pdf") => {
     setFeedback(null);
     if (!selectedCompanyId || staffList.length === 0) { setFeedback({type: 'error', message: "Error", details: "No company selected or no staff data to export."}); return; }
-    const sortedPaymentTypesForExport = [...paymentTypes].sort((a,b) => a.order - b.order);
+    const sortedPaymentTypesForExport = [...paymentTypes].sort((a,b) => a.orderNumber - b.orderNumber);
     const exportHeaders = ['StaffID', 'StaffName', ...sortedPaymentTypesForExport.map(pt => pt.name)];
     const dataToExport = staffList.map(staff => {
       const details = paymentDataStore[staff.id] || {};
-      const row: Record<string, string | number> = { 'StaffID': String(staff.id), 'StaffName': `${staff.firstName} ${staff.lastName}`};
+      const row: Record<string, string | number> = { 'StaffID': String(staff.id), 'StaffName': `${staff.first_name} ${staff.last_name}`};
       sortedPaymentTypesForExport.forEach(pt => { row[pt.name] = details[pt.id] || 0; }); // Amounts are numbers
       return row;
     });
@@ -542,7 +542,7 @@ export default function PaymentsPage() {
                       }
                       const staffId = String(rawRow[staffIdKey]).trim();
 
-                      if (!currentStaffList.find(s => s.id === staffId && s.companyId === currentCompanyId)) {
+                      if (!currentStaffList.find(s => s.id === staffId && s.company_id === currentCompanyId)) {
                           validationSkippedLog.push(`Row ${originalLineNumber} skipped. Reason: Staff ID ${staffId} not found for current company.`);
                           return;
                       }
@@ -584,16 +584,21 @@ export default function PaymentsPage() {
       reader.onload = async (e) => {
         const text = e.target?.result as string;
          if (!text || text.trim() === "") {
-            setFeedback({type: 'info', message: "Import Note", details: "The CSV file appears to be empty."});
+            setFeedback({type: 'info', message: "Import Note", details: "The CSV file appears to be empty or contains only headers."});
             return;
         }
         try {
           const { data: parsedData, processedDataRowCount, papaParseErrors, validationSkippedLog } = await parseCSVToPaymentDetails(text, selectedCompanyId, paymentTypes, staffList);
-          let newCount = 0; let updatedCount = 0;
+          let newCount = 0; let updatedCount = 0; let upsertError: any = null;
           for (const item of parsedData) {
-            // Supabase: Upsert staff payment config
-            await upsertStaffPaymentConfig({ ...item.details, companyId: selectedCompanyId, staffId: item.staffId });
-            // Optionally, you can check if the config exists by fetching it first if needed
+            try {
+              await upsertStaffPaymentConfig({ ...item.details, companyId: selectedCompanyId, staffId: item.staffId });
+              // Optionally, you can check if the config exists by fetching it first if needed
+              // You may want to increment newCount/updatedCount based on upsert result
+            } catch (err) {
+              upsertError = err;
+              break;
+            }
           }
           // Supabase: Fetch all staff payment configs for the company
           const updatedPaymentStore = await fetchStaffPaymentConfigs(selectedCompanyId);
@@ -605,7 +610,11 @@ export default function PaymentsPage() {
           const totalPapaParseErrors = papaParseErrors.length;
           const totalValidationSkipped = validationSkippedLog.length;
 
-          if (newCount > 0 || updatedCount > 0) {
+          if (upsertError) {
+            setFeedback({type: 'error', message: "Import Failed", details: upsertError.message || String(upsertError)});
+            return;
+          }
+          if ((newCount > 0 || updatedCount > 0) && !upsertError) {
             feedbackTitle = "Import Successful";
             feedbackMessage = `${newCount} records added, ${updatedCount} records updated.`;
             feedbackType = 'success';
@@ -613,7 +622,7 @@ export default function PaymentsPage() {
             feedbackTitle = "Import Failed";
             feedbackMessage = `All ${processedDataRowCount} data row(s) were processed, but no valid payment configurations could be imported.`;
             feedbackType = 'error';
-          } else if (parsedData.length === 0 && processedDataRowCount === 0 && (totalPapaParseErrors > 0 || text.split('\\n').filter(l => l.trim() !== '').length > 1) ) {
+          } else if (parsedData.length === 0 && processedDataRowCount === 0 && (totalPapaParseErrors > 0 || text.split('\n').filter(l => l.trim() !== '').length > 1) ) {
             feedbackTitle = "Import Failed";
             feedbackMessage = `No data rows found or all rows had critical parsing errors. Please check CSV structure.`;
             feedbackType = 'error';
@@ -643,7 +652,7 @@ export default function PaymentsPage() {
     { key: 'id', label: 'ID', isIdLike: true },
     { key: 'name', label: 'Name' },
     { key: 'type', label: 'Type (Gross/Net)' },
-    { key: 'order', label: 'Order' },
+    { key: 'orderNumber', label: 'Order' },
     { key: 'isFixedName', label: 'IsFixedName' },
     { key: 'isDeletable', label: 'IsDeletable' },
   ];
@@ -769,7 +778,7 @@ export default function PaymentsPage() {
                   const parsedPaymentTypes: PaymentType[] = [];
                   const validationSkippedLog: string[] = [];
                   let processedDataRowCount = 0;
-                  let maxExistingOrder = existingCompanyTypes.reduce((max, pt) => Math.max(max, pt.order), 0);
+                  let maxExistingOrder = existingCompanyTypes.reduce((max, pt) => Math.max(max, pt.orderNumber), 0);
 
                   results.data.forEach((rawRow, index) => {
                       processedDataRowCount++;
@@ -806,7 +815,7 @@ export default function PaymentsPage() {
                           maxExistingOrder++;
                           parsedPaymentTypes.push({
                               id, companyId: currentCompanyId, name, type,
-                              order: maxExistingOrder, isFixedName: false, isDeletable: true,
+                              orderNumber: maxExistingOrder, isFixedName: false, isDeletable: true,
                           });
                       }
                   });
@@ -852,7 +861,7 @@ export default function PaymentsPage() {
                 companyId: selectedCompanyId,
                 name: importedPT.name,
                 type: importedPT.type,
-                order: importedPT.order,
+                orderNumber: importedPT.orderNumber,
                 isFixedName: false,
                 isDeletable: true
               }).select();
@@ -869,7 +878,7 @@ export default function PaymentsPage() {
             }
           }
           const safeUpdatedPaymentTypesList = updatedPaymentTypesList || [];
-          setPaymentTypes(safeUpdatedPaymentTypesList.sort((a: PaymentType, b: PaymentType) => a.order - b.order));
+          setPaymentTypes(safeUpdatedPaymentTypesList.sort((a: PaymentType, b: PaymentType) => a.orderNumber - b.orderNumber));
 
           let feedbackMessage = "";
           let feedbackTitle = "Import Processed";
@@ -955,11 +964,11 @@ export default function PaymentsPage() {
     : paymentTypes.length === 0 ? "Define Payment Types first for this company."
     : staffWithoutPaymentConfig.length === 0 ? "All staff in this company already have payment configurations."
     : "Add new payment configuration for a staff member.";
-
   return (
-    <div className="space-y-8">
-      <input type="file" ref={staffPaymentImportFileInputRef} onChange={handleStaffPaymentFileUpload} accept=".csv" className="hidden" />
-      <input type="file" ref={paymentTypesImportFileInputRef} onChange={handlePaymentTypesFileUpload} accept=".csv" className="hidden" />
+    <>
+      <div className="space-y-8">
+        <input type="file" ref={staffPaymentImportFileInputRef} onChange={handleStaffPaymentFileUpload} accept=".csv" className="hidden" />
+        <input type="file" ref={paymentTypesImportFileInputRef} onChange={handlePaymentTypesFileUpload} accept=".csv" className="hidden" />
 
       <div className="flex items-center gap-2 mb-1">
         <CreditCard className="h-7 w-7 text-primary" />
@@ -988,8 +997,7 @@ export default function PaymentsPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input type="search" placeholder="Search staff..." className="w-full pl-10" value={staffPaymentSearchTerm} onChange={(e) => { setStaffPaymentSearchTerm(e.target.value); setSpCurrentPage(1); setSelectedStaffPaymentItems(new Set()); setFeedback(null);}} disabled={!selectedCompanyId}/>
                     </div>
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
-                        <DropdownMenu>
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">                        <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" className="w-full sm:w-auto" disabled={!selectedCompanyId} onClick={() => setFeedback(null)}>
                                     <Upload className="mr-2 h-4 w-4" /> Import / Template
@@ -1145,7 +1153,7 @@ export default function PaymentsPage() {
                                     disabled={!pt.isDeletable}
                                 />
                               </TableCell>
-                              <TableCell>{pt.order}</TableCell>
+                              <TableCell>{pt.orderNumber}</TableCell>
                               <TableCell className="font-medium">{pt.name} {(pt.id === DEFAULT_BASIC_PAY_ID || pt.id === DEFAULT_TRANSPORT_ALLOWANCE_ID) && <span className="text-xs text-muted-foreground ml-1">(Core)</span>}
                               {pt.name.toLowerCase() === "house allowance" && (
                                   <TooltipProvider delayDuration={100}>
@@ -1236,7 +1244,7 @@ export default function PaymentsPage() {
       <Dialog open={isStaffPaymentFormDialogOpen} onOpenChange={(isOpen) => { setIsStaffPaymentFormDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
         <DialogContent className="sm:max-w-lg md:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Edit Payment Details for {editingStaffForPayments?.firstName} {editingStaffForPayments?.lastName}</DialogTitle>
+            <DialogTitle>Edit Payment Details for {editingStaffForPayments?.first_name} {editingStaffForPayments?.last_name}</DialogTitle>
             <DialogDescription>Update amounts for each defined Payment Type (Gross/Net status is fixed by type).</DialogDescription>
           </DialogHeader>
           <ScrollArea>
@@ -1258,7 +1266,7 @@ export default function PaymentsPage() {
       </Dialog>
       <Dialog open={isAddStaffPaymentDialogOpen} onOpenChange={(isOpen) => { setIsAddStaffPaymentDialogOpen(isOpen); if (!isOpen) setFeedback(null); }}>
         <DialogContent className="sm:max-w-lg md:max-w-xl"><DialogHeader><DialogTitle>Add New Staff Payment Configuration</DialogTitle><DialogDescription>Select staff from current company without existing payment details.</DialogDescription></DialogHeader><ScrollArea className="max-h-[60vh] pr-3" tabIndex={0}><div className="space-y-4 py-4">
-          <div className="space-y-2"><Label htmlFor="addStaffSelect">Staff Member *</Label><Select value={selectedStaffIdForNewConfig} onValueChange={setSelectedStaffIdForNewConfig} required><SelectTrigger id="addStaffSelect"><SelectValue placeholder="Select staff member" /></SelectTrigger><SelectContent>{staffWithoutPaymentConfig.length === 0 ? (<SelectItem value="no-staff" disabled>No staff available without payment config.</SelectItem>) : (staffWithoutPaymentConfig.map(staff => (<SelectItem key={staff.id} value={staff.id}>{staff.firstName} {staff.lastName} ({staff.id})</SelectItem>)))}</SelectContent></Select></div>
+          <div className="space-y-2"><Label htmlFor="addStaffSelect">Staff Member *</Label><Select value={selectedStaffIdForNewConfig} onValueChange={setSelectedStaffIdForNewConfig} required><SelectTrigger id="addStaffSelect"><SelectValue placeholder="Select staff member" /></SelectTrigger><SelectContent>{staffWithoutPaymentConfig.length === 0 ? (<SelectItem value="no-staff" disabled>No staff available without payment config.</SelectItem>) : (staffWithoutPaymentConfig.map(staff => (<SelectItem key={staff.id} value={staff.id}>{staff.first_name} {staff.last_name} ({staff.id})</SelectItem>)))}</SelectContent></Select></div>
           {selectedStaffIdForNewConfig && paymentTypes.length > 0 && (<div className="grid grid-cols-1 gap-4">{paymentTypes.map(pt => (<div key={`add-${pt.id}`} className="space-y-2 p-3 border rounded-md bg-muted/20"><Label htmlFor={`addstaffpay-${pt.id}`}>{pt.name} ({pt.type})</Label><Input id={`addstaffpay-${pt.id}`} type="number" value={currentStaffPaymentFormData[pt.id] || ""} onChange={(e) => handleStaffPaymentFormAmountChange(pt.id, e.target.value)} placeholder="0" min="0" step="1"/></div>))}</div>)}
           {paymentTypes.length === 0 && <p className="text-muted-foreground text-center col-span-full py-4">No payment types defined for this company. Please add payment types first.</p>}
         </div></ScrollArea><DialogFooter className="border-t pt-4"><Button type="button" variant="outline" onClick={() => setIsAddStaffPaymentDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveNewStaffPaymentConfig} disabled={!selectedStaffIdForNewConfig || staffWithoutPaymentConfig.length === 0 || paymentTypes.length === 0}><Save className="mr-2 h-4 w-4" /> Save New Configuration</Button></DialogFooter></DialogContent>
@@ -1267,15 +1275,15 @@ export default function PaymentsPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Remove payment record for staff ID "{staffIdForPaymentRecordDeletion}"?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteSingleStaffPaymentRecord} className="bg-destructive hover:bg-destructive/90">Delete Payment Record</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </AlertDialogContent>      </AlertDialog>
       <AlertDialog open={isBulkDeleteStaffPaymentsDialogOpen} onOpenChange={(isOpen) => { setIsBulkDeleteStaffPaymentsDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete payment records for {selectedStaffPaymentItems.size} selected staff member(s)?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteStaffPayments} className="bg-destructive hover:bg-destructive/90">Delete Selected Records</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </>
   );
 }
 

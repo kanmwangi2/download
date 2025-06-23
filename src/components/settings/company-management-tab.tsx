@@ -480,7 +480,7 @@ export default function CompanyManagementTab() {
         </CardTitle>
         <CardDescription>
           Add, edit, and manage company records available across the application.
-          These companies will be assignable to users. Data is persisted in IndexedDB.
+          These companies will be assignable to users. Data is persisted in Supabase.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

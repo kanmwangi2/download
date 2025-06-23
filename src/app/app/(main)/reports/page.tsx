@@ -126,17 +126,16 @@ const HtmlPayslipPreview = ({ payslipData, companyProfile, companyPaymentTypes, 
 
   const basicPayAmount = record.dynamicGrossEarnings[DEFAULT_BASIC_PAY_ID] || 0;
   const basicPayType = companyPaymentTypes.find(pt => pt.id === DEFAULT_BASIC_PAY_ID);
-
   const allowancePaymentTypes = companyPaymentTypes
     .filter(pt => pt.id !== DEFAULT_BASIC_PAY_ID && (record.dynamicGrossEarnings[pt.id] || 0) > 0)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => a.orderNumber - b.orderNumber);
 
   const subtotalAllowances = allowancePaymentTypes.reduce(
     (sum, pt) => sum + (record.dynamicGrossEarnings[pt.id] || 0),
     0
   );
 
-  const sortedDeductionTypesToDisplay = [...companyDeductionTypes].sort((a,b) => a.order - b.order)
+  const sortedDeductionTypesToDisplay = [...companyDeductionTypes].sort((a,b) => a.orderNumber - b.orderNumber)
                                       .filter(dt => (record.appliedDeductionAmounts[dt.id] || 0) > 0);
 
   const totalStatutoryDeductions = (record.paye || 0) + (record.employeePension || 0) + (record.employeeMaternity || 0) + (record.employeeRama || 0) + (record.cbhiDeduction || 0);
@@ -260,10 +259,9 @@ const HtmlDeductionHistoryPreview = ({ deductionHistoryData, staffMember, deduct
         </div> 
       </div> 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-2">
-        <div><strong>Staff Name:</strong> {staffMember?.firstName} {staffMember?.lastName}</div>
-        <div><strong>Designation:</strong> {staffMember?.designation || 'N/A'}</div>
-        <div><strong>Staff No:</strong> {getStringIdentifier(staffMember?.staffNumber || 'N/A')}</div>
-        <div><strong>RSSB No:</strong> {getStringIdentifier(staffMember?.staffRssbNumber || 'N/A')}</div>
+        <div><strong>Staff Name:</strong> {staffMember?.first_name} {staffMember?.last_name}</div>
+        <div><strong>Designation:</strong> {staffMember?.designation || 'N/A'}</div>        <div><strong>Staff No:</strong> {getStringIdentifier(staffMember?.staff_number || 'N/A')}</div>
+        <div><strong>RSSB No:</strong> {getStringIdentifier(staffMember?.staff_rssb_number || 'N/A')}</div>
       </div>
       <div className="text-sm mb-4"> 
         <div><strong>Deduction Item:</strong> {deduction?.description}</div> 

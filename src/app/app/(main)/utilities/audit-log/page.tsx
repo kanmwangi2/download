@@ -14,9 +14,21 @@ import { Input } from "@/components/ui/input";
 import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { getAllAuditLogs, STORE_NAMES, type AuditLogEntry } from '@/lib/indexedDbUtils';
 import { format, parseISO, isValid } from 'date-fns';
 import { useCompany } from '@/context/CompanyContext';
+import { createClient } from '@/lib/supabase';
+
+// Temporary type until Supabase audit logging is implemented
+type AuditLogEntry = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  user_id: string;
+  company_id: string;
+  timestamp: string;
+  details?: Record<string, any>;
+};
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -40,11 +52,11 @@ export default function AuditLogPage() {
       if (isLoadingCompanyContext) return; // Wait for company context to load
 
       setIsLoading(true);
-      try {
-        // If no company selected (e.g. global admin view), pass undefined for companyId
-        // to fetch global logs + logs for all companies (or adjust getAllAuditLogs logic)
-        // For now, it fetches logs for selectedCompanyId OR global logs.
-        const { logs, totalCount } = await getAllAuditLogs(selectedCompanyId, searchTerm, currentPage, rowsPerPage);
+      try {        // TODO: Implement audit logging in Supabase
+        // For now, return empty results since audit logging is not yet implemented
+        const logs: AuditLogEntry[] = [];
+        const totalCount = 0;
+        
         setAuditLogs(logs);
         setTotalLogs(totalCount);
       } catch (error) {
@@ -129,11 +141,12 @@ export default function AuditLogPage() {
                       {auditLogs.length > 0 ? (
                         auditLogs.map((log) => (
                           <TableRow key={log.id}>
-                            <TableCell className="whitespace-nowrap">{formatTimestamp(log.timestamp)}</TableCell>
-                            <TableCell>{log.userEmail || log.userId || 'System'}</TableCell>
-                            <TableCell>{log.companyName || log.companyId || 'Global'}</TableCell>
+                            <TableCell className="whitespace-nowrap">{formatTimestamp(log.timestamp)}</TableCell>                            <TableCell>{log.user_id || 'System'}</TableCell>
+                            <TableCell>{log.company_id || 'Global'}</TableCell>
                             <TableCell className="font-medium">{log.action}</TableCell>
-                            <TableCell className="max-w-md truncate" title={log.details}>{log.details}</TableCell>
+                            <TableCell className="max-w-md truncate" title={log.details ? JSON.stringify(log.details) : undefined}>
+                              {log.details ? JSON.stringify(log.details) : 'N/A'}
+                            </TableCell>
                           </TableRow>
                         ))
                       ) : (

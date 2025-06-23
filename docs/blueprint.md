@@ -15,8 +15,9 @@
 - **Frontend:** Next.js (React, TypeScript)
 - **UI:** ShadCN UI (Radix UI, Tailwind CSS)
 - **Backend:** Supabase (PostgreSQL, Auth, Storage, Functions)
-- **Cloud-Native:** All data is securely stored in Supabase and accessible from any device with proper credentials. No data is stored in the browser or local device storage.
-- **Multi-User:** Supports multiple users, companies, and roles with secure authentication and authorization.
+- **Cloud-Native:** Fully migrated from IndexedDB to Supabase. All data is securely stored in Supabase PostgreSQL and accessible from any device with proper credentials. No data is stored in the browser or local device storage.
+- **Real-time:** Leverages Supabase real-time features for instant data synchronization across all user sessions.
+- **Multi-User:** Supports multiple users, companies, and roles with secure authentication and authorization through Supabase Auth.
 
 ## Style Guidelines:
 

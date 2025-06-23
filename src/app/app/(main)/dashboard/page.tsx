@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Users, Banknote, CalendarClock, LayoutGrid, Loader2, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useCompany } from '@/context/CompanyContext';
-import { getAllFromStore, getFromStore, STORE_NAMES } from '@/lib/indexedDbUtils';
+import { createClient } from '@/lib/supabase';
 import type { StaffMember } from '@/lib/staffData';
 import type { PayrollRunSummary } from '@/app/app/(main)/payroll/page';
 import type { PayrollRunDetail } from '@/app/app/(main)/payroll/[id]/page';
-import { addMonths, getYear, getMonth } from 'date-fns'; 
+import { addMonths, getYear, getMonth } from 'date-fns';
 
 // --- Helper Functions ---
 const monthOrder: { [key: string]: number } = {
@@ -46,8 +46,7 @@ export default function DashboardPage() {
   const [deductionsCardSubtext, setDeductionsCardSubtext] = useState("No approved run or details unavailable");
 
 
-  useEffect(() => {
-    const fetchDataForDashboard = async () => {
+  useEffect(() => {    const fetchDataForDashboard = async () => {
       if (!selectedCompanyId || isLoadingCompanyContext) {
         if (!isLoadingCompanyContext && !selectedCompanyId) setIsLoadingData(false);
         return;
@@ -55,15 +54,39 @@ export default function DashboardPage() {
       setIsLoadingData(true);
 
       try {
-        const staffData = await getAllFromStore<StaffMember>(STORE_NAMES.STAFF, selectedCompanyId);
-        const activeEmployees = staffData.filter(s => s.status === "Active").length;
+        const supabase = createClient();
+        
+        // Fetch staff data from Supabase
+        const { data: staffData, error: staffError } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+          
+        if (staffError) {
+          console.error('Error fetching staff data:', staffError);
+          setIsLoadingData(false);
+          return;
+        }
+        
+        const activeEmployees = (staffData || []).filter((s: any) => s.status === "Active").length;
         setTotalActiveEmployees(activeEmployees);
 
-        const payrollRuns = await getAllFromStore<PayrollRunSummary>(STORE_NAMES.PAYROLL_SUMMARIES, selectedCompanyId);
+        // Fetch payroll runs from Supabase
+        const { data: payrollRuns, error: payrollError } = await supabase
+          .from('payroll_runs')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+          
+        if (payrollError) {
+          console.error('Error fetching payroll runs:', payrollError);
+          setIsLoadingData(false);
+          return;
+        }
 
-        const nonApprovedRuns = payrollRuns
-          .filter(run => run.status !== "Approved")
-          .sort((a, b) => {
+        const runs = payrollRuns || [];
+        const nonApprovedRuns = runs
+          .filter((run: any) => run.status !== "Approved")
+          .sort((a: any, b: any) => {
             if (a.year !== b.year) return a.year - b.year;
             return monthOrder[a.month] - monthOrder[b.month];
           });
@@ -73,9 +96,9 @@ export default function DashboardPage() {
           setNextPayrollRunDisplay(`${currentNonApprovedRun.month} ${currentNonApprovedRun.year}`);
           setNextPayrollSubtext(`Status: ${currentNonApprovedRun.status}`);
         } else {
-          const approvedRunsSortedForNext = payrollRuns
-            .filter(run => run.status === "Approved")
-            .sort((a, b) => {
+          const approvedRunsSortedForNext = runs
+            .filter((run: any) => run.status === "Approved")
+            .sort((a: any, b: any) => {
               if (b.year !== a.year) return b.year - a.year;
               return monthOrder[b.month] - monthOrder[a.month];
             });
@@ -93,9 +116,9 @@ export default function DashboardPage() {
         }
 
 
-        const approvedPayrollRuns = payrollRuns
-          .filter(run => run.status === "Approved")
-          .sort((a, b) => {
+        const approvedPayrollRuns = runs
+          .filter((run: any) => run.status === "Approved")
+          .sort((a: any, b: any) => {
             if (b.year !== a.year) return b.year - a.year;
             return monthOrder[b.month] - monthOrder[a.month];
           });
@@ -108,20 +131,23 @@ export default function DashboardPage() {
 
         if (lastApprovedRun) {
             try {
-                const runDetail = await getFromStore<PayrollRunDetail>(
-                    STORE_NAMES.PAYROLL_RUN_DETAILS,
-                    lastApprovedRun.id,
-                    selectedCompanyId
-                );
-                if (runDetail) {
+                // Fetch payroll run details from Supabase
+                const { data: runDetail, error: runDetailError } = await supabase
+                  .from('payroll_run_details')
+                  .select('*')
+                  .eq('id', lastApprovedRun.id)
+                  .eq('company_id', selectedCompanyId)
+                  .single();
+                  
+                if (runDetail && !runDetailError) {
                     // Payroll Cost Card
-                    const totalCost = (runDetail.totalGrossSalary || 0) + (runDetail.totalEmployerRssb || 0);
+                    const totalCost = (runDetail.total_gross_salary || 0) + (runDetail.total_employer_rssb || 0);
                     newTotalPayrollCostDisplay = formatCurrencyForCard(totalCost);
-                    newPayrollCostSubtext = `Gross: ${formatNumberDisplay(runDetail.totalGrossSalary)}, Empr RSSB: ${formatNumberDisplay(runDetail.totalEmployerRssb)} (for ${lastApprovedRun.month} ${lastApprovedRun.year})`;
+                    newPayrollCostSubtext = `Gross: ${formatNumberDisplay(runDetail.total_gross_salary)}, Empr RSSB: ${formatNumberDisplay(runDetail.total_employer_rssb)} (for ${lastApprovedRun.month} ${lastApprovedRun.year})`;
 
                     // Deductions Card
-                    const statutoryDed = (runDetail.totalEmployeeRssb || 0) + (runDetail.totalPaye || 0) + (runDetail.totalCbhiDeduction || 0);
-                    const otherDed = runDetail.totalTotalDeductionsAppliedThisRun || 0;
+                    const statutoryDed = (runDetail.total_employee_rssb || 0) + (runDetail.total_paye || 0) + (runDetail.total_cbhi_deduction || 0);
+                    const otherDed = runDetail.total_total_deductions_applied_this_run || 0;
                     const totalDedVal = statutoryDed + otherDed;
                     newTotalDeductionsMainDisplay = formatCurrencyForCard(totalDedVal);
                     newDeductionsCardSubtext = `Statutory: ${formatNumberDisplay(statutoryDed)}, Other: ${formatNumberDisplay(otherDed)} (for ${lastApprovedRun.month} ${lastApprovedRun.year})`;

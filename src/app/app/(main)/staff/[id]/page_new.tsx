@@ -94,10 +94,8 @@ export default function StaffDetailPage() {
           isDeletable: cfd.is_deletable ?? true
         }));
 
-        setCompanyCustomFields(convertedCustomFields.sort((a,b) => a.orderNumber - b.orderNumber));
-
-        if (staffMember) {
-          const { id, company_id, custom_fields, ...formData } = staffMember;
+        setCompanyCustomFields(convertedCustomFields.sort((a,b) => a.orderNumber - b.orderNumber));        if (staffMember) {
+          const { custom_fields, ...formData } = staffMember;
           setStaffData(formData);
           setCustomFieldsData(custom_fields || {});
           setOriginalStaffDataForDisplay(staffMember);

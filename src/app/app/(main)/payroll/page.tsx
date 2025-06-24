@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Eye, CheckCircle, XCircle, AlertTriangle, Hourglass, Search, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, Loader2, Users, Info, CheckCircle2 } from "lucide-react";
+import { PlusCircle, Eye, CheckCircle, XCircle, AlertTriangle, Hourglass, Search, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, Loader2, Info, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -51,8 +51,6 @@ import type { UserRole } from '@/lib/userData';
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from '@/context/CompanyContext';
 import { cn } from '@/lib/utils';
-import type { Deduction as FullDeductionRecord } from '@/app/app/(main)/deductions/page';
-import type { PayrollRunDetail as FullPayrollRunDetail } from '@/app/app/(main)/payroll/[id]/page';
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase client setup
@@ -172,11 +170,9 @@ export default function PayrollPage() {
           lastName: userProfile.last_name,
           role: userProfile.role,
           assignedCompanyIds: userProfile.assigned_company_ids || [],
-        });
-
-        // Fetch payroll run summaries for the selected company (snake_case)
+        });        // Fetch payroll run summaries for the selected company (snake_case)
         const { data: summaries, error } = await supabase
-          .from("payroll_summaries")
+          .from("payroll_runs")
           .select("*")
           .eq("company_id", selectedCompanyId);
 
@@ -277,10 +273,9 @@ export default function PayrollPage() {
     const newRunId = `PR${year}${monthNumberStr}`;
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      // Check for duplicate
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);      // Check for duplicate
       const { data: existingSummaries, error: fetchError } = await supabase
-        .from('payroll_summaries')
+        .from('payroll_runs')
         .select('id')
         .eq('company_id', selectedCompanyId)
         .eq('id', newRunId);
@@ -304,9 +299,8 @@ export default function PayrollPage() {
         deductions: 0,
         net_pay: 0,
         status: "Draft",
-      };
-      const { error: insertError } = await supabase
-        .from('payroll_summaries')
+      };      const { error: insertError } = await supabase
+        .from('payroll_runs')
         .insert([newRun]);
       if (insertError) throw insertError;
       // Add to UI state as camelCase
@@ -325,10 +319,9 @@ export default function PayrollPage() {
       setIsCreateRunDialogOpen(false);
       if (currentForm) {
         currentForm.reset();
-      }
-      resetSelectionAndPage();
+      }      resetSelectionAndPage();
       router.push(`/app/payroll/${newRunId}`);
-    } catch (error) {
+    } catch {
       setFeedback({ type: 'error', message: "Creation Failed", details: "Could not create payroll run." });
     }
   };
@@ -356,7 +349,7 @@ export default function PayrollPage() {
     setFeedback(null);
     if (runIds.length === 0 || !selectedCompanyId) return;
 
-    let actualIdsToDeleteFromDB: string[] = [];
+    const actualIdsToDeleteFromDB: string[] = [];
     let skippedRunsCount = 0;
 
     for (const runId of runIds) {
@@ -376,13 +369,12 @@ export default function PayrollPage() {
     }
     if (actualIdsToDeleteFromDB.length === 0) return;
 
-    let deductionsReversedCount = 0;
+    const deductionsReversedCount = 0;
     try {
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         for (const id of actualIdsToDeleteFromDB) {
-            // Reverse deductions if needed (implement as needed in Supabase)
-            // Delete payroll run summary
-            await supabase.from('payroll_summaries').delete().eq('id', id).eq('company_id', selectedCompanyId);
+            // Reverse deductions if needed (implement as needed in Supabase)            // Delete payroll run summary
+            await supabase.from('payroll_runs').delete().eq('id', id).eq('company_id', selectedCompanyId);
             // Optionally delete details, etc.
             await supabase.from('payroll_run_details').delete().eq('id', id).eq('company_id', selectedCompanyId);
         }

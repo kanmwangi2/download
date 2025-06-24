@@ -44,7 +44,7 @@ CREATE TABLE public.user_company_assignments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'hr', 'user')),
+  role TEXT DEFAULT 'Payroll Preparer' CHECK (role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, company_id)
 );
@@ -249,6 +249,57 @@ CREATE TABLE public.audit_logs (
 );
 
 -- =====================================================
+-- TABLE: user_avatars
+-- Profile picture storage for users
+-- =====================================================
+CREATE TABLE public.user_avatars (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- =====================================================
+-- TABLE: custom_field_definitions
+-- Company-specific custom field definitions
+-- =====================================================
+CREATE TABLE public.custom_field_definitions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('text', 'number', 'date')),
+  order_index INTEGER DEFAULT 0,
+  is_deletable BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =====================================================
+-- TABLE: users
+-- Comprehensive user management table
+-- =====================================================
+CREATE TABLE public.users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email TEXT UNIQUE NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  phone TEXT,
+  role TEXT DEFAULT 'Payroll Preparer' CHECK (role IN (
+    'Primary Admin', 
+    'App Admin', 
+    'Company Admin', 
+    'Payroll Approver', 
+    'Payroll Preparer'
+  )),
+  assigned_company_ids TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =====================================================
 -- INDEXES FOR PERFORMANCE
 -- =====================================================
 
@@ -287,6 +338,18 @@ CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_company_id ON audit_logs(company_id);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
+-- User avatars
+CREATE INDEX idx_user_avatars_user_id ON user_avatars(user_id);
+
+-- Custom field definitions
+CREATE INDEX idx_custom_field_definitions_company_id ON custom_field_definitions(company_id);
+CREATE INDEX idx_custom_field_definitions_order ON custom_field_definitions(company_id, order_index);
+
+-- Users table
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_status ON users(status);
+
 -- =====================================================
 -- FUNCTIONS AND TRIGGERS
 -- =====================================================
@@ -308,3 +371,40 @@ CREATE TRIGGER update_staff_payment_configs_updated_at BEFORE UPDATE ON staff_pa
 CREATE TRIGGER update_staff_deductions_updated_at BEFORE UPDATE ON staff_deductions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_tax_settings_updated_at BEFORE UPDATE ON tax_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_payroll_runs_updated_at BEFORE UPDATE ON payroll_runs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_avatars_updated_at BEFORE UPDATE ON user_avatars FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_custom_field_definitions_updated_at BEFORE UPDATE ON custom_field_definitions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- TABLE ALIASES/VIEWS FOR NAMING CONSISTENCY
+-- =====================================================
+
+-- Create a view to alias staff_members as staff for code compatibility
+CREATE OR REPLACE VIEW public.staff AS SELECT * FROM public.staff_members;
+
+-- =====================================================
+-- SAMPLE DATA INITIALIZATION
+-- =====================================================
+
+-- Insert default custom field definitions for demo companies
+INSERT INTO public.custom_field_definitions (company_id, name, type, order_index, is_deletable)
+SELECT 
+    c.id,
+    'T-Shirt Size',
+    'text',
+    1,
+    true
+FROM public.companies c
+WHERE c.name LIKE '%Umoja Tech%'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.custom_field_definitions (company_id, name, type, order_index, is_deletable)
+SELECT 
+    c.id,
+    'Transport Route',
+    'text',
+    1,
+    true
+FROM public.companies c
+WHERE c.name LIKE '%Isoko Trading%'
+ON CONFLICT DO NOTHING;

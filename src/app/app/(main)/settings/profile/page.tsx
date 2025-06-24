@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getSupabaseClient } from '@/lib/supabase';
-import type { User } from '@/lib/userData';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -137,10 +136,8 @@ export default function UserProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [originalEmail, setOriginalEmail] = useState<string>("");
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [passwordFeedback, setPasswordFeedback] = useState<FeedbackMessage | null>(null);
   const [avatarFeedback, setAvatarFeedback] = useState<FeedbackMessage | null>(null);
@@ -153,10 +150,8 @@ export default function UserProfilePage() {
         if (!user) {
           setIsLoaded(true);
           setFeedback({ type: 'error', message: 'User not authenticated', details: 'Please log in again.' });
-          return;
-        }
+          return;        }
         setCurrentUserId(user.id);
-        setOriginalEmail(user.email);
         // Avatar
         let avatar = null;
         try {
@@ -176,18 +171,14 @@ export default function UserProfilePage() {
           setUserDetails({
             firstName: profile.firstName || '',
             lastName: profile.lastName || '',
-            email: profile.email || user.email || '',
-            phone: profile.phone || ''
+            email: profile.email || user.email || '',            phone: profile.phone || ''
           });
-          setOriginalEmail(profile.email || user.email || '');
         } else {
           setUserDetails({
             firstName: user.firstName || '',
             lastName: user.lastName || '',
-            email: user.email || '',
-            phone: user.phone || ''
+            email: user.email || '',            phone: user.phone || ''
           });
-          setOriginalEmail(user.email || '');
         }
       } catch (err) {
         setFeedback({ type: 'error', message: 'Profile Load Error', details: String(err) });
@@ -225,9 +216,7 @@ export default function UserProfilePage() {
         data: {
           first_name: userDetails.firstName,
           last_name: userDetails.lastName,
-        }
-      });
-      setOriginalEmail(userDetails.email);
+        }      });
       setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
     } catch (error: any) {
       setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error?.message || String(error)) });
@@ -266,8 +255,7 @@ export default function UserProfilePage() {
     try {
       await updateUserPassword(currentUserId, passwordDetails.newPassword);
       setPasswordFeedback({ type: 'success', message: "Password Updated", details: "Your password has been successfully changed." });
-      setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
-    } catch (error) {
+      setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });    } catch {
       setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. Please try again." });
     }
   };

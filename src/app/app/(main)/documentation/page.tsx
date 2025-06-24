@@ -482,7 +482,7 @@ export default function DocumentationPage() {
       const sectionTitleNumberMatch = section.title.match(/^(\d+\.\s*)/);
       const sectionTitleNumber = sectionTitleNumberMatch ? sectionTitleNumberMatch[0] : "";
 
-      let estSectionTitleHeight = sectionTitleLineHeight;
+      const estSectionTitleHeight = sectionTitleLineHeight;
       let firstContentEstimatedHeight = 0;
       if (section.content.length > 0) {
           const firstContentItem = section.content[0];
@@ -521,7 +521,7 @@ export default function DocumentationPage() {
           yPos += (listBottomMargin - listItemSpacing);
         } else if (item.type === 'subsection' && item.subTitle && item.subContent) {
           const subTitleSegments = parseHtmlLikeTags(item.subTitle);
-          let estSubTitleHeight = subSectionTitleLineHeight;
+          const estSubTitleHeight = subSectionTitleLineHeight;
           let firstSubContentEstHeight = 0;
            if (item.subContent.length > 0) {
               const firstSubContent = item.subContent[0];

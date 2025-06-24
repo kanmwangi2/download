@@ -1,79 +1,20 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { PlusCircle, Eye, Search, Upload, Download, FileText, FileSpreadsheet, FileType, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Users, Loader2, AlertTriangle, Info, CheckCircle2, Settings, Edit } from "lucide-react";
-import Link from "next/link";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Checkbox } from "@/components/ui/checkbox";
-import { countries } from "@/lib/countries";
-import { StaffMember, StaffStatus, EmployeeCategory, staffFromBackend, staffToBackend } from '@/lib/staffData';
+import { StaffMember, staffFromBackend, staffToBackend } from '@/lib/staffData';
 import { CustomFieldDefinition } from '@/lib/customFieldDefinitionData';
 import { getSupabaseClient } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { isValid as isValidDate, parseISO, format, parse } from 'date-fns';
+import { isValid as isValidDate, format, parse } from 'date-fns';
 import { useCompany } from '@/context/CompanyContext';
 import Papa from 'papaparse';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 // --- STAFF TABLE NAME CONSTANT ---
 const STAFF_TABLE = 'staff_members';
-
-const statusColors: Record<StaffStatus, string> = {
-  Active: "bg-green-500 hover:bg-green-600",
-  Inactive: "bg-gray-500 hover:bg-gray-600",
-};
-
-const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
-const CFD_ROWS_PER_PAGE_OPTIONS = [5, 10, 20];
 
 const sanitizeFilename = (name: string | null | undefined): string => {
     if (!name) return 'UnknownCompany';
@@ -86,42 +27,13 @@ type FeedbackMessage = {
   details?: string;
 };
 
-const defaultCustomFieldDefinitionData: Omit<CustomFieldDefinition, 'id' | 'companyId' | 'orderNumber' | 'isDeletable'> = {
-  name: "",
-  type: "Text",
-};
-
 
 export default function StaffPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
   const [allStaffForCompany, setAllStaffForCompany] = useState<StaffMember[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [isDeleteStaffDialogOpen, setIsDeleteStaffDialogOpen] = useState(false);
-  const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
-
   const [customFieldDefinitions, setCustomFieldDefinitions] = useState<CustomFieldDefinition[]>([]);
-  const [isCfdDialogOpen, setIsCfdDialogOpen] = useState(false);
-  const [editingCfd, setEditingCfd] = useState<CustomFieldDefinition | null>(null);
-  const [cfdFormData, setCfdFormData] = useState(defaultCustomFieldDefinitionData);
-  const [isDeleteCfdDialogOpen, setIsDeleteCfdDialogOpen] = useState(false);
-  const [cfdToDelete, setCfdToDelete] = useState<CustomFieldDefinition | null>(null);
-  const [cfdSearchTerm, setCfdSearchTerm] = useState("");
-  const [cfdCurrentPage, setCfdCurrentPage] = useState(1);
-  const [cfdRowsPerPage, setCfdRowsPerPage] = useState(CFD_ROWS_PER_PAGE_OPTIONS[1]);
-  const [selectedCfdItems, setSelectedCfdItems] = useState<Set<string>>(new Set());
-  const [isBulkDeleteCfdDialogOpen, setIsBulkDeleteCfdDialogOpen] = useState(false);
-  const cfdImportFileInputRef = useRef<HTMLInputElement>(null);
-
 
   useEffect(() => {
     const loadData = async () => {
@@ -129,19 +41,19 @@ export default function StaffPage() {
         if (!isLoadingCompanyContext && !selectedCompanyId) {
             setAllStaffForCompany([]);
             setCustomFieldDefinitions([]);
-            setIsLoaded(true);
         }
         return;
       }
-      setIsLoaded(false);
       setFeedback(null);
-      try {        // Fetch staff from Supabase (keep as snake_case backend format)
+      try {        
+        // Fetch staff from Supabase (keep as snake_case backend format)
         const { data: staff, error: staffError } = await getSupabaseClient()
           .from(STAFF_TABLE)
           .select('*')
           .eq('company_id', selectedCompanyId);
         if (staffError) throw staffError;
         setAllStaffForCompany(staff || []);
+        
         // Fetch custom field definitions from Supabase (snake_case)
         const { data: cfds, error: cfdError } = await getSupabaseClient()
           .from('custom_field_definitions')
@@ -154,126 +66,13 @@ export default function StaffPage() {
         setCustomFieldDefinitions([]);
         setFeedback({ type: 'error', message: 'Could not load company data.', details: (error as Error).message });
       }
-      setIsLoaded(true);
     };
     loadData();
   }, [selectedCompanyId, isLoadingCompanyContext]);
-
-  useEffect(() => {
-    if (isCfdDialogOpen) {
-        if(editingCfd) {
-            setCfdFormData({ name: editingCfd.name, type: editingCfd.type });
-        } else {
-            setCfdFormData(defaultCustomFieldDefinitionData);
-        }
-    }
-  }, [isCfdDialogOpen, editingCfd]);  // Transform backend data to UI format (camelCase) for filtering and display
+  // Transform backend data to UI format (camelCase) for filtering and display
   const allStaffForCompanyUI = useMemo(() => 
     allStaffForCompany.map(staffFromBackend), [allStaffForCompany]
   );
-
-  // Use allStaffForCompanyUI in all UI/filter/search/export logic
-  const filteredStaffSource = useMemo(() => allStaffForCompanyUI.filter(
-    (staff) =>
-      staff.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (staff.email && staff.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (staff.department && staff.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (staff.designation && staff.designation.toLowerCase().includes(searchTerm.toLowerCase()))
-  ), [allStaffForCompanyUI, searchTerm]);
-
-  const totalItems = filteredStaffSource.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedStaff = filteredStaffSource.slice(startIndex, endIndex);
-
-  const handleSelectRow = (itemId: string, checked: boolean) => {
-    setSelectedItems(prev => { const newSelected = new Set(prev); if (checked) newSelected.add(itemId); else newSelected.delete(itemId); return newSelected; });
-  };
-  const handleSelectAllOnPage = (checked: boolean) => {
-    const pageItemIds = paginatedStaff.map(item => item.id);
-    if (checked) { setSelectedItems(prev => new Set([...prev, ...pageItemIds])); }
-    else { const pageItemIdsSet = new Set(pageItemIds); setSelectedItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id)))); }
-  };
-  const isAllOnPageSelected = paginatedStaff.length > 0 && paginatedStaff.every(item => selectedItems.has(item.id));
-  const resetSelectionAndPage = () => { setSelectedItems(new Set()); setCurrentPage(1); };
-
-
-  const handleAddStaff = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setFeedback(null);
-    if (!selectedCompanyId) { setFeedback({ type: 'error', message: 'No company selected. Cannot add staff.' }); return; }
-    const formData = new FormData(event.currentTarget);
-    const customFieldsData: Record<string, string> = {};
-    customFieldDefinitions.forEach(cfd => {
-      const value = formData.get(`customField_${cfd.id}`) as string;
-      if (value !== null && value.trim() !== '') {
-        customFieldsData[cfd.id] = value.trim();
-      }
-    });
-    const newStaffUI = {
-      companyId: selectedCompanyId,
-      firstName: formData.get('firstName') as string, lastName: formData.get('lastName') as string,
-      staffNumber: formData.get('staffNumber') as string, email: formData.get('email') as string,
-      phone: formData.get('phone') as string, staffRssbNumber: formData.get('staffRssbNumber') as string,
-      employeeCategory: formData.get('employeeCategory') as EmployeeCategory || 'P',
-      gender: formData.get('gender') as StaffMember['gender'] || undefined,
-      birthDate: formData.get('birthDate') as string || undefined,
-      department: formData.get('department') as string,
-      designation: formData.get('designation') as string || undefined,
-      employmentDate: formData.get('employmentDate') as string || undefined,
-      nationality: formData.get('nationality') as string, idPassportNumber: formData.get('idPassportNumber') as string,
-      province: formData.get('province') as string, district: formData.get('district') as string,
-      sector: formData.get('sector') as string, cell: formData.get('cell') as string, village: formData.get('village') as string,
-      bankName: formData.get('bankName') as string, bankCode: formData.get('bankCode') as string, bankAccountNumber: formData.get('bankAccountNumber') as string,
-      bankBranch: formData.get('bankBranch') as string,
-      keyContactName: formData.get('keyContactName') as string, keyContactRelationship: formData.get('keyContactRelationship') as string,
-      keyContactPhone: formData.get('keyContactPhone') as string, status: formData.get('status') as StaffStatus,
-      customFields: customFieldsData,
-    };
-    try {
-      const { data: inserted, error } = await getSupabaseClient()
-        .from(STAFF_TABLE)
-        .insert(staffToBackend(newStaffUI))
-        .select();
-      if (error) throw error;      if (inserted && inserted.length > 0) {
-        setAllStaffForCompany(prev => [inserted[0], ...prev].sort((a, b) => a.id.localeCompare(b.id)));
-        setFeedback({ type: 'success', message: `Staff Added`, details: `${newStaffUI.firstName} ${newStaffUI.lastName} has been added.` });
-      } else {
-        setFeedback({ type: 'success', message: `Staff Added`, details: `Staff member has been added.` });
-      }
-      setIsAddStaffDialogOpen(false); event.currentTarget.reset(); resetSelectionAndPage();
-    } catch (error) {
-      setFeedback({ type: 'error', message: 'Save Failed', details: 'Could not add staff member.' });
-    }
-  };
-
-  const handleDeleteStaffs = async (staffIds: string[]) => {
-    setFeedback(null);
-    if (staffIds.length === 0 || !selectedCompanyId) return;
-    try {
-      for (const id of staffIds) { 
-          const staffMember = allStaffForCompany.find(s => s.id === id);
-          await getSupabaseClient()
-            .from(STAFF_TABLE)
-            .delete()
-            .eq('id', id)
-            .eq('company_id', selectedCompanyId);          if (staffMember) {
-               //await logAuditEvent("Staff Deleted", `Staff member ${staffMember.first_name} ${staffMember.last_name} (ID: ${id}) deleted.`, selectedCompanyId, selectedCompanyName);
-          }
-      }
-      setAllStaffForCompany(prev => prev.filter(s => !staffIds.includes(s.id)));
-      setSelectedItems(prev => { const newSelected = new Set(prev); staffIds.forEach(id => newSelected.delete(id)); return newSelected; });
-      setFeedback({ type: 'success', message: "Staff Deleted", details: `Successfully deleted ${staffIds.length} staff member(s).` });
-      if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage - 2) * rowsPerPage, (currentPage - 1) * rowsPerPage).length > 0) { setCurrentPage(currentPage - 1); }
-      else if (currentPage > 1 && paginatedStaff.length === staffIds.length && filteredStaffSource.slice((currentPage-1)*rowsPerPage).length === 0){ setCurrentPage( Math.max(1, currentPage -1)); }
-    } catch (error) { setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete ${staffIds.length} staff member(s).` }); }
-  };
-  const handleDeleteSingleStaffClick = (staff: StaffMember) => { setFeedback(null); setStaffToDelete(staff); setIsDeleteStaffDialogOpen(true); };
-  const confirmDeleteSingleStaff = async () => { if (staffToDelete) { await handleDeleteStaffs([staffToDelete.id]); } setIsDeleteStaffDialogOpen(false); setStaffToDelete(null); };
-  const handleOpenBulkDeleteDialog = () => { setFeedback(null); if (selectedItems.size === 0) { setFeedback({ type: "info", message: "No staff members selected." }); return; } setIsBulkDeleteDialogOpen(true); };
-  const confirmBulkDeleteStaff = async () => { await handleDeleteStaffs(Array.from(selectedItems)); setIsBulkDeleteDialogOpen(false); };
 
   const staffDataColumnsForExport = useMemo(() => {
     const baseCols = [
@@ -382,7 +181,7 @@ export default function StaffPage() {
               const normalizedCsvHeader = csvHeader.trim().toLowerCase().replace(/\s+/g, '');
               const mappedKey = headerToStaffKeyMap[normalizedCsvHeader];
               if (mappedKey) {
-                let value = String(rawRow[csvHeader] || '').trim();
+                const value = String(rawRow[csvHeader] || '').trim();
                 if (mappedKey.startsWith('custom_')) {
                     const cfdId = mappedKey.substring(7);
                     const cfd = currentCustomFieldDefinitions.find(c => c.id === cfdId);
@@ -484,9 +283,7 @@ export default function StaffPage() {
           const { data: updatedStaffList = [] } = await getSupabaseClient()
             .from(STAFF_TABLE)
             .select('*')
-            .eq('company_id', selectedCompanyId);
-          setAllStaffForCompany((updatedStaffList || []).sort((a: any, b: any) => a.id.localeCompare(b.id)));
-          resetSelectionAndPage();
+            .eq('company_id', selectedCompanyId);          setAllStaffForCompany((updatedStaffList || []).sort((a: any, b: any) => a.id.localeCompare(b.id)));
           let fbMsg = '';
           let fbTitle = 'Import Processed';
           let fbType: FeedbackMessage['type'] = 'info';

@@ -123,8 +123,6 @@ type FeedbackMessage = {
   details?: string;
 };
 
-const idLikeCompanyFields = ['id', 'tinNumber', 'phone'];
-
 export default function CompanyManagementTab() {
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -148,12 +146,11 @@ export default function CompanyManagementTab() {
     const loadCompanies = async () => {
       setIsLoaded(false);
       setFeedback(null);
-      try {
-        const supabase = getSupabaseClient();
+      try {        const supabase = getSupabaseClient();
         const { data: companies, error } = await supabase.from('companies').select('*');
         if (error) throw error;
         setAllCompanies((companies || []).map(companyFromBackend));
-      } catch (error) {
+      } catch {
         setAllCompanies([]);
         setFeedback({ type: "error", message: "Loading Error", details: "Could not load company records."})
       } finally {
@@ -209,10 +206,9 @@ export default function CompanyManagementTab() {
       const supabase = getSupabaseClient();
       const { error } = await supabase.from('companies').delete().in('id', idsToDelete);
       if (error) throw error;
-      setAllCompanies(prev => prev.filter(comp => !idsToDelete.includes(comp.id)));
-      setSelectedCompanyItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
+      setAllCompanies(prev => prev.filter(comp => !idsToDelete.includes(comp.id)));      setSelectedCompanyItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       setFeedback({type: 'success', message: "Company(s) Deleted", details: `Successfully deleted ${idsToDelete.length} company(s).`});
-    } catch (error) {
+    } catch {
       setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} company(s).`});
     }
   };
@@ -275,21 +271,9 @@ export default function CompanyManagementTab() {
     const pageItemIds = paginatedCompanies.map(item => item.id);
     if (checked) { setSelectedCompanyItems(prev => new Set([...prev, ...pageItemIds])); }
     else { const pageItemIdsSet = new Set(pageItemIds); setSelectedCompanyItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id)))); }
-  };
-  const isAllCompaniesOnPageSelected = paginatedCompanies.length > 0 && paginatedCompanies.every(item => selectedCompanyItems.has(item.id));
+  };  const isAllCompaniesOnPageSelected = paginatedCompanies.length > 0 && paginatedCompanies.every(item => selectedCompanyItems.has(item.id));
 
   // --- EXPORT/IMPORT LOGIC ---
-  // Update export columns to use backend keys for file headers, but map to camelCase for UI
-  const globalCompanyExportColumns = [
-    { key: 'id', label: 'ID', isIdLike: true },
-    { key: 'name', label: 'Name' },
-    { key: 'tinNumber', label: 'TINNumber', isIdLike: true },
-    { key: 'address', label: 'Address' },
-    { key: 'email', label: 'Email' },
-    { key: 'phone', label: 'Phone', isIdLike: true },
-    { key: 'primaryBusiness', label: 'PrimaryBusiness' }
-  ];
-
   // Helper: Map camelCase UI company to export row with correct headers
   type CompanyExportRow = {
     ID: string;

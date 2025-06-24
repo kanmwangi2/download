@@ -1,7 +1,16 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { 
+  createContext, 
+  useContext, 
+  useState, 
+  ReactNode, 
+  useEffect, 
+  useMemo,
+  memo 
+} from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { useStableCallback } from '@/lib/performance';
 
 interface CompanyContextType {
   selectedCompanyId: string | null;
@@ -13,26 +22,26 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
-export const CompanyProvider = ({ children }: { children: ReactNode }) => {
+export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
   const [selectedCompanyName, setSelectedCompanyNameState] = useState<string | null>(null);
   const [isLoadingCompanyContext, setIsLoadingCompanyContext] = useState(true);
 
-  useEffect(() => {
-    const fetchCompanyFromProfile = async () => {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Assume user_metadata contains selectedCompanyId and selectedCompanyName
-        setSelectedCompanyIdState(user.user_metadata?.selectedCompanyId || null);
-        setSelectedCompanyNameState(user.user_metadata?.selectedCompanyName || null);
-      }
-      setIsLoadingCompanyContext(false);
-    };
-    fetchCompanyFromProfile();
-  }, []);
+  const fetchCompanyFromProfile = useStableCallback(async () => {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Assume user_metadata contains selectedCompanyId and selectedCompanyName
+      setSelectedCompanyIdState(user.user_metadata?.selectedCompanyId || null);
+      setSelectedCompanyNameState(user.user_metadata?.selectedCompanyName || null);
+    }
+    setIsLoadingCompanyContext(false);  }, []);
 
-  const setSelectedCompanyId = useCallback(async (companyId: string | null) => {
+  useEffect(() => {
+    fetchCompanyFromProfile();
+  }, [fetchCompanyFromProfile]);
+
+  const setSelectedCompanyId = useStableCallback(async (companyId: string | null) => {
     setSelectedCompanyIdState(companyId);
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -43,7 +52,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const setSelectedCompanyName = useCallback(async (name: string | null) => {
+  const setSelectedCompanyName = useStableCallback(async (name: string | null) => {
     setSelectedCompanyNameState(name);
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -54,12 +63,21 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const contextValue = useMemo(() => ({
+    selectedCompanyId,
+    setSelectedCompanyId,
+    selectedCompanyName,
+    setSelectedCompanyName,
+    isLoadingCompanyContext
+  }), [selectedCompanyId, setSelectedCompanyId, selectedCompanyName, setSelectedCompanyName, isLoadingCompanyContext]);
   return (
-    <CompanyContext.Provider value={{ selectedCompanyId, setSelectedCompanyId, selectedCompanyName, setSelectedCompanyName, isLoadingCompanyContext }}>
+    <CompanyContext.Provider value={contextValue}>
       {children}
     </CompanyContext.Provider>
   );
-};
+});
+
+CompanyProvider.displayName = 'CompanyProvider';
 
 export const useCompany = (): CompanyContextType => {
   const context = useContext(CompanyContext);

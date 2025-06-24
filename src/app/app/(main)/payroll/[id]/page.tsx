@@ -26,10 +26,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { 
-  ArrowLeft, Download, FileText, FileSpreadsheet, FileType, Edit2,
+  ArrowLeft, Download, FileText, Edit2,
   CheckCircle, XCircle, AlertTriangle, Hourglass, Users, Banknote, 
   MinusCircle, PlayCircle, Send, Save, Eye, SlidersHorizontal,
-  Loader2, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   InfoIcon, FileSpreadsheet as FileSpreadsheetIcon, FileType as FileTypePdfIcon
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -44,7 +44,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 // Missing type definitions - these need to be created or imported from the correct modules
 interface StaffPaymentDetails {
@@ -435,8 +435,6 @@ const formatNumberForTable = (amount?: number) => (amount === undefined || amoun
 const formatCurrencyForCard = (amount?: number) => `RWF ${formatNumberForTable(amount)}`;
 const sanitizeFilename = (name: string | null | undefined): string => { if (!name) return 'UnknownCompany'; return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, ''); };
 
-const idLikePayrollDetailFieldsForExport = ['employeeId', 'staffNumber', 'rssbNumber'];
-
 export default function PayrollRunDetailPage() {
   const router = useRouter(); const params = useParams();
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
@@ -520,16 +518,14 @@ export default function PayrollRunDetailPage() {
                 .limit(1)
                 .single();
             setCurrentTaxSettings(taxSettings || getDefaultTaxSettings());
-            
-            // Load staff data
+              // Load staff data
             const { data: staffFromDB } = await supabase
-                .from('staff')
+                .from('staff_members')
                 .select('*')
                 .eq('company_id', selectedCompanyId);
-            setAllStaff(staffFromDB || []);
-              // Load payment configurations - convert array to Record
+            setAllStaff(staffFromDB || []);            // Load payment configurations - convert array to Record
             const { data: paymentConfigsFromDB } = await supabase
-                .from('staff_payment_details')
+                .from('staff_payment_configs')
                 .select('*')
                 .eq('company_id', selectedCompanyId);
             const paymentConfigsRecord: Record<string, StaffPaymentDetails> = {};
@@ -537,17 +533,15 @@ export default function PayrollRunDetailPage() {
                 paymentConfigsRecord[config.staff_id] = config;
             });
             setAllPaymentConfigs(paymentConfigsRecord);
-            
-            // Load deductions
+              // Load deductions
             const { data: deductionsFromDB } = await supabase
-                .from('deductions')
+                .from('staff_deductions')
                 .select('*')
                 .eq('company_id', selectedCompanyId);
             setAllDeductions(deductionsFromDB || []);
-            
-            // Load company profile
+              // Load company profile
             const { data: profileFromDB } = await supabase
-                .from('company_profiles')
+                .from('companies')
                 .select('*')
                 .eq('id', selectedCompanyId)
                 .single();
@@ -621,9 +615,8 @@ export default function PayrollRunDetailPage() {
                     setDynamicColumnsBasedOnRun(runDetail, dedTypesFromDB || [], paymentTypesFromDB || []);
                     setIsDetailViewOpen(true);
                 }
-            } else {
-                const { data: summary } = await supabase
-                    .from('payroll_summaries')
+            } else {                const { data: summary } = await supabase
+                    .from('payroll_runs')
                     .select('*')
                     .eq('id', runId)
                     .eq('company_id', selectedCompanyId)
@@ -658,9 +651,8 @@ export default function PayrollRunDetailPage() {
             grossSalary: runTotalsForSummary.totalGrossSalary || 0,
             deductions: (runTotalsForSummary.totalEmployeeRssb || 0) + (runTotalsForSummary.totalPaye || 0) + (runTotalsForSummary.totalCbhiDeduction || 0) + (runTotalsForSummary.totalTotalDeductionsAppliedThisRun || 0),
             netPay: runTotalsForSummary.totalFinalNetPay || 0, status: updatedRun.status, rejectionReason: updatedRun.rejectionReason,
-        };
-        await supabase
-            .from('payroll_summaries')
+        };        await supabase
+            .from('payroll_runs')
             .upsert(updatedSummary);
         setPayrollRun(updatedRun);
     } catch (error) { console.error("Error saving payroll run data:", error); throw error; }
@@ -781,9 +773,8 @@ export default function PayrollRunDetailPage() {
           setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + " Warning: Could not fetch approved run details for deduction update."} : {type: 'info', message: 'Warning', details: 'Could not fetch approved run details for deduction update.'});
           return; 
       }
-      
-      const { data: allCurrentDeductionRecords } = await supabase
-          .from('deductions')
+        const { data: allCurrentDeductionRecords } = await supabase
+          .from('staff_deductions')
           .select('*')
           .eq('company_id', selectedCompanyId);
           
@@ -807,7 +798,7 @@ export default function PayrollRunDetailPage() {
         }
       }
       if (deductionsToActuallyUpdateInDB.length > 0) {
-        await supabase.from('deductions').upsert(deductionsToActuallyUpdateInDB);
+        await supabase.from('staff_deductions').upsert(deductionsToActuallyUpdateInDB);
         setAllDeductions(prevDeds => { const updatedMap = new Map(prevDeds.map(d => [d.id, d])); deductionsToActuallyUpdateInDB.forEach(updated => updatedMap.set(updated.id, updated)); return Array.from(updatedMap.values()); });
         setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + ` ${deductionsUpdatedCount} deduction record(s) reconciled.`} : {type: 'info', message: 'Success', details: `${deductionsUpdatedCount} deduction record(s) reconciled.`});
       }

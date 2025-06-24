@@ -31,12 +31,10 @@ import { Badge } from "@/components/ui/badge";
 import { useCompany } from '@/context/CompanyContext';
 import Link from 'next/link';
 import Papa from 'papaparse';
-import { DeductionType, initialDeductionTypesForCompanySeed, exampleUserDefinedDeductionTypesForUmoja, exampleUserDefinedDeductionTypesForIsoko, DEFAULT_ADVANCE_DEDUCTION_TYPE_ID, DEFAULT_LOAN_DEDUCTION_TYPE_ID, DEFAULT_CHARGE_DEDUCTION_TYPE_ID } from '@/lib/deductionTypesData';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DeductionType, DEFAULT_ADVANCE_DEDUCTION_TYPE_ID, DEFAULT_LOAN_DEDUCTION_TYPE_ID, DEFAULT_CHARGE_DEDUCTION_TYPE_ID } from '@/lib/deductionTypesData';
 import { cn } from '@/lib/utils';
-import { isValid as isValidDate, parseISO, format, parse } from 'date-fns';
+import { isValid as isValidDate, format, parse } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { deductionFromBackend, deductionToBackend } from '@/lib/deductionsData';
 import { getSupabaseClient } from '@/lib/supabase';
 
 
@@ -78,8 +76,7 @@ const formatDateForDisplay = (dateString?: string) => {
       if (isValidDate(parsedDate)) {
           return format(parsedDate, 'dd/MM/yyyy');
       }
-      return 'N/A';
-  } catch (e) {
+      return 'N/A';  } catch {
       return 'N/A';
   }
 };
@@ -172,23 +169,21 @@ export default function DeductionsPage() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        const supabase = getSupabaseClient();
-        // Fetch staff
-        const { data: staffData, error: staffError } = await supabase
+        const supabase = getSupabaseClient();        // Fetch staff
+        const { data: staffData, error: _staffError } = await supabase
           .from('staff')
           .select('*')
           .eq('company_id', selectedCompanyId);
         setStaffList(staffData || []);
         // Fetch deduction types
-        const { data: deductionTypesData, error: deductionTypesError } = await supabase
+        const { data: deductionTypesData, error: _deductionTypesError } = await supabase
           .from('deduction_types')
           .select('*')
           .eq('company_id', selectedCompanyId);
         const mappedDeductionTypes = (deductionTypesData || []).map(mapDeductionTypeFromSupabase);
-        setDeductionTypes(mappedDeductionTypes);
-        // Fetch deductions
-        const { data: deductionsData, error: deductionsError } = await supabase
-          .from('deductions')
+        setDeductionTypes(mappedDeductionTypes);        // Fetch deductions
+        const { data: deductionsData, error: _deductionsError } = await supabase
+          .from('staff_deductions')
           .select('*')
           .eq('company_id', selectedCompanyId);
         const mappedDeductions = (deductionsData || []).map((d: any) => mapDeductionFromSupabase(d, staffData || [], mappedDeductionTypes));
@@ -207,7 +202,7 @@ export default function DeductionsPage() {
   useEffect(() => {
     if (isDeductionDialogOpen) {
       if (editingDeduction) {
-        const { balance, staffName, companyId, deductionTypeName, ...formDataFromEdit } = editingDeduction;
+        const { balance: _balance, staffName: _staffName, companyId: _companyId, deductionTypeName: _deductionTypeName, ...formDataFromEdit } = editingDeduction;
         setDeductionFormData(formDataFromEdit);
       } else {
         const defaultType = deductionTypes.find(dt => dt.id === DEFAULT_LOAN_DEDUCTION_TYPE_ID) || deductionTypes[0];
@@ -269,7 +264,7 @@ export default function DeductionsPage() {
     if (idsToDelete.length === 0 || !selectedCompanyId) return;
     try {
       const supabase = getSupabaseClient();
-      await supabase.from('deductions').delete().in('id', idsToDelete);
+      await supabase.from('staff_deductions').delete().in('id', idsToDelete);
       setAllDeductionsData(prev => prev.filter(d => !idsToDelete.includes(d.id)));
       setSelectedItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
       setFeedback({type: 'success', message: `${idsToDelete.length} Deduction(s) Deleted`, details: `Successfully deleted ${idsToDelete.length} deduction(s).`});
@@ -305,7 +300,7 @@ export default function DeductionsPage() {
           deduction_type_id: deductionFormData.deductionTypeId,
           balance: calculatedBalance,
         };
-        await supabase.from('deductions').update(updatedDeductionDb).eq('id', editingDeduction.id);
+        await supabase.from('staff_deductions').update(updatedDeductionDb).eq('id', editingDeduction.id);
         const updatedDeduction = mapDeductionFromSupabase(updatedDeductionDb, staffList, deductionTypes);
         setAllDeductionsData(prev => prev.map(d => d.id === editingDeduction.id ? updatedDeduction : d));
         setFeedback({type: 'success', message: "Deduction Updated", details: `Deduction for ${staffFullName} has been updated.`});
@@ -322,7 +317,7 @@ export default function DeductionsPage() {
           start_date: deductionFormData.startDate,
           balance: calculatedBalance,
         };
-        await supabase.from('deductions').insert(newDeductionDb);
+        await supabase.from('staff_deductions').insert(newDeductionDb);
         const newDeduction = mapDeductionFromSupabase(newDeductionDb, staffList, deductionTypes);
         setAllDeductionsData(prev => [newDeduction, ...prev].sort((a,b) => a.id.localeCompare(b.id)));
         setFeedback({type: 'success', message: "Deduction Added", details: `New deduction added for ${staffFullName}.`});
@@ -335,7 +330,7 @@ export default function DeductionsPage() {
     setIsDeductionDialogOpen(false);
   };
 
-  const idLikeDeductionFieldsForExport = ['id', 'staffId', 'deductionTypeId'];
+  const _idLikeDeductionFieldsForExport = ['id', 'staffId', 'deductionTypeId'];
   const deductionColumnsForExport = [
     { key: 'id', label: 'ID', isIdLike: true }, { key: 'staffId', label: 'StaffID', isIdLike: true }, { key: 'staffName', label: 'StaffName' },
     { key: 'deductionTypeId', label: 'DeductionTypeID', isIdLike: true }, { key: 'deductionTypeName', label: 'DeductionTypeName' },
@@ -353,7 +348,7 @@ export default function DeductionsPage() {
       const rowStatus = (row.balance || 0) > 0 ? "Active" : "Completed";
       const exportRow: Record<string, string | number> = {};
       deductionColumnsForExport.forEach(col => {
-        let value = row[col.key as keyof Deduction];
+        const value = row[col.key as keyof Deduction];
         if (col.isIdLike) {
             exportRow[col.label] = String(value || '');
         } else if (['originalAmount', 'monthlyDeduction', 'deductedSoFar'].includes(col.key)) {
@@ -471,7 +466,7 @@ export default function DeductionsPage() {
               const normalizedCsvHeader = csvHeader.trim().toLowerCase().replace(/\s+/g, '');
               const deductionKey = normalizedHeaderToKeyMap[normalizedCsvHeader];
               if (deductionKey) {
-                let value = String(rawRow[csvHeader] || '').trim();
+                const value = String(rawRow[csvHeader] || '').trim();
                 if (['originalAmount', 'monthlyDeduction', 'deductedSoFar'].includes(deductionKey)) {
                   (deductionObject as any)[deductionKey] = parseFloat(value.replace(/,/g, '')) || 0;
                 } else if (deductionKey === 'startDate' && value) {
@@ -603,7 +598,7 @@ export default function DeductionsPage() {
       deletableTypeNames.push(`"${type.name}"`);
       actualIdsToDeleteFromDB.push(id);
     }
-    let feedbackMessages: string[] = [];
+    const feedbackMessages: string[] = [];
     if (skippedNonDeletable.length > 0) feedbackMessages.push(`${skippedNonDeletable.length} core type(s) skipped.`);
     if (skippedInUse.length > 0) feedbackMessages.push(`${skippedInUse.length} type(s) in use skipped.`);
     if (actualIdsToDeleteFromDB.length > 0) {

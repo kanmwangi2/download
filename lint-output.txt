@@ -1,0 +1,476 @@
+﻿
+> nextn@0.1.0 lint
+> next lint
+
+
+./src/app/api/create-profile/route.ts
+16:5  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+55:5  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+62:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/debug-auth/route.ts
+20:5  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+64:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/app/(main)/dashboard/page.tsx
+69:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+86:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+86:79  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+86:87  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+96:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+97:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+97:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+113:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+114:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+114:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/app/(main)/deductions/page.tsx
+80:12  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+101:38  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+101:54  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+101:77  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+102:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+103:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+119:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+190:65  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+286:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+352:13  Warning: 'value' is never reassigned. Use 'const' instead.  prefer-const
+410:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+470:21  Warning: 'value' is never reassigned. Use 'const' instead.  prefer-const
+472:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+482:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+487:87  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+487:129  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+489:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+504:193  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+504:246  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+504:282  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+602:9  Warning: 'feedbackMessages' is never reassigned. Use 'const' instead.  prefer-const
+752:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+909:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+947:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1160:77  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1230:283  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1230:316  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1251:300  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1251:330  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/app/app/(main)/documentation/page.tsx
+485:11  Warning: 'estSectionTitleHeight' is never reassigned. Use 'const' instead.  prefer-const
+524:15  Warning: 'estSubTitleHeight' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/app/(main)/payments/page.tsx
+18:168  Warning: 'Users' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+69:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+86:49  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+206:74  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+217:82  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+355:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+365:73  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+397:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+407:73  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+424:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+434:73  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+525:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+630:15  Warning: 'newCount' is never reassigned. Use 'const' instead.  prefer-const
+630:33  Warning: 'updatedCount' is never reassigned. Use 'const' instead.  prefer-const
+630:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+643:91  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+683:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+768:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+954:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+990:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1270:124  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1270:152  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1308:12  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1314:139  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1314:173  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/app/app/(main)/payroll/page.tsx
+17:175  Warning: 'Users' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+54:28  Warning: 'FullDeductionRecord' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+55:35  Warning: 'FullPayrollRunDetail' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+185:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+327:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+355:9  Warning: 'actualIdsToDeleteFromDB' is never reassigned. Use 'const' instead.  prefer-const
+375:9  Warning: 'deductionsReversedCount' is never reassigned. Use 'const' instead.  prefer-const
+472:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+548:22  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+647:30  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+779:52  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+779:61  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/app/app/(main)/payroll/[id]/page.tsx
+29:34  Warning: 'FileSpreadsheet' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+29:51  Warning: 'FileType' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+32:12  Warning: 'Info' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+47:18  Warning: 'parseISO' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+438:7  Warning: 'idLikePayrollDetailFieldsForExport' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+500:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+534:59  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+630:142  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+850:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+976:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+989:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+993:125  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+994:131  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+996:128  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1000:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1006:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1049:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1065:262  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1069:170  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1085:18  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1137:143  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1138:149  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1140:146  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+1179:19  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+1211:426  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+1211:449  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+1211:471  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1211:475  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1211:597  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+1211:619  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+
+./src/app/app/(main)/reports/page.tsx
+11:10  Warning: 'initialPaymentTypesForCompanySeed' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+14:11  Warning: An interface declaring no members is equivalent to its supertype.  @typescript-eslint/no-empty-object-type
+33:7  Warning: 'formatAmountForDisplay' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+38:7  Warning: 'getStringIdentifier' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+52:10  Warning: 'approvedRunsForStatutory' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+53:10  Warning: 'isLoadingRuns' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+54:10  Warning: 'allStaffMembers' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+55:10  Warning: 'companyProfile' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+56:10  Warning: 'companyPaymentTypes' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+57:10  Warning: 'companyDeductionTypes' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+59:45  Warning: 'setSelectedStaffIdForDeductionReport' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+60:10  Warning: 'staffDeductionsForSelection' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+62:10  Warning: 'deductionHistoryReportData' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+63:10  Warning: 'approvedRunsForPayslips' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+64:42  Warning: 'setSelectedPayrollRunIdForPayslip' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+65:10  Warning: 'staffInSelectedRunForPayslip' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+66:10  Warning: 'selectedStaffForPayslipPeriodGeneration' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+67:10  Warning: 'isLoadingPayslipStaff' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+68:10  Warning: 'feedback' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+93:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+93:97  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+93:105  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+113:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+113:70  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+119:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+119:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+158:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+168:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+174:18  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/app/(main)/settings/company/page.tsx
+28:23  Warning: 'SupabaseUser' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+28:58  Warning: 'AppCompany' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+38:7  Warning: 'UMOJA_COMPANY_ID' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+39:7  Warning: 'ISOKO_COMPANY_ID' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+114:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+162:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+175:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+251:10  Warning: 'isDeleteDepartmentDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+261:10  Warning: 'isBulkDeleteDepartmentsDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+263:10  Warning: 'isTaxToggleAlertOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+406:9  Warning: 'confirmTaxToggle' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+492:9  Warning: 'confirmDeleteDepartment' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+494:9  Warning: 'confirmBulkDeleteDepartments' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+597:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+651:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+713:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+735:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+792:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+798:78  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+799:80  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+816:72  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+871:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+989:197  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+989:214  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+989:219  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+989:236  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+1024:230  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+1024:295  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/app/app/(main)/settings/profile/page.tsx
+16:15  Warning: 'User' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+143:10  Warning: 'originalEmail' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+232:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+270:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+347:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+425:22  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+433:16  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+448:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/app/(main)/staff/page.tsx
+47:10  Warning: 'isAddStaffDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+50:10  Warning: 'isDeleteStaffDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+52:10  Warning: 'isLoaded' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+57:10  Warning: 'isBulkDeleteDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+61:27  Warning: 'setIsCfdDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+62:22  Warning: 'setEditingCfd' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+63:10  Warning: 'cfdFormData' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+64:10  Warning: 'isDeleteCfdDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+64:33  Warning: 'setIsDeleteCfdDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+65:10  Warning: 'cfdToDelete' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+65:23  Warning: 'setCfdToDelete' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+66:10  Warning: 'cfdSearchTerm' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+66:25  Warning: 'setCfdSearchTerm' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+67:10  Warning: 'cfdCurrentPage' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+67:26  Warning: 'setCfdCurrentPage' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+68:10  Warning: 'cfdRowsPerPage' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+68:26  Warning: 'setCfdRowsPerPage' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+69:10  Warning: 'selectedCfdItems' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+69:28  Warning: 'setSelectedCfdItems' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+70:10  Warning: 'isBulkDeleteCfdDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+70:37  Warning: 'setIsBulkDeleteCfdDialogOpen' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+71:9  Warning: 'cfdImportFileInputRef' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+99:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+138:9  Warning: 'handleSelectRow' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+141:9  Warning: 'handleSelectAllOnPage' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+146:9  Warning: 'isAllOnPageSelected' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+150:9  Warning: 'handleAddStaff' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+194:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+218:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+220:9  Warning: 'handleDeleteSingleStaffClick' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+221:9  Warning: 'confirmDeleteSingleStaff' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+222:9  Warning: 'handleOpenBulkDeleteDialog' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+223:9  Warning: 'confirmBulkDeleteStaff' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+254:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+259:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+301:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+323:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+326:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+332:21  Warning: 'value' is never reassigned. Use 'const' instead.  prefer-const
+415:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+419:91  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+419:136  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+419:168  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+435:67  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+435:75  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+486:8  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+493:12  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/app/app/(main)/staff/[id]/page.tsx
+11:10  Warning: 'Textarea' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+100:19  Warning: 'id' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+100:23  Warning: 'company_id' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+190:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/app/app/(main)/staff/[id]/page_new.tsx
+100:19  Warning: 'id' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+100:23  Warning: 'company_id' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+192:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/app/app/(main)/support/page.tsx
+9:15  Warning: 'User' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/app/app/(main)/utilities/audit-log/page.tsx
+3:38  Warning: 'useMemo' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+19:10  Warning: 'createClient' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+30:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/app/(main)/utilities/faq/page.tsx
+162:11  Warning: 'contentIndentAfterNumber' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+184:17  Warning: 'nextTagIndex' is never reassigned. Use 'const' instead.  prefer-const
+292:11  Warning: 'estQuestionHeight' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/layout.tsx
+25:9  Warning: Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+./src/app/manual-setup/page.tsx
+127:37  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+150:31  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+150:42  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+151:31  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+151:41  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/app/setup-database/page.tsx
+23:25  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+27:5  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+62:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+117:14  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+125:12  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/app/signup/page.tsx
+27:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+40:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+49:9  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+70:9  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+89:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+168:12  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/auth/login-form.tsx
+59:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+62:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+72:9  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+83:11  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+85:18  Warning: 'routerError' is defined but never used.  @typescript-eslint/no-unused-vars
+86:11  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+117:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+180:20  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+195:18  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+
+./src/components/company/company-selector.tsx
+37:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+200:16  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/debug/supabase-test.tsx
+10:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+20:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+45:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+69:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+88:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+94:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/error-boundary.tsx
+89:16  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+97:20  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/layout/app-shell.tsx
+19:10  Warning: 'Button' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+42:18  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+95:7  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+
+./src/components/layout/user-nav.tsx
+128:18  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/settings/company-management-tab.tsx
+55:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+55:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+67:38  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+67:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+126:7  Warning: 'idLikeCompanyFields' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+156:16  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+215:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+249:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+283:9  Warning: 'globalCompanyExportColumns' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+370:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+401:112  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+464:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+628:87  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+628:111  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/components/settings/taxes-tab.tsx
+55:72  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+74:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+188:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/settings/user-management-tab.tsx
+56:38  Warning: 'globalAllCompanyIds' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+57:5  Warning: 'defaultNewUserFormData' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+84:7  Warning: 'idLikeUserFields' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+88:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+88:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+98:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+98:38  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+141:10  Warning: 'originalEmailForEdit' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u.  @typescript-eslint/no-unused-vars
+164:16  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+237:9  Warning: 'handleEditUserClick' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+243:9  Warning: 'handleDeleteUserClick' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+267:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+319:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+377:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+433:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+451:115  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+529:10  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+715:31  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+726:79  Warning: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+767:15  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+767:104  Warning: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+./src/components/ui/command.tsx
+27:11  Warning: An interface declaring no members is equivalent to its supertype.  @typescript-eslint/no-empty-object-type
+
+./src/components/ui/loading.tsx
+28:8  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+89:8  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/components/ui/sidebar.tsx
+665:8  Warning: Potential leaked value that might cause unintentionally rendered values or rendering crashes  react/jsx-no-leaked-render
+
+./src/hooks/common-hooks.ts
+2:10  Warning: 'createClient' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+3:31  Warning: 'displayError' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+3:45  Warning: 'withErrorHandling' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+7:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+32:6  Warning: React Hook useCallback was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies.  react-hooks/exhaustive-deps
+32:6  Warning: React Hook useCallback has a missing dependency: 'queryFn'. Either include it or remove the dependency array. If 'queryFn' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+51:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+53:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+59:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/hooks/use-common.ts
+7:49  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+34:6  Warning: React Hook useCallback was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies.  react-hooks/exhaustive-deps
+34:6  Warning: React Hook useCallback has a missing dependency: 'query'. Either include it or remove the dependency array. If 'query' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+53:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+55:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+61:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+210:13  Warning: 'result' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/lib/accessibility.ts
+290:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+294:49  Warning: The ref value 'liveRegionRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'liveRegionRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/lib/config.ts
+57:12  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+107:3  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+
+./src/lib/customFieldDefinitionData.ts
+57:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+68:77  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/deductionsData.ts
+2:77  Warning: 'DEFAULT_CHARGE_DEDUCTION_TYPE_ID' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+64:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+82:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/deductionTypesData.ts
+69:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+80:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/error-handling.ts
+33:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+153:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+177:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+177:87  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/paymentTypesData.ts
+83:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+95:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/performance.ts
+21:10  Warning: React Hook useMemo received a function whose dependencies are unknown. Pass an inline function instead.  react-hooks/exhaustive-deps
+25:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+25:65  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+29:10  Warning: React Hook useCallback received a function whose dependencies are unknown. Pass an inline function instead.  react-hooks/exhaustive-deps
+33:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+33:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+50:5  Warning: React Hook useCallback has a missing dependency: 'callback'. Either include it or remove the dependency array. If 'callback' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+50:6  Warning: React Hook useCallback has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies.  react-hooks/exhaustive-deps
+
+./src/lib/security.ts
+156:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+160:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+171:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+187:5  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+192:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+246:3  Warning: Unexpected console statement. Only these console methods are allowed: warn, error.  no-console
+
+./src/lib/staffData.ts
+204:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+204:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+229:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+229:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+255:10  Warning: 'staffMemberFromBackend' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+255:139  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/userData.ts
+116:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+116:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+127:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+127:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

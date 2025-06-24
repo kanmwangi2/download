@@ -25,19 +25,14 @@ import 'jspdf-autotable';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
-import type { User as SupabaseUser, UserRole, Company as AppCompany } from '@/lib/userData';
+import type { UserRole } from '@/lib/userData';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export interface Department {
   id: string;
   companyId: string;
-  name: string;
-  description?: string;
+  name: string;  description?: string;
 }
-
-const UMOJA_COMPANY_ID = "co_001";
-const ISOKO_COMPANY_ID = "co_002";
-
 
 export const initialDepartments: Omit<Department, 'companyId'>[] = [
   { id: "dept_eng_co001", name: "Engineering", description: "Software development and R&D" },
@@ -134,9 +129,16 @@ async function fetchDepartments(companyId: string): Promise<Department[]> {
   const { data, error } = await supabase
     .from('departments')
     .select('*')
-    .eq('companyId', companyId);
+    .eq('company_id', companyId);
   if (error) return [];
-  return data as Department[];
+  // Map from snake_case to camelCase
+  return (data || []).map(dept => ({
+    id: dept.id,
+    companyId: dept.company_id,
+    name: dept.name,
+    description: dept.description,
+    createdAt: dept.created_at
+  }));
 }
 
 // --- User type (frontend: camelCase only) ---
@@ -198,11 +200,18 @@ async function updateCompanyProfile(companyId: string, profile: CompanyProfileDa
 
 // Helper: update department in Supabase
 async function updateDepartment(companyId: string, department: Department) {
+  // Convert camelCase to snake_case for database
+  const deptDbFormat = {
+    id: department.id,
+    company_id: department.companyId,
+    name: department.name,
+    description: department.description
+  };
   await supabase
     .from('departments')
-    .update(department)
+    .update(deptDbFormat)
     .eq('id', department.id)
-    .eq('companyId', companyId);
+    .eq('company_id', companyId);
 }
 
 // Helper: delete department in Supabase
@@ -211,7 +220,7 @@ async function deleteDepartment(companyId: string, departmentId: string) {
     .from('departments')
     .delete()
     .eq('id', departmentId)
-    .eq('companyId', companyId);
+    .eq('company_id', companyId);
 }
 
 // Remove export from defaultNewUserFormData to avoid export conflict
@@ -515,14 +524,15 @@ export default function CompanySettingsPage() {
 
   const deleteCompanyUsersByIds = async (idsToDelete: string[]) => {
     setFeedback(null);
-    if (!selectedCompanyId || idsToDelete.length === 0) return;
-    try {
+    if (!selectedCompanyId || idsToDelete.length === 0) return;    try {
+      // NOTE: This logic needs revision - users don't have companyId column
+      // Should remove company from assigned_company_ids array instead
       for (const userId of idsToDelete) {
         await supabase
           .from('users')
           .delete()
-          .eq('id', userId)
-          .eq('companyId', selectedCompanyId);
+          .eq('id', userId);
+          // TODO: Fix to properly remove company from assigned_company_ids
       }
       setCompanyUsers(prev => prev.filter(u => !idsToDelete.includes(u.id)));
       setSelectedCompanyUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });

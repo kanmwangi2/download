@@ -156,10 +156,8 @@ export default function FaqPage() {
     const baseFontLineHeight = baseFontSize * 1.5;
     const questionFontLineHeight = questionFontSize * 1.5;
 
-    const questionSpacing = 12;
-    const itemSpacing = 15;
+    const questionSpacing = 12;    const itemSpacing = 15;
     const numberTextGap = 5;
-    const contentIndentAfterNumber = 20;
 
     const checkPageBreak = (currentY: number, neededSpace: number): number => {
       if (currentY + neededSpace > pageHeight - (margin + baseFontLineHeight * 2)) {
@@ -181,7 +179,7 @@ export default function FaqPage() {
             const brIndex = remainingText.indexOf("<br />");
 
 
-            let nextTagIndex = Math.min(
+            const nextTagIndex = Math.min(
                 strongOpenIndex !== -1 ? strongOpenIndex : Infinity,
                 strongCloseIndex !== -1 ? strongCloseIndex : Infinity,
                 codeOpenIndex !== -1 ? codeOpenIndex : Infinity,
@@ -289,7 +287,7 @@ export default function FaqPage() {
       const questionSegments = parseHtmlTagsForFaq(questionTextForParsing);
       const questionNumberPrefix = `${index + 1}. `;
 
-      let estQuestionHeight = questionFontLineHeight;
+      const estQuestionHeight = questionFontLineHeight;
       let firstAnswerLineHeight = 0;
       if (item.answer) { firstAnswerLineHeight = baseFontLineHeight; }
 

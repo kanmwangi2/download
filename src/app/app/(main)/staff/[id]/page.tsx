@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -94,10 +93,8 @@ export default function StaffDetailPage() {
           isDeletable: cfd.is_deletable ?? true
         }));
 
-        setCompanyCustomFields(convertedCustomFields.sort((a,b) => a.orderNumber - b.orderNumber));
-
-        if (staffMember) {
-          const { id, company_id, custom_fields, ...formData } = staffMember;
+        setCompanyCustomFields(convertedCustomFields.sort((a,b) => a.orderNumber - b.orderNumber));        if (staffMember) {
+          const { custom_fields, ...formData } = staffMember;
           setStaffData(formData);
           setCustomFieldsData(custom_fields || {});
           setOriginalStaffDataForDisplay(staffMember);

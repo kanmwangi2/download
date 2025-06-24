@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { LifeBuoy, Mail, Phone, MessageSquare, BookOpenText, HelpCircle, Loader2 } from "lucide-react"; 
 import Link from "next/link";
 import { createClient } from '@/lib/supabase';
-import { type User } from '@/lib/userData';
 
 export default function SupportPage() {
   const [primaryAdminEmail, setPrimaryAdminEmail] = useState<string | null>(null);

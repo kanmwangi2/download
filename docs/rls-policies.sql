@@ -17,6 +17,9 @@ ALTER TABLE public.tax_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_run_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_avatars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.custom_field_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
 -- UTILITY FUNCTION: Get user companies
@@ -60,7 +63,7 @@ CREATE POLICY "Admins can update companies" ON companies
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = companies.id 
-      AND role = 'admin'
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
     )
   );
 
@@ -69,7 +72,7 @@ CREATE POLICY "Admins can insert companies" ON companies
     EXISTS (
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
-      AND role = 'admin'
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
     )
   );
 
@@ -86,7 +89,7 @@ CREATE POLICY "Admins can manage assignments" ON user_company_assignments
       SELECT 1 FROM user_company_assignments uca
       WHERE uca.user_id = auth.uid() 
       AND uca.company_id = user_company_assignments.company_id 
-      AND uca.role = 'admin'
+      AND uca.role IN ('Primary Admin', 'App Admin', 'Company Admin')
     )
   );
 
@@ -96,14 +99,14 @@ CREATE POLICY "Admins can manage assignments" ON user_company_assignments
 CREATE POLICY "Users can view company staff" ON staff_members
   FOR SELECT USING (company_id = ANY(get_user_companies()));
 
-CREATE POLICY "HR/Admins can manage staff" ON staff_members
+CREATE POLICY "Authorized users can manage staff" ON staff_members
   FOR ALL USING (
     company_id = ANY(get_user_companies()) AND
     EXISTS (
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = staff_members.company_id 
-      AND role IN ('admin', 'hr')
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
     )
   );
 
@@ -120,7 +123,7 @@ CREATE POLICY "HR/Admins can manage payroll runs" ON payroll_runs
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = payroll_runs.company_id 
-      AND role IN ('admin', 'hr')
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
     )
   );
 
@@ -134,7 +137,7 @@ CREATE POLICY "HR/Admins can manage payroll details" ON payroll_run_details
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = payroll_run_details.company_id 
-      AND role IN ('admin', 'hr')
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
     )
   );
 
@@ -151,7 +154,7 @@ CREATE POLICY "HR/Admins can manage payment configs" ON staff_payment_configs
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = staff_payment_configs.company_id 
-      AND role IN ('admin', 'hr')
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
     )
   );
 
@@ -166,7 +169,75 @@ CREATE POLICY "HR/Admins can manage deductions" ON staff_deductions
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND company_id = staff_deductions.company_id 
-      AND role IN ('admin', 'hr')
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
+    )
+  );
+
+-- =====================================================
+-- DEPARTMENTS POLICIES
+-- =====================================================
+CREATE POLICY "Users can view company departments" ON departments
+  FOR SELECT USING (company_id = ANY(get_user_companies()));
+
+CREATE POLICY "Admins can manage departments" ON departments
+  FOR ALL USING (
+    company_id = ANY(get_user_companies()) AND
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND company_id = departments.company_id 
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
+    )
+  );
+
+-- =====================================================
+-- PAYMENT TYPES POLICIES
+-- =====================================================
+CREATE POLICY "Users can view company payment types" ON payment_types
+  FOR SELECT USING (company_id = ANY(get_user_companies()));
+
+CREATE POLICY "Admins can manage payment types" ON payment_types
+  FOR ALL USING (
+    company_id = ANY(get_user_companies()) AND
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND company_id = payment_types.company_id 
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
+    )
+  );
+
+-- =====================================================
+-- DEDUCTION TYPES POLICIES
+-- =====================================================
+CREATE POLICY "Users can view company deduction types" ON deduction_types
+  FOR SELECT USING (company_id = ANY(get_user_companies()));
+
+CREATE POLICY "Admins can manage deduction types" ON deduction_types
+  FOR ALL USING (
+    company_id = ANY(get_user_companies()) AND
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND company_id = deduction_types.company_id 
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
+    )
+  );
+
+-- =====================================================
+-- TAX SETTINGS POLICIES
+-- =====================================================
+CREATE POLICY "Users can view company tax settings" ON tax_settings
+  FOR SELECT USING (company_id = ANY(get_user_companies()));
+
+CREATE POLICY "Admins can manage tax settings" ON tax_settings
+  FOR ALL USING (
+    company_id = ANY(get_user_companies()) AND
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND company_id = tax_settings.company_id 
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
     )
   );
 
@@ -180,10 +251,63 @@ CREATE POLICY "System can insert audit logs" ON audit_logs
   FOR INSERT WITH CHECK (true);
 
 -- =====================================================
+-- USER AVATARS POLICIES
+-- Users can only access their own avatar
+-- =====================================================
+CREATE POLICY "Users can view their own avatar" ON user_avatars
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage their own avatar" ON user_avatars
+  FOR ALL USING (auth.uid() = user_id);
+
+-- =====================================================
+-- CUSTOM FIELD DEFINITIONS POLICIES
+-- Company-based access control
+-- =====================================================
+CREATE POLICY "Users can view custom fields for their companies" ON custom_field_definitions
+  FOR SELECT USING (company_id = ANY(get_user_companies()));
+
+CREATE POLICY "Company admins can manage custom fields" ON custom_field_definitions
+  FOR ALL USING (
+    company_id = ANY(get_user_companies()) AND
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND company_id = custom_field_definitions.company_id 
+      AND role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')
+    )
+  );
+
+-- =====================================================
+-- USERS TABLE POLICIES
+-- Admin access only for user management
+-- =====================================================
+CREATE POLICY "Admins can view all users" ON users
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND role IN ('Primary Admin', 'App Admin')
+    )
+  );
+
+CREATE POLICY "Admins can manage users" ON users
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM user_company_assignments 
+      WHERE user_id = auth.uid() 
+      AND role IN ('Primary Admin', 'App Admin')
+    )
+  );
+
+-- =====================================================
 -- REALTIME SUBSCRIPTIONS
 -- Enable realtime for key tables
 -- =====================================================
 ALTER PUBLICATION supabase_realtime ADD TABLE companies;
 ALTER PUBLICATION supabase_realtime ADD TABLE staff_members;
 ALTER PUBLICATION supabase_realtime ADD TABLE payroll_runs;
-ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs; 
+ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
+ALTER PUBLICATION supabase_realtime ADD TABLE user_avatars;
+ALTER PUBLICATION supabase_realtime ADD TABLE custom_field_definitions;
+ALTER PUBLICATION supabase_realtime ADD TABLE users;

@@ -51,10 +51,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { 
     type UserRole, 
     type Company, 
-    type User, 
-    // USER_ROLES, // <-- Removed: not exported from userData
-    all_company_ids_for_user_seed as globalAllCompanyIds, // Corrected import alias
-    defaultNewUserFormData
+    type User
 } from '@/lib/userData';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import Papa from 'papaparse';
@@ -80,9 +77,6 @@ type FeedbackMessage = {
   message: string;
   details?: string;
 };
-
-const idLikeUserFields = ['id', 'phone'];
-
 
 // Utility: Convert camelCase user to snake_case for backend
 function userToBackend(user: any): any {
@@ -132,13 +126,11 @@ export default function UserManagementTab() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserUI>(defaultNewUserFormDataUI);
   
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showPasswordInDialog, setShowPasswordInDialog] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState(""); 
   const globalUsersImportFileInputRef = useRef<HTMLInputElement>(null);
-  const [originalEmailForEdit, setOriginalEmailForEdit] = useState<string>("");
 
 
   const [userCurrentPage, setUserCurrentPage] = useState(1);
@@ -160,8 +152,7 @@ export default function UserManagementTab() {
         setAllUsers((users || []).map(userFromBackend));
         const { data: companies, error: companyError } = await supabase.from('companies').select('*');
         if (companyError) throw companyError;
-        setAvailableCompaniesForAssignment(companies || []);
-      } catch (error) {
+        setAvailableCompaniesForAssignment(companies || []);      } catch {
         setAllUsers([]); 
         setAvailableCompaniesForAssignment([]);
         setFeedback({type: 'error', message: "Loading Error", details: "Could not load initial data."})
@@ -189,20 +180,16 @@ export default function UserManagementTab() {
         id: uiUser.id,
         firstName: uiUser.firstName,
         lastName: uiUser.lastName,
-        email: uiUser.email,
-        phone: uiUser.phone || "",
+        email: uiUser.email,        phone: uiUser.phone || "",
         role: uiUser.role,
         assignedCompanyIds: assignedIds,
         password: "",
       });
-      setOriginalEmailForEdit(uiUser.email);
     } else {
       let initialAssignedIds = defaultNewUserFormDataUI.assignedCompanyIds || [];
       if (defaultNewUserFormDataUI.role === "Primary Admin" || defaultNewUserFormDataUI.role === "App Admin") {
-        initialAssignedIds = availableCompaniesForAssignment.map(c => c.id);
-      }
+        initialAssignedIds = availableCompaniesForAssignment.map(c => c.id);      }
       setFormData({ ...defaultNewUserFormDataUI, assignedCompanyIds: initialAssignedIds, password: "" });
-      setOriginalEmailForEdit("");
     }
   }, [editingUser, isUserDialogOpen, availableCompaniesForAssignment]);
 
@@ -233,23 +220,6 @@ export default function UserManagementTab() {
     setEditingUser(null);
     setIsUserDialogOpen(true);
   };
-
-  const handleEditUserClick = (user: User) => {
-    setFeedback(null);
-    setEditingUser(user);
-    setIsUserDialogOpen(true);
-  };
-
-  const handleDeleteUserClick = (user: User) => {
-    setFeedback(null);
-    if (user.role === "Primary Admin") {
-      setFeedback({type: 'info', message: "Action Denied", details: "The Primary Admin account cannot be deleted."});
-      return;
-    }
-    setUserToDelete(user);
-    setIsDeleteDialogOpen(true);
-  };
-
   const deleteUsersByIds = async (idsToDelete: string[]) => {
     setFeedback(null);
     if (idsToDelete.length === 0) return;
@@ -263,8 +233,7 @@ export default function UserManagementTab() {
         idsToDelete.forEach(id => newSelected.delete(id));
         return newSelected;
       });
-      setFeedback({ type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).` });
-    } catch (error) {
+      setFeedback({ type: 'success', message: "User(s) Deleted", details: `Successfully deleted ${idsToDelete.length} user(s).` });    } catch {
       setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} user(s).` });
     }
   };

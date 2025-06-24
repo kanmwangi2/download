@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { format, parseISO, isValid } from 'date-fns';
 import { useCompany } from '@/context/CompanyContext';
-import { createClient } from '@/lib/supabase';
 
 // Temporary type until Supabase audit logging is implemented
 type AuditLogEntry = {

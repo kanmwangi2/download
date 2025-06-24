@@ -1,5 +1,5 @@
 import type { Deduction } from '@/app/app/(main)/deductions/page';
-import { DEFAULT_ADVANCE_DEDUCTION_TYPE_ID, DEFAULT_LOAN_DEDUCTION_TYPE_ID, DEFAULT_CHARGE_DEDUCTION_TYPE_ID } from '@/lib/deductionTypesData';
+import { DEFAULT_ADVANCE_DEDUCTION_TYPE_ID, DEFAULT_LOAN_DEDUCTION_TYPE_ID } from '@/lib/deductionTypesData';
 
 export const initialDeductionsData: Deduction[] = [
   {

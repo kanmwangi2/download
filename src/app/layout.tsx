@@ -2,8 +2,8 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-// Toaster removed
 import { ThemeProvider } from "@/components/theme-provider";
+import ErrorBoundary from "@/components/error-boundary";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -24,15 +24,15 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className={`${inter.variable} font-body antialiased`}>
-        <ThemeProvider
+      <body className={`${inter.variable} font-body antialiased`}>        <ThemeProvider
           attribute="class"
           defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          {/* Toaster removed */}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

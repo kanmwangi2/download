@@ -1,6 +1,6 @@
 // Simple database setup for Cheetah Payroll
 export async function setupDatabaseTables() {
-  console.log('🔄 Setting up database tables...')
+  console.warn('🔄 Setting up database tables...')
   
   // Manual instructions for now since MCP requires additional setup
   const instructions = `
@@ -44,10 +44,9 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 
 -- User company assignments
 CREATE TABLE IF NOT EXISTS public.user_company_assignments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),  user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'hr', 'user')),
+  role TEXT DEFAULT 'Payroll Preparer' CHECK (role IN ('Primary Admin', 'App Admin', 'Company Admin', 'Payroll Approver', 'Payroll Preparer')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, company_id)
 );
@@ -129,6 +128,6 @@ CREATE POLICY "Allow all for authenticated users" ON public.audit_logs FOR ALL T
 After running the SQL, go to /signup and test user creation!
 `
 
-  console.log(instructions)
+  console.warn(instructions)
   return instructions
 } 

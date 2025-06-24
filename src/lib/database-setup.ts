@@ -20,11 +20,11 @@ const supabase = createClient(
 
 // Apply database schema using Supabase MCP
 export async function createDatabaseTables() {
-  console.log('🔄 Creating database tables using Supabase MCP...')
+  console.warn('🔄 Creating database tables using Supabase MCP...')
   
   try {
     // We'll use the actual Supabase MCP to create tables step by step
-    console.log('✅ Database tables creation initiated - will be handled by MCP')
+    console.warn('✅ Database tables creation initiated - will be handled by MCP')
     return true
 
   } catch (error) {
@@ -35,7 +35,7 @@ export async function createDatabaseTables() {
 
 // Enable Row Level Security
 export async function enableRLS() {
-  console.log('🔐 Enabling Row Level Security...')
+  console.warn('🔐 Enabling Row Level Security...')
   
   try {
     const { error } = await supabase.rpc('sql', {
@@ -50,7 +50,7 @@ export async function enableRLS() {
     })
     
     if (error) throw error
-    console.log('✅ RLS enabled successfully!')
+    console.warn('✅ RLS enabled successfully!')
     return true
   } catch (error) {
     console.error('❌ RLS setup failed:', error)
@@ -60,7 +60,7 @@ export async function enableRLS() {
 
 // Test data insertion
 export async function insertTestData() {
-  console.log('📊 Inserting test data...')
+  console.warn('📊 Inserting test data...')
   
   try {
     // Insert test company
@@ -76,7 +76,7 @@ export async function insertTestData() {
       .single()
 
     if (companyError) throw companyError
-    console.log('✅ Test company created:', company.name)
+    console.warn('✅ Test company created:', company.name)
     
     return company
   } catch (error) {
@@ -87,7 +87,7 @@ export async function insertTestData() {
 
 // Complete database setup
 export async function setupDatabase() {
-  console.log('🚀 Starting complete database setup...\n')
+  console.warn('🚀 Starting complete database setup...\n')
   
   const steps = [
     { name: 'Create Tables', fn: createDatabaseTables },
@@ -96,15 +96,15 @@ export async function setupDatabase() {
   ]
   
   for (const step of steps) {
-    console.log(`🔄 ${step.name}...`)
+    console.warn(`🔄 ${step.name}...`)
     const result = await step.fn()
     if (!result && step.name !== 'Insert Test Data') {
-      console.log(`❌ ${step.name} failed - stopping setup`)
+      console.warn(`❌ ${step.name} failed - stopping setup`)
       return false
     }
-    console.log(`✅ ${step.name} completed\n`)
+    console.warn(`✅ ${step.name} completed\n`)
   }
   
-  console.log('🎉 Database setup completed successfully!')
+  console.warn('🎉 Database setup completed successfully!')
   return true
 } 

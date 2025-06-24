@@ -4,13 +4,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Banknote, CalendarClock, LayoutGrid, Loader2, ReceiptText } from "lucide-react";
+import { Users, Banknote, CalendarClock, LayoutGrid, ReceiptText } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import Link from "next/link";
 import { useCompany } from '@/context/CompanyContext';
 import { createClient } from '@/lib/supabase';
-import type { StaffMember } from '@/lib/staffData';
-import type { PayrollRunSummary } from '@/app/app/(main)/payroll/page';
-import type { PayrollRunDetail } from '@/app/app/(main)/payroll/[id]/page';
 import { addMonths, getYear, getMonth } from 'date-fns';
 
 // --- Helper Functions ---
@@ -85,42 +83,37 @@ export default function DashboardPage() {
 
         const runs = payrollRuns || [];
         const nonApprovedRuns = runs
-          .filter((run: any) => run.status !== "Approved")
-          .sort((a: any, b: any) => {
+          .filter((run: any) => run.status !== "Approved")          .sort((a: any, b: any) => {
             if (a.year !== b.year) return a.year - b.year;
-            return monthOrder[a.month] - monthOrder[b.month];
+            return (monthOrder[a.month] ?? 0) - (monthOrder[b.month] ?? 0);
           });
 
         if (nonApprovedRuns.length > 0) {
           const currentNonApprovedRun = nonApprovedRuns[0];
           setNextPayrollRunDisplay(`${currentNonApprovedRun.month} ${currentNonApprovedRun.year}`);
           setNextPayrollSubtext(`Status: ${currentNonApprovedRun.status}`);
-        } else {
-          const approvedRunsSortedForNext = runs
+        } else {          const approvedRunsSortedForNext = runs
             .filter((run: any) => run.status === "Approved")
             .sort((a: any, b: any) => {
               if (b.year !== a.year) return b.year - a.year;
-              return monthOrder[b.month] - monthOrder[a.month];
+              return (monthOrder[b.month] ?? 0) - (monthOrder[a.month] ?? 0);
             });
 
           let nextPeriodDate: Date;
           if (approvedRunsSortedForNext.length > 0) {
             const latestApprovedRun = approvedRunsSortedForNext[0];
-            const latestRunDate = new Date(latestApprovedRun.year, monthOrder[latestApprovedRun.month]);
+            const latestRunDate = new Date(latestApprovedRun.year, monthOrder[latestApprovedRun.month] ?? 0);
             nextPeriodDate = addMonths(latestRunDate, 1);
           } else {
             nextPeriodDate = addMonths(new Date(),1);
           }
           setNextPayrollRunDisplay(`${monthNames[getMonth(nextPeriodDate)]} ${getYear(nextPeriodDate)}`);
           setNextPayrollSubtext("Status: Awaiting Creation");
-        }
-
-
-        const approvedPayrollRuns = runs
+        }        const approvedPayrollRuns = runs
           .filter((run: any) => run.status === "Approved")
           .sort((a: any, b: any) => {
             if (b.year !== a.year) return b.year - a.year;
-            return monthOrder[b.month] - monthOrder[a.month];
+            return (monthOrder[b.month] ?? 0) - (monthOrder[a.month] ?? 0);
           });
         const lastApprovedRun = approvedPayrollRuns.length > 0 ? approvedPayrollRuns[0] : null;
         
@@ -188,14 +181,8 @@ export default function DashboardPage() {
     fetchDataForDashboard();
   }, [selectedCompanyId, isLoadingCompanyContext]);
 
-
   if (isLoadingCompanyContext || isLoadingData) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading dashboard data...</p>
-      </div>
-    );
+    return <LoadingSpinner text="Loading dashboard data..." className="h-screen" />;
   }
 
   if (!selectedCompanyId && !isLoadingCompanyContext) {
@@ -220,9 +207,8 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 mb-1">
           <LayoutGrid className="h-7 w-7 text-primary" />
           <h1 className="text-3xl font-bold tracking-tight font-headline">Welcome back!</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Here's an overview of your payroll status for the current company. All monetary values are in Rwandan Francs (RWF).
+        </div>        <p className="text-muted-foreground">
+          Here&apos;s an overview of your payroll status for the current company. All monetary values are in Rwandan Francs (RWF).
         </p>
       </div>
 
@@ -250,15 +236,14 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Payroll Cost (Last Run, RWF)</CardTitle>
             <Banknote className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </CardHeader>          <CardContent>
             <div className="text-2xl font-bold">{totalPayrollCostDisplay}</div>
-            {(totalPayrollCostDisplay !== "N/A" && totalPayrollCostDisplay !== "Error") && (
+            {(totalPayrollCostDisplay !== "N/A" && totalPayrollCostDisplay !== "Error") ? (
               <p className="text-xs text-muted-foreground">{payrollCostSubtext}</p>
-            )}
-             {(totalPayrollCostDisplay === "N/A" && payrollCostSubtext) &&
+            ) : null}
+             {(totalPayrollCostDisplay === "N/A" && Boolean(payrollCostSubtext)) ? (
               <p className="text-xs text-muted-foreground">{payrollCostSubtext}</p>
-            }
+            ) : null}
           </CardContent>
         </Card>
          <Card>
@@ -266,14 +251,13 @@ export default function DashboardPage() {
             <CardTitle className="text-sm font-medium">Total Deductions (Last Run, RWF)</CardTitle>
             <ReceiptText className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDeductionsMainDisplay}</div>
-            {(totalDeductionsMainDisplay !== "N/A" && totalDeductionsMainDisplay !== "Error") && (
+          <CardContent>            <div className="text-2xl font-bold">{totalDeductionsMainDisplay}</div>
+            {(totalDeductionsMainDisplay !== "N/A" && totalDeductionsMainDisplay !== "Error") ? (
              <p className="text-xs text-muted-foreground">{deductionsCardSubtext}</p>
-            )}
-            {(totalDeductionsMainDisplay === "N/A" && deductionsCardSubtext) &&
+            ) : null}
+            {(totalDeductionsMainDisplay === "N/A" && Boolean(deductionsCardSubtext)) ? (
               <p className="text-xs text-muted-foreground">{deductionsCardSubtext}</p>
-            }
+            ) : null}
           </CardContent>
         </Card>
       </div>

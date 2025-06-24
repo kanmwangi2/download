@@ -81,8 +81,7 @@ export function LoginForm() {
         // Use replace to prevent going back to login page
         try {
           console.log("🚀 Redirecting to /select-company");
-          router.replace("/select-company");
-        } catch (routerError) {
+          router.replace("/select-company");        } catch {
           console.log("❌ Router redirect failed, using window.location");
           window.location.href = "/select-company";
         }

@@ -112,27 +112,8 @@ export const defaultNewUserFormData: Omit<User, 'id' | 'password'> & { password?
   phone: "",
 };
 
-// Utility: Convert camelCase user to snake_case for backend
-export function userToBackend(user: any): any {
-  return {
-    ...user,
-    first_name: user.firstName,
-    last_name: user.lastName,
-    assigned_company_ids: user.assignedCompanyIds,
-    // ...other mappings as needed
-  };
-}
-
-// Utility: Convert backend user to camelCase for frontend
-export function userFromBackend(user: any): any {
-  return {
-    ...user,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    assignedCompanyIds: user.assigned_company_ids,
-    // ...other mappings as needed
-  };
-}
+// Import centralized case conversion utilities
+export { userToBackend, userFromBackend } from './case-conversion';
 
 import { getSupabaseClient } from './supabase';
 

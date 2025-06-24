@@ -60,38 +60,5 @@ export const initialDeductionsData: Deduction[] = [
   },
 ];
 
-// Utility: Convert backend deduction (snake_case) to frontend (camelCase)
-export function deductionFromBackend(row: any): Deduction {
-  return {
-    id: row.id,
-    companyId: row.company_id,
-    staffId: row.staff_id,
-    staffName: row.staff_name, // optional, may be populated elsewhere
-    deductionTypeId: row.deduction_type_id,
-    deductionTypeName: row.deduction_type_name, // optional, may be populated elsewhere
-    description: row.description,
-    originalAmount: row.original_amount,
-    monthlyDeduction: row.monthly_deduction,
-    deductedSoFar: row.deducted_so_far,
-    balance: row.balance,
-    startDate: row.start_date,
-  };
-}
-
-// Utility: Convert frontend deduction (camelCase) to backend (snake_case)
-export function deductionToBackend(ded: Deduction): any {
-  return {
-    id: ded.id,
-    company_id: ded.companyId,
-    staff_id: ded.staffId,
-    staff_name: ded.staffName, // optional, may be omitted
-    deduction_type_id: ded.deductionTypeId,
-    deduction_type_name: ded.deductionTypeName, // optional, may be omitted
-    description: ded.description,
-    original_amount: ded.originalAmount,
-    monthly_deduction: ded.monthlyDeduction,
-    deducted_so_far: ded.deductedSoFar,
-    balance: ded.balance,
-    start_date: ded.startDate,
-  };
-}
+// Import centralized case conversion utilities
+export { deductionFromBackend, deductionToBackend } from './case-conversion';

@@ -80,26 +80,5 @@ export const exampleUserDefinedPaymentTypesForIsoko: Omit<PaymentType, 'companyI
 ];
 
 // --- Mapping utilities for frontend/backend case conversion ---
-export function paymentTypeFromBackend(row: any): PaymentType {
-  return {
-    id: row.id,
-    companyId: row.company_id,
-    name: row.name,
-    type: row.type,
-    orderNumber: row.order_number, // snake_case to camelCase
-    isFixedName: row.is_fixed_name,
-    isDeletable: row.is_deletable,
-  };
-}
-
-export function paymentTypeToBackend(def: PaymentType): any {
-  return {
-    id: def.id,
-    company_id: def.companyId,
-    name: def.name,
-    type: def.type,
-    order_number: def.orderNumber, // camelCase to snake_case
-    is_fixed_name: def.isFixedName,
-    is_deletable: def.isDeletable,
-  };
-}
+// Import centralized case conversion utilities
+export { paymentTypeFromBackend, paymentTypeToBackend } from './case-conversion';

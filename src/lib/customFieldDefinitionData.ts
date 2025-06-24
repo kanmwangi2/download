@@ -54,24 +54,5 @@ export const initialCustomFieldDefinitionsForCompanySeed = (companyId: string): 
 };
 
 // --- Mapping utilities for frontend/backend case conversion ---
-export function customFieldDefinitionFromBackend(row: any): CustomFieldDefinition {
-  return {
-    id: row.id,
-    companyId: row.company_id,
-    name: row.name,
-    type: row.type,
-    orderNumber: row.order_number, // snake_case to camelCase
-    isDeletable: row.is_deletable,
-  };
-}
-
-export function customFieldDefinitionToBackend(def: CustomFieldDefinition): any {
-  return {
-    id: def.id,
-    company_id: def.companyId,
-    name: def.name,
-    type: def.type,
-    order_number: def.orderNumber, // camelCase to snake_case
-    is_deletable: def.isDeletable,
-  };
-}
+// Import centralized case conversion utilities
+export { customFieldDefinitionFromBackend, customFieldDefinitionToBackend } from './case-conversion';

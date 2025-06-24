@@ -200,55 +200,8 @@ export const initialStaffData: StaffMember[] = [
   },
 ];
 
-// Utility: Convert backend staff to camelCase for frontend
-export function staffFromBackend(staff: any): any {
-  return {
-    ...staff,
-    companyId: staff.company_id,
-    firstName: staff.first_name,
-    lastName: staff.last_name,
-    staffNumber: staff.staff_number,
-    staffRssbNumber: staff.staff_rssb_number,
-    employeeCategory: staff.employee_category,
-    birthDate: staff.birth_date,
-    employmentDate: staff.employment_date,
-    idPassportNumber: staff.id_passport_number,
-    keyContactName: staff.key_contact_name,
-    keyContactRelationship: staff.key_contact_relationship,
-    keyContactPhone: staff.key_contact_phone,
-    bankName: staff.bank_name,
-    bankCode: staff.bank_code,
-    bankAccountNumber: staff.bank_account_number,
-    bankBranch: staff.bank_branch,
-    customFields: staff.custom_fields,
-    // ...other mappings as needed
-  };
-}
-
-// Utility: Convert camelCase staff to snake_case for backend
-export function staffToBackend(staff: any): any {
-  return {
-    ...staff,
-    company_id: staff.companyId,
-    first_name: staff.firstName,
-    last_name: staff.lastName,
-    staff_number: staff.staffNumber,
-    staff_rssb_number: staff.staffRssbNumber,
-    employee_category: staff.employeeCategory,
-    birth_date: staff.birthDate,
-    employment_date: staff.employmentDate,
-    id_passport_number: staff.idPassportNumber,
-    key_contact_name: staff.keyContactName,
-    key_contact_relationship: staff.keyContactRelationship,
-    key_contact_phone: staff.keyContactPhone,
-    bank_name: staff.bankName,
-    bank_code: staff.bankCode,
-    bank_account_number: staff.bankAccountNumber,
-    bank_branch: staff.bankBranch,
-    custom_fields: staff.customFields,
-    // ...other mappings as needed
-  };
-}
+// Import centralized case conversion utilities
+export { staffToBackend, staffFromBackend } from './case-conversion';
 
 // Fix: Map backend staff fields to camelCase for frontend display
 // Helper function to convert StaffMember backend fields to camelCase for UI

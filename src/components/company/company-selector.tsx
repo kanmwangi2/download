@@ -33,18 +33,9 @@ import { useCompany } from "@/context/CompanyContext";
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Company as AppCompany } from '@/lib/userData';
 
-// Utility functions for camelCase <-> snake_case mapping
-function fromSnakeCaseCompany(data: any): AppCompany {
-  return {
-    id: data.id,
-    name: data.name,
-    tin_number: data.tin_number,
-    address: data.address,
-    phone: data.phone,
-    email: data.email,
-    primary_business: data.primary_business,
-  };
-}
+import { objectToCamelCase } from '@/lib/case-conversion';
+
+// ...existing code...
 
 type CurrentUser = {
   id: string;
@@ -93,7 +84,7 @@ export function CompanySelector() {
       if (error) {
         setAvailableCompanies([]);
       } else {
-        setAvailableCompanies((companies || []).map(fromSnakeCaseCompany));
+        setAvailableCompanies((companies || []).map(objectToCamelCase));
       }
       setIsLoadingData(false);
     };

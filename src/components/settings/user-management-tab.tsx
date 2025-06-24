@@ -78,26 +78,7 @@ type FeedbackMessage = {
   details?: string;
 };
 
-// Utility: Convert camelCase user to snake_case for backend
-function userToBackend(user: any): any {
-  return {
-    ...user,
-    first_name: user.firstName,
-    last_name: user.lastName,
-    assigned_company_ids: user.assignedCompanyIds,
-    // ...other mappings as needed
-  };
-}
-// Utility: Convert backend user to camelCase for frontend
-function userFromBackend(user: any): any {
-  return {
-    ...user,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    assignedCompanyIds: user.assigned_company_ids,
-    // ...other mappings as needed
-  };
-}
+import { userToBackend, userFromBackend } from '@/lib/case-conversion';
 // UI type for all state and form logic
 export type UserUI = {
   id?: string;
@@ -284,9 +265,8 @@ export default function UserManagementTab() {
           setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
         }
       }
-      setIsUserDialogOpen(false);
-    } catch (error: any) {
-      setFeedback({type: 'error', message: "Save Failed", details: `Could not save user. ${(error as Error).message}`});
+      setIsUserDialogOpen(false);    } catch (error) {
+      setFeedback({type: 'error', message: "Save Failed", details: `Could not save user. ${error instanceof Error ? error.message : 'Unknown error'}`});
     }
   };
 
@@ -310,11 +290,10 @@ export default function UserManagementTab() {
       user.role.toLowerCase().includes(lowerSearchTerm)
     );
   }, [allUsers, userSearchTerm]);
-
   const userTotalItems = filteredUsersSource.length;
-  const userTotalPages = Math.ceil(userTotalItems / userRowsPerPage) || 1;
-  const userStartIndex = (userCurrentPage - 1) * userRowsPerPage;
-  const userEndIndex = userStartIndex + userRowsPerPage;
+  const userTotalPages = Math.ceil(userTotalItems / (userRowsPerPage || 10)) || 1;
+  const userStartIndex = (userCurrentPage - 1) * (userRowsPerPage || 10);
+  const userEndIndex = userStartIndex + (userRowsPerPage || 10);
   const paginatedUsers = filteredUsersSource.slice(userStartIndex, userEndIndex);
 
   const handleSelectUserRow = (itemId: string, checked: boolean) => {
@@ -342,8 +321,7 @@ export default function UserManagementTab() {
     const headers = globalUsersExportColumns.map(c => c.label);
     const dataToExport = allUsers.map(user => {
       const row: Record<string, string | number> = {};
-      globalUsersExportColumns.forEach(col => {
-        let value: any;
+      globalUsersExportColumns.forEach(col => {        let value: string | number | string[] | undefined;
         if (col.key === 'assignedCompanyIds') {
           value = user.assignedCompanyIds.join(',');
         } else {
@@ -399,6 +377,7 @@ export default function UserManagementTab() {
     } else if (fileType === "pdf") {
         const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
         const doc = new jsPDF({ orientation: 'landscape' });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (doc as any).autoTable({ head: [headers], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
         doc.save(fileName);
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
@@ -415,9 +394,8 @@ export default function UserManagementTab() {
       Papa.parse(file, {
         header: true, skipEmptyLines: true,
         complete: async (results) => {
-          const { data: rawData, errors: papaParseErrors } = results;
-          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: any[] = [];
+          const { data: rawData, errors: papaParseErrors } = results;          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}.`}); return; }
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: Record<string, unknown>[] = [];
           const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
           const supabase = getSupabaseClient();
           const { data: existingUsersRaw = [], error: fetchUsersError } = await supabase.from('users').select('*');
@@ -461,7 +439,7 @@ export default function UserManagementTab() {
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; } 
           let details = "";
-          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
+          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}`; }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
         }
       }); if (event.target) event.target.value = '';
@@ -495,7 +473,7 @@ export default function UserManagementTab() {
       <Alert variant={variant} className={cn("mb-4", additionalAlertClasses)}>
         <IconComponent className="h-4 w-4" />
         <AlertTitle>{feedback.message}</AlertTitle>
-        {feedback.details && <AlertDescription>{feedback.details}</AlertDescription>}
+        {Boolean(feedback.details) && <AlertDescription>{feedback.details}</AlertDescription>}
       </Alert>
     );
   };
@@ -678,10 +656,9 @@ export default function UserManagementTab() {
                 <SelectTrigger id="role">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem 
+                <SelectContent>                  <SelectItem 
                     value="Primary Admin" 
-                    disabled={primaryAdminExists && editingUser?.id !== currentPrimaryAdmin?.id}
+                    disabled={Boolean(primaryAdminExists && editingUser?.id !== currentPrimaryAdmin?.id)}
                   >
                     Primary Admin (Max 1)
                   </SelectItem>
@@ -690,9 +667,8 @@ export default function UserManagementTab() {
                   <SelectItem value="Payroll Approver">Payroll Approver</SelectItem>
                   <SelectItem value="Payroll Preparer">Payroll Preparer</SelectItem>
                 </SelectContent>
-              </Select>
-              {editingUser?.role === "Primary Admin" && (
-                <p className="text-xs text-muted-foreground">The Primary Admin's role cannot be changed.</p>
+              </Select>              {Boolean(editingUser?.role === "Primary Admin") && (
+                <p className="text-xs text-muted-foreground">The Primary Admin&apos;s role cannot be changed.</p>
               )}
             </div>
             <div className="space-y-2">
@@ -731,9 +707,8 @@ export default function UserManagementTab() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user
-              "{userToDelete ? `${userToDelete.first_name ?? ''} ${userToDelete.last_name ?? ''}` : ''}".
+            <AlertDialogDescription>              This action cannot be undone. This will permanently delete the user
+              &quot;{userToDelete ? `${userToDelete.first_name ?? ''} ${userToDelete.last_name ?? ''}` : ''}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

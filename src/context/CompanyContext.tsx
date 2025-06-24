@@ -7,10 +7,10 @@ import React, {
   ReactNode, 
   useEffect, 
   useMemo,
-  memo 
+  memo,
+  useCallback 
 } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
-import { useStableCallback } from '@/lib/performance';
 
 interface CompanyContextType {
   selectedCompanyId: string | null;
@@ -27,7 +27,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
   const [selectedCompanyName, setSelectedCompanyNameState] = useState<string | null>(null);
   const [isLoadingCompanyContext, setIsLoadingCompanyContext] = useState(true);
 
-  const fetchCompanyFromProfile = useStableCallback(async () => {
+  const fetchCompanyFromProfile = useCallback(async () => {
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -41,7 +41,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     fetchCompanyFromProfile();
   }, [fetchCompanyFromProfile]);
 
-  const setSelectedCompanyId = useStableCallback(async (companyId: string | null) => {
+  const setSelectedCompanyId = useCallback(async (companyId: string | null) => {
     setSelectedCompanyIdState(companyId);
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -52,7 +52,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const setSelectedCompanyName = useStableCallback(async (name: string | null) => {
+  const setSelectedCompanyName = useCallback(async (name: string | null) => {
     setSelectedCompanyNameState(name);
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();

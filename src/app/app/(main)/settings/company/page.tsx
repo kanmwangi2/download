@@ -49,18 +49,18 @@ const defaultDepartmentFormData = { name: "", description: "" };
 
 export interface CompanyProfileData {
   name: string;
-  address?: string;
-  registrationNumber?: string;
-  taxId?: string;
-  contactEmail?: string;
-  contactPhone?: string;
+  address?: string | undefined;
+  registrationNumber?: string | undefined;
+  taxId?: string | undefined;
+  contactEmail?: string | undefined;
+  contactPhone?: string | undefined;
   currency: string;
   isPayeActive: boolean;
   isPensionActive: boolean;
   isMaternityActive: boolean;
   isCbhiActive: boolean;
   isRamaActive: boolean;
-  primaryBusiness?: string;
+  primaryBusiness?: string | undefined;
 }
 
 export const defaultInitialCompanyProfile: CompanyProfileData = {
@@ -80,12 +80,6 @@ export const defaultInitialCompanyProfile: CompanyProfileData = {
 };
 
 type TaxExemptionKey = 'isPayeActive' | 'isPensionActive' | 'isMaternityActive' | 'isCbhiActive' | 'isRamaActive';
-
-interface TaxToggleAction {
-  taxType: TaxExemptionKey;
-  newState: boolean;
-  taxName: string;
-}
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
@@ -214,15 +208,6 @@ async function updateDepartment(companyId: string, department: Department) {
     .eq('company_id', companyId);
 }
 
-// Helper: delete department in Supabase
-async function deleteDepartment(companyId: string, departmentId: string) {
-  await supabase
-    .from('departments')
-    .delete()
-    .eq('id', departmentId)
-    .eq('company_id', companyId);
-}
-
 // Remove export from defaultNewUserFormData to avoid export conflict
 const defaultNewUserFormData: Omit<User, 'id'> & { password?: string } = {
   firstName: '',
@@ -241,22 +226,14 @@ export default function CompanySettingsPage() {
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
   const [allDepartments, setAllDepartments] = useState<Department[]>([]);
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
-  const [departmentFormData, setDepartmentFormData] = useState(defaultDepartmentFormData);
-  const [isDeleteDepartmentDialogOpen, setIsDeleteDepartmentDialogOpen] = useState(false);
-  const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);  const [departmentFormData, setDepartmentFormData] = useState(defaultDepartmentFormData);
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const departmentImportFileInputRef = useRef<HTMLInputElement>(null);
 
   const [deptCurrentPage, setDeptCurrentPage] = useState(1);
-  const [deptRowsPerPage, setDeptRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
-  const [selectedDepartmentItems, setSelectedDepartmentItems] = useState<Set<string>>(new Set());
-  const [isBulkDeleteDepartmentsDialogOpen, setIsBulkDeleteDepartmentsDialogOpen] = useState(false);
-
-  const [isTaxToggleAlertOpen, setIsTaxToggleAlertOpen] = useState(false);
-  const [taxToggleAction, setTaxToggleAction] = useState<TaxToggleAction | null>(null);
+  const [deptRowsPerPage, setDeptRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);  const [selectedDepartmentItems, setSelectedDepartmentItems] = useState<Set<string>>(new Set());
 
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [isCompanyUserDialogOpen, setIsCompanyUserDialogOpen] = useState(false);
@@ -389,20 +366,13 @@ export default function CompanySettingsPage() {
     setFeedback(null);
     const { name, value } = e.target;
     setCompanyProfile(prev => (prev ? { ...prev, [name]: value, currency: "RWF" } : null));
-  };
-
-  const handleTaxToggleChange = (taxType: TaxExemptionKey, newCheckedState: boolean, taxName: string) => {
+  };  const handleTaxToggleChange = (taxType: TaxExemptionKey, newCheckedState: boolean, _taxName: string) => {
     setFeedback(null);
     if (!companyProfile) return;
     if (companyProfile[taxType] !== newCheckedState) {
-        setTaxToggleAction({ taxType, newState: newCheckedState, taxName }); setIsTaxToggleAlertOpen(true);
+        // Directly apply the change
+        setCompanyProfile(prev => (prev ? { ...prev, [taxType]: newCheckedState } : null));
     }
-  };
-  const confirmTaxToggle = () => {
-    if (taxToggleAction && companyProfile) {
-      setCompanyProfile(prev => (prev ? { ...prev, [taxToggleAction.taxType]: taxToggleAction.newState } : null));
-    }
-    setIsTaxToggleAlertOpen(false); setTaxToggleAction(null);
   };
 
   const handleSaveProfileDetails = async (event?: React.FormEvent<HTMLFormElement>) => {
@@ -415,22 +385,21 @@ export default function CompanySettingsPage() {
     if (!companyProfile.name.trim()) {
       setFeedback({type: 'error', message: "Validation Error", details: "Company Name cannot be empty."});
       return;
-    }
-    // Only save profile specific fields if tax settings are separate
+    }    // Only save profile specific fields if tax settings are separate
     const profileDataToSave: CompanyProfileData = {
       name: companyProfile.name,
-      address: companyProfile.address,
-      registrationNumber: companyProfile.registrationNumber,
-      taxId: companyProfile.taxId,
-      contactEmail: companyProfile.contactEmail,
-      contactPhone: companyProfile.contactPhone,
+      address: companyProfile.address || undefined,
+      registrationNumber: companyProfile.registrationNumber || undefined,
+      taxId: companyProfile.taxId || undefined,
+      contactEmail: companyProfile.contactEmail || undefined,
+      contactPhone: companyProfile.contactPhone || undefined,
       currency: "RWF", // Always RWF
       isPayeActive: companyProfile.isPayeActive, // Keep existing tax settings
       isPensionActive: companyProfile.isPensionActive,
       isMaternityActive: companyProfile.isMaternityActive,
       isCbhiActive: companyProfile.isCbhiActive,
       isRamaActive: companyProfile.isRamaActive,
-      primaryBusiness: companyProfile.primaryBusiness,
+      primaryBusiness: companyProfile.primaryBusiness || undefined,
     };
 
     try {
@@ -457,36 +426,11 @@ export default function CompanySettingsPage() {
     }
   };
 
-
   const handleDepartmentInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setDepartmentFormData(prev => ({ ...prev, [name]: value }));
   };
-  const handleAddDepartmentClick = () => { setFeedback(null); setEditingDepartment(null); setIsDepartmentDialogOpen(true); };
-  const handleEditDepartmentClick = (department: Department) => { setFeedback(null); setEditingDepartment(department); setIsDepartmentDialogOpen(true); };
-  const handleDeleteDepartmentClick = (department: Department) => { setFeedback(null); setDepartmentToDelete(department); setIsDeleteDepartmentDialogOpen(true); };
-
-  const deleteDepartmentsByIds = async (idsToDelete: string[]) => {
-    setFeedback(null);
-    if (!selectedCompanyId || idsToDelete.length === 0) return;
-    try {
-      for (const id of idsToDelete) {
-        await deleteDepartment(selectedCompanyId, id);
-      }
-      setAllDepartments(prev => prev.filter(dept => !idsToDelete.includes(dept.id)));
-      setSelectedDepartmentItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
-      setFeedback({type: 'success', message: "Department(s) Deleted", details: `Successfully deleted ${idsToDelete.length} department(s).`});
-      if (deptCurrentPage > 1 && paginatedDepartments.length === idsToDelete.length && filteredDepartmentsSource.slice((deptCurrentPage - 2) * deptRowsPerPage, (deptCurrentPage - 1) * deptRowsPerPage).length > 0) { setDeptCurrentPage(deptCurrentPage - 1); }
-      else if (deptCurrentPage > 1 && paginatedDepartments.length === idsToDelete.length && filteredDepartmentsSource.slice((deptCurrentPage-1)*deptRowsPerPage).length === 0){ setDeptCurrentPage( Math.max(1, deptCurrentPage -1)); }
-    } catch (error) {
-      console.error("Error deleting department(s) from Supabase:", error);
-      setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} department(s). ${(error as Error).message}`});
-    }
-  };
-
-  const confirmDeleteDepartment = async () => { if (departmentToDelete) { await deleteDepartmentsByIds([departmentToDelete.id]); } setIsDeleteDepartmentDialogOpen(false); setDepartmentToDelete(null); };
-  const handleOpenBulkDeleteDepartmentsDialog = () => { setFeedback(null); if (selectedDepartmentItems.size === 0) { setFeedback({type: 'info', message: "No Selection", details: "Please select departments to delete."}); return; } setIsBulkDeleteDepartmentsDialogOpen(true); };
-  const confirmBulkDeleteDepartments = async () => { await deleteDepartmentsByIds(Array.from(selectedDepartmentItems)); setIsBulkDeleteDepartmentsDialogOpen(false); };
+  const handleAddDepartmentClick = () => { setFeedback(null); setEditingDepartment(null); setIsDepartmentDialogOpen(true); };  const handleEditDepartmentClick = (department: Department) => { setFeedback(null); setEditingDepartment(department); setIsDepartmentDialogOpen(true); };
 
   const handleSaveDepartment = async () => {
     setFeedback(null);
@@ -536,9 +480,8 @@ export default function CompanySettingsPage() {
       }
       setCompanyUsers(prev => prev.filter(u => !idsToDelete.includes(u.id)));
       setSelectedCompanyUserItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
-      setFeedback({type: 'success', message: "User(s) Deleted", details: `Successfully removed ${idsToDelete.length} user(s).`});
-      if (compUserCurrentPage > 1 && paginatedCompanyUsers.length === idsToDelete.length && filteredCompanyUsersSource.slice((compUserCurrentPage - 2) * compUserRowsPerPage, (compUserCurrentPage - 1) * compUserRowsPerPage).length > 0) { setCompUserCurrentPage(compUserCurrentPage - 1); }
-      else if (compUserCurrentPage > 1 && paginatedCompanyUsers.length === idsToDelete.length && filteredCompanyUsersSource.slice((compUserCurrentPage-1)*compUserRowsPerPage).length === 0){ setCompUserCurrentPage( Math.max(1, compUserCurrentPage -1)); }
+      setFeedback({type: 'success', message: "User(s) Deleted", details: `Successfully removed ${idsToDelete.length} user(s).`});      if (compUserCurrentPage > 1 && paginatedCompanyUsers.length === idsToDelete.length && filteredCompanyUsersSource.slice((compUserCurrentPage - 2) * (compUserRowsPerPage || 20), (compUserCurrentPage - 1) * (compUserRowsPerPage || 20)).length > 0) { setCompUserCurrentPage(compUserCurrentPage - 1); }
+      else if (compUserCurrentPage > 1 && paginatedCompanyUsers.length === idsToDelete.length && filteredCompanyUsersSource.slice((compUserCurrentPage-1)*(compUserRowsPerPage || 20)).length === 0){ setCompUserCurrentPage( Math.max(1, compUserCurrentPage -1)); }
     } catch (error) {
       console.error("Error deleting company user(s):", error);
       setFeedback({type: 'error', message: "Delete Failed", details: `Could not delete ${idsToDelete.length} user(s). ${(error as Error).message}`});
@@ -600,10 +543,9 @@ export default function CompanySettingsPage() {
     const lowerSearchTerm = departmentSearchTerm.toLowerCase();
     return allDepartments.filter(dept => dept.name.toLowerCase().includes(lowerSearchTerm) || (dept.description && dept.description.toLowerCase().includes(lowerSearchTerm)));
   }, [allDepartments, departmentSearchTerm]);
-  const deptTotalItems = filteredDepartmentsSource.length;
-  const deptTotalPages = Math.ceil(deptTotalItems / deptRowsPerPage) || 1;
-  const deptStartIndex = (deptCurrentPage - 1) * deptRowsPerPage;
-  const deptEndIndex = deptStartIndex + deptRowsPerPage;
+  const deptTotalItems = filteredDepartmentsSource.length;  const deptTotalPages = Math.ceil(deptTotalItems / (deptRowsPerPage || 20)) || 1;
+  const deptStartIndex = (deptCurrentPage - 1) * (deptRowsPerPage || 20);
+  const deptEndIndex = deptStartIndex + (deptRowsPerPage || 20);
   const paginatedDepartments = filteredDepartmentsSource.slice(deptStartIndex, deptEndIndex);
 
   const handleSelectDepartmentRow = (itemId: string, checked: boolean) => {
@@ -622,10 +564,9 @@ export default function CompanySettingsPage() {
     const lowerSearchTerm = companyUserSearchTerm.toLowerCase();
     return companyUsers.filter(user => user.firstName.toLowerCase().includes(lowerSearchTerm) || user.lastName.toLowerCase().includes(lowerSearchTerm) || user.email.toLowerCase().includes(lowerSearchTerm) || user.role.toLowerCase().includes(lowerSearchTerm));
   }, [companyUsers, companyUserSearchTerm]);
-  const compUserTotalItems = filteredCompanyUsersSource.length;
-  const compUserTotalPages = Math.ceil(compUserTotalItems / compUserRowsPerPage) || 1;
-  const compUserStartIndex = (compUserCurrentPage - 1) * compUserRowsPerPage;
-  const compUserEndIndex = compUserStartIndex + compUserRowsPerPage;
+  const compUserTotalItems = filteredCompanyUsersSource.length;  const compUserTotalPages = Math.ceil(compUserTotalItems / (compUserRowsPerPage || 20)) || 1;
+  const compUserStartIndex = (compUserCurrentPage - 1) * (compUserRowsPerPage || 20);
+  const compUserEndIndex = compUserStartIndex + (compUserRowsPerPage || 20);
   const paginatedCompanyUsers = filteredCompanyUsersSource.slice(compUserStartIndex, compUserEndIndex);
 
   const handleSelectCompanyUserRow = (itemId: string, checked: boolean) => {
@@ -724,7 +665,14 @@ export default function CompanySettingsPage() {
         header: true, skipEmptyLines: true,
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
-          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
+          if (papaParseErrors.length > 0 && rawData.length === 0) { 
+            setFeedback({
+              type: 'error', 
+              message: "Import Failed", 
+              details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown parsing error'}.`
+            }); 
+            return; 
+          }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Department[] = [];
           const existingDepts = await fetchDepartments(selectedCompanyId);
           let upsertError: any = null;
@@ -763,7 +711,11 @@ export default function CompanySettingsPage() {
             feedbackMessage = "No changes applied.";
           }
           let details = "";
-          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
+          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { 
+            details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; 
+            if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; 
+            else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0]?.message || 'Unknown error'}`; 
+          }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
         }
       }); if (event.target) event.target.value = '';
@@ -779,7 +731,14 @@ export default function CompanySettingsPage() {
         header: true, skipEmptyLines: true,
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;
-          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
+          if (papaParseErrors.length > 0 && rawData.length === 0) { 
+            setFeedback({
+              type: 'error', 
+              message: "Import Failed", 
+              details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown parsing error'}.`
+            }); 
+            return; 
+          }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: User[] = [];
           const allGlobalUsers = await supabase
             .from('users')
@@ -829,7 +788,11 @@ export default function CompanySettingsPage() {
             feedbackMessage = "No changes applied.";
           }
           let details = "";
-          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0].message}`; }
+          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { 
+            details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; 
+            if (validationSkippedLog.length > 0) details += ` First: ${validationSkippedLog[0]}`; 
+            else if (papaParseErrors.length > 0) details += ` First: ${papaParseErrors[0]?.message || 'Unknown error'}`; 
+          }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
         }
       }); if (event.target) event.target.value = '';
@@ -971,9 +934,7 @@ export default function CompanySettingsPage() {
                     <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full sm:w-auto" disabled={allDepartments.length === 0} onClick={() => setFeedback(null)}><Download className="mr-2 h-4 w-4" /> Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => exportGenericData(allDepartments, departmentExportColumns, 'departments_data', 'csv')}><FileText className="mr-2 h-4 w-4" /> CSV</DropdownMenuItem><DropdownMenuItem onClick={() => exportGenericData(allDepartments, departmentExportColumns, 'departments_data', 'xlsx')}><FileSpreadsheet className="mr-2 h-4 w-4" /> XLSX</DropdownMenuItem><DropdownMenuItem onClick={() => exportGenericData(allDepartments, departmentExportColumns, 'departments_data', 'pdf')}><FileType className="mr-2 h-4 w-4" /> PDF</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                     <Button onClick={handleAddDepartmentClick} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Department</Button>
                 </div>
-              </div>
-              {selectedDepartmentItems.size > 0 && (<div className="my-2 flex items-center justify-between p-3 bg-muted/50 rounded-md"><span className="text-sm text-muted-foreground">{selectedDepartmentItems.size} item(s) selected</span><Button variant="destructive" onClick={handleOpenBulkDeleteDepartmentsDialog} disabled={!selectedCompanyId}><Trash2 className="mr-2 h-4 w-4" /> Delete Selected</Button></div>)}
-              <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead className="sticky top-0 z-10 bg-card w-[50px]"><Checkbox checked={isAllDepartmentsOnPageSelected} onCheckedChange={(checked) => handleSelectAllDepartmentsOnPage(Boolean(checked))} aria-label="Select all departments on page" disabled={paginatedDepartments.length === 0}/></TableHead><TableHead className="sticky top-0 z-10 bg-card">Name</TableHead><TableHead className="sticky top-0 z-10 bg-card">Description</TableHead><TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{paginatedDepartments.map((dept) => (<TableRow key={dept.id} data-state={selectedDepartmentItems.has(dept.id) ? "selected" : ""}><TableCell><Checkbox checked={selectedDepartmentItems.has(dept.id)} onCheckedChange={(checked) => handleSelectDepartmentRow(dept.id, Boolean(checked))} aria-label={`Select department ${dept.name}`}/></TableCell><TableCell className="font-medium">{dept.name}</TableCell><TableCell>{dept.description || "N/A"}</TableCell><TableCell className="text-right space-x-1"><Button variant="ghost" size="icon" onClick={() => handleEditDepartmentClick(dept)} title="Edit Department"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDeleteDepartmentClick(dept)} title="Delete Department" className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>))}{paginatedDepartments.length === 0 && (<TableRow><TableCell colSpan={4} className="text-center h-24">{departmentSearchTerm ? "No departments match search." : "No departments found."}</TableCell></TableRow>)}</TableBody></Table></div>
+              </div>              <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead className="sticky top-0 z-10 bg-card w-[50px]"><Checkbox checked={isAllDepartmentsOnPageSelected} onCheckedChange={(checked) => handleSelectAllDepartmentsOnPage(Boolean(checked))} aria-label="Select all departments on page" disabled={paginatedDepartments.length === 0}/></TableHead><TableHead className="sticky top-0 z-10 bg-card">Name</TableHead><TableHead className="sticky top-0 z-10 bg-card">Description</TableHead><TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{paginatedDepartments.map((dept) => (<TableRow key={dept.id} data-state={selectedDepartmentItems.has(dept.id) ? "selected" : ""}><TableCell><Checkbox checked={selectedDepartmentItems.has(dept.id)} onCheckedChange={(checked) => handleSelectDepartmentRow(dept.id, Boolean(checked))} aria-label={`Select department ${dept.name}`}/></TableCell><TableCell className="font-medium">{dept.name}</TableCell><TableCell>{dept.description || "N/A"}</TableCell><TableCell className="text-right space-x-1"><Button variant="ghost" size="icon" onClick={() => handleEditDepartmentClick(dept)} title="Edit Department"><Edit className="h-4 w-4" /></Button></TableCell></TableRow>))}{paginatedDepartments.length === 0 && (<TableRow><TableCell colSpan={4} className="text-center h-24">{departmentSearchTerm ? "No departments match search." : "No departments found."}</TableCell></TableRow>)}</TableBody></Table></div>
               {deptTotalPages > 1 && (<div className="flex items-center justify-between py-4"><div className="text-sm text-muted-foreground">{selectedDepartmentItems.size > 0 ? `${selectedDepartmentItems.size} item(s) selected.` : `Page ${deptCurrentPage} of ${deptTotalPages} (${deptTotalItems} total departments)`}</div><div className="flex items-center space-x-6 lg:space-x-8"><div className="flex items-center space-x-2"><p className="text-sm font-medium">Rows per page</p><Select value={`${deptRowsPerPage}`} onValueChange={(value) => {setDeptRowsPerPage(Number(value)); setDeptCurrentPage(1); setSelectedDepartmentItems(new Set());}}><SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={`${deptRowsPerPage}`} /></SelectTrigger><SelectContent side="top">{ROWS_PER_PAGE_OPTIONS.map((s) => (<SelectItem key={`dept-${s}`} value={`${s}`}>{s}</SelectItem>))}</SelectContent></Select></div><div className="flex items-center space-x-2"><Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setDeptCurrentPage(1); setSelectedDepartmentItems(new Set());}} disabled={deptCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button><Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setDeptCurrentPage(p => p - 1); setSelectedDepartmentItems(new Set());}} disabled={deptCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" className="h-8 w-8 p-0" onClick={() => {setDeptCurrentPage(p => p + 1); setSelectedDepartmentItems(new Set());}} disabled={deptCurrentPage === deptTotalPages}><ChevronRight className="h-4 w-4" /></Button><Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => {setDeptCurrentPage(deptTotalPages); setSelectedDepartmentItems(new Set());}} disabled={deptCurrentPage === deptTotalPages}><ChevronsRight className="h-4 w-4" /></Button></div></div></div>)}
             </CardContent>
           </Card>

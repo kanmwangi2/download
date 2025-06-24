@@ -66,24 +66,5 @@ export const exampleUserDefinedDeductionTypesForIsoko: Omit<DeductionType, 'comp
 ];
 
 // --- Mapping utilities for frontend/backend case conversion ---
-export function deductionTypeFromBackend(row: any): DeductionType {
-  return {
-    id: row.id,
-    companyId: row.company_id,
-    name: row.name,
-    orderNumber: row.order_number, // snake_case to camelCase
-    isFixedName: row.is_fixed_name,
-    isDeletable: row.is_deletable,
-  };
-}
-
-export function deductionTypeToBackend(def: DeductionType): any {
-  return {
-    id: def.id,
-    company_id: def.companyId,
-    name: def.name,
-    order_number: def.orderNumber, // camelCase to snake_case
-    is_fixed_name: def.isFixedName,
-    is_deletable: def.isDeletable,
-  };
-}
+// Import centralized case conversion utilities
+export { deductionTypeFromBackend, deductionTypeToBackend } from './case-conversion';

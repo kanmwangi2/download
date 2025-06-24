@@ -52,9 +52,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from '@/lib/utils';
 
 // Utility: Convert camelCase company to snake_case for backend
-function companyToBackend(company: any): any {
+function companyToBackend(company: Company | Omit<Company, 'id'>): Record<string, unknown> {
   return {
-    id: company.id,
+    ...(('id' in company) && { id: company.id }),
     name: company.name,
     tin_number: company.tinNumber,
     address: company.address,
@@ -64,15 +64,15 @@ function companyToBackend(company: any): any {
   };
 }
 // Utility: Convert backend company to camelCase for frontend
-function companyFromBackend(company: any): any {
+function companyFromBackend(company: Record<string, unknown>): Company {
   return {
-    id: company.id,
-    name: company.name,
-    tinNumber: company.tin_number,
-    address: company.address,
-    email: company.email,
-    phone: company.phone,
-    primaryBusiness: company.primary_business,
+    id: company.id as string,
+    name: company.name as string,
+    tinNumber: company.tin_number as string,
+    address: company.address as string,
+    email: company.email as string,
+    phone: company.phone as string,
+    primaryBusiness: company.primary_business as string,
   };
 }
 
@@ -240,10 +240,9 @@ export default function CompanyManagementTab() {
         } else {
           setFeedback({type: 'success', message: "Company Added", details: `Company has been added.`});
         }
-      }
-      setIsCompanyDialogOpen(false);
-    } catch (error: any) {
-      setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${(error as Error).message}`});
+      }      setIsCompanyDialogOpen(false);
+    } catch (error) {
+      setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${error instanceof Error ? error.message : 'Unknown error'}`});
     }
   };
 
@@ -257,11 +256,10 @@ export default function CompanyManagementTab() {
       (company.email && company.email.toLowerCase().includes(lowerSearchTerm))
     );
   }, [allCompanies, companySearchTerm]);
-
   const compTotalItems = filteredCompaniesSource.length;
-  const compTotalPages = Math.ceil(compTotalItems / compRowsPerPage) || 1;
-  const compStartIndex = (compCurrentPage - 1) * compRowsPerPage;
-  const compEndIndex = compStartIndex + compRowsPerPage;
+  const compTotalPages = Math.ceil(compTotalItems / (compRowsPerPage || 10)) || 1;
+  const compStartIndex = (compCurrentPage - 1) * (compRowsPerPage || 10);
+  const compEndIndex = compStartIndex + (compRowsPerPage || 10);
   const paginatedCompanies = filteredCompaniesSource.slice(compStartIndex, compEndIndex);
 
   const handleSelectCompanyRow = (itemId: string, checked: boolean) => {
@@ -348,9 +346,9 @@ export default function CompanyManagementTab() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Global Companies");
         XLSX.writeFile(workbook, fileName);
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
-    } else if (fileType === "pdf") {
-        const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
+    } else if (fileType === "pdf") {        const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
         const doc = new jsPDF({ orientation: 'landscape' });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (doc as any).autoTable({ head: [headers as string[]], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
         doc.save(fileName);
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
@@ -381,8 +379,8 @@ export default function CompanyManagementTab() {
         header: true, skipEmptyLines: true,
         complete: async (results: Papa.ParseResult<Record<string, string>>) => {
           const { data: rawData, errors: papaParseErrors } = results;
-          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0].message}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: any[] = [];
+          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}.`}); return; }
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Record<string, unknown>[] = [];
           // Fetch existing companies from Supabase
           const supabase = getSupabaseClient();
           const { data: existingCompanies, error: fetchError } = await supabase.from('companies').select('*');
@@ -411,7 +409,7 @@ export default function CompanyManagementTab() {
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} companies added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";
-          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0].message}`; }
+          if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}`; }
           setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
         }
       }); if (event.target) event.target.value = '';
@@ -445,7 +443,7 @@ export default function CompanyManagementTab() {
       <Alert variant={variant} className={cn("mb-4", additionalAlertClasses)}>
         <IconComponent className="h-4 w-4" />
         <AlertTitle>{feedback.message}</AlertTitle>
-        {feedback.details && <AlertDescription>{feedback.details}</AlertDescription>}
+        {Boolean(feedback.details) && <AlertDescription>{feedback.details}</AlertDescription>}
       </Alert>
     );
   };
@@ -609,7 +607,7 @@ export default function CompanyManagementTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the company: "{companyToDelete?.name}".
+              This action cannot be undone. This will permanently delete the company: &quot;{companyToDelete?.name}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

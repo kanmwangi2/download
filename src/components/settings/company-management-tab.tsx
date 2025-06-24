@@ -240,8 +240,11 @@ export default function CompanyManagementTab() {
         } else {
           setFeedback({type: 'success', message: "Company Added", details: `Company has been added.`});
         }
-      }      setIsCompanyDialogOpen(false);
+      }
+      setIsCompanyDialogOpen(false);
     } catch (error) {
+      // Log the error for debugging
+      console.error('Save Company Error:', error);
       setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${error instanceof Error ? error.message : 'Unknown error'}`});
     }
   };

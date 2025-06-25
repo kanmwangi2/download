@@ -31,6 +31,11 @@ export class PaymentTypeService extends BaseService {
     }
   }
 
+  // Alias for backwards compatibility
+  async getByCompanyId(companyId: string): Promise<PaymentType[]> {
+    return this.getPaymentTypesByCompany(companyId);
+  }
+
   async getById(id: string): Promise<PaymentType | null> {
     try {
       const { data, error } = await this.supabase

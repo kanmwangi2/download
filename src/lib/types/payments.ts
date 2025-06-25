@@ -1,4 +1,4 @@
-export type PaymentCategory = 'allowance' | 'earning' | 'reimbursement' | 'overtime' | 'bonus' | 'other';
+export type PaymentCategory = 'allowance' | 'earning' | 'reimbursement' | 'overtime' | 'bonus' | 'other' | 'Gross' | 'Net';
 
 export interface PaymentType {
   id: string;
@@ -7,6 +7,9 @@ export interface PaymentType {
   type: PaymentCategory;
   isTaxable: boolean;
   isDefault: boolean;
+  orderNumber: number;
+  isFixedName: boolean;
+  isDeletable: boolean;
   description?: string;
 }
 

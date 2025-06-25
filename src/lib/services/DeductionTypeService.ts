@@ -1,7 +1,5 @@
 import { BaseService } from './BaseService';
-import { DeductionType } from '../types/deductionTypes';
-import { initialDeductionTypesForCompanySeed } from '../deductionTypesData';
-import { objectToCamelCase, objectToSnakeCase } from '../case-conversion';
+import { DeductionType } from '../types/deductions';
 
 export type { DeductionType };
 
@@ -19,27 +17,122 @@ export class DeductionTypeService extends BaseService {
         this.handleError(error, 'fetch deduction types');
       }
 
-      if ((!dedTypesFromDB || dedTypesFromDB.length === 0) && companyId) {
-        const defaultDedTypes = initialDeductionTypesForCompanySeed(companyId);
-        const snakeCaseDeds = defaultDedTypes.map(d => objectToSnakeCase(d));
+      if (!dedTypesFromDB || dedTypesFromDB.length === 0) {
+        // Create default deduction types for the company
+        const defaultDeductionTypes = [
+          {
+            company_id: companyId,
+            name: 'Loan',
+            description: 'Employee loan deduction',
+            is_default: true
+          },
+          {
+            company_id: companyId,
+            name: 'Advance',
+            description: 'Salary advance deduction',
+            is_default: true
+          }
+        ];
 
-        const { data: newTypes, error: insertError } = await this.supabase
-            .from(this.tableName)
-            .upsert(snakeCaseDeds)
-            .select();
-        
+        const { data: insertedTypes, error: insertError } = await this.supabase
+          .from(this.tableName)
+          .insert(defaultDeductionTypes)
+          .select();
+
         if (insertError) {
-            this.handleError(insertError, 'seed deduction types');
-            return [];
+          this.handleError(insertError, 'create default deduction types');
         }
-        dedTypesFromDB = newTypes;
+
+        dedTypesFromDB = insertedTypes || [];
       }
-      
-      const camelCaseDeds = (dedTypesFromDB || []).map(d => objectToCamelCase<DeductionType>(d));
-      return camelCaseDeds.sort((a: DeductionType, b: DeductionType) => a.orderNumber - b.orderNumber);
+
+      return (dedTypesFromDB || []).map(this.mapFromDatabase);
     } catch (error) {
       this.handleError(error, 'fetch deduction types');
       return [];
     }
+  }
+
+  async createDeductionType(deductionTypeData: Omit<DeductionType, 'id'>): Promise<DeductionType | null> {
+    try {
+      const dbData = this.mapToDatabase(deductionTypeData);
+
+      const { data, error } = await this.supabase
+        .from(this.tableName)
+        .insert(dbData)
+        .select()
+        .single();
+
+      if (error) {
+        this.handleError(error, 'create deduction type');
+        return null;
+      }
+
+      return this.mapFromDatabase(data);
+    } catch (error) {
+      this.handleError(error, 'create deduction type');
+      return null;
+    }
+  }
+
+  async updateDeductionType(deductionType: DeductionType): Promise<DeductionType | null> {
+    try {
+      const dbData = this.mapToDatabase(deductionType);
+
+      const { data, error } = await this.supabase
+        .from(this.tableName)
+        .update(dbData)
+        .eq('id', deductionType.id)
+        .select()
+        .single();
+
+      if (error) {
+        this.handleError(error, 'update deduction type');
+        return null;
+      }
+
+      return this.mapFromDatabase(data);
+    } catch (error) {
+      this.handleError(error, 'update deduction type');
+      return null;
+    }
+  }
+
+  async deleteDeductionType(id: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase
+        .from(this.tableName)
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        this.handleError(error, 'delete deduction type');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.handleError(error, 'delete deduction type');
+      return false;
+    }
+  }
+
+  private mapFromDatabase(dbRow: any): DeductionType {
+    return {
+      id: dbRow.id,
+      companyId: dbRow.company_id,
+      name: dbRow.name,
+      description: dbRow.description,
+      isDefault: dbRow.is_default
+    };
+  }
+
+  private mapToDatabase(deductionType: Partial<DeductionType>): any {
+    return {
+      company_id: deductionType.companyId,
+      name: deductionType.name,
+      description: deductionType.description,
+      is_default: deductionType.isDefault
+    };
   }
 }

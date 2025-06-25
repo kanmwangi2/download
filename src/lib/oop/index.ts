@@ -36,25 +36,17 @@ export { PayrollPermissions } from '../utils/PayrollPermissions';
 
 // Type definitions
 export type { PaymentType } from '../types/payments';
-export type { CreatePaymentTypeData, UpdatePaymentTypeData } from '../services/PaymentTypeService';
-export type { StaffPaymentConfig } from '../types/staff';
-export type { 
-  CreateStaffPaymentConfigData, 
-  UpdateStaffPaymentConfigData 
-} from '../services/StaffPaymentConfigService';
-export type { Staff, CreateStaffData, UpdateStaffData } from '../services/StaffService';
-export type { StaffMember, StaffStatus, EmployeeCategory } from '../types/staff';
+export type { StaffMember, StaffStatus } from '../types/staff';
 export type { 
   PayrollRunSummary, 
   PayrollStatus, 
   PayrollRunDetail,
   EmployeePayrollRecord
 } from '../types/payroll';
-export type { 
-  User, 
-  UserRole, 
-  AuthenticatedUser, 
-  UserProfile
-} from '../services/UserService';
 export type { CustomFieldDefinition } from '../types/custom-fields';
-export type { Deduction, DeductionType, DeductionRecord } from '../types/deductions';
+export type { DeductionType } from '../types/deductions';
+export type { 
+  StaffPaymentConfig, 
+  CreateStaffPaymentConfigData, 
+  UpdateStaffPaymentConfigData 
+} from '../services/StaffPaymentConfigService';

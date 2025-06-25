@@ -13,6 +13,7 @@ import { DeductionService } from './DeductionService';
 import { CompanyService } from './CompanyService';
 import { PayrollCalculationService } from './PayrollCalculationService';
 import { DeductionTypeService } from './DeductionTypeService';
+import { StaffPaymentConfigService } from './StaffPaymentConfigService';
 
 export class ServiceRegistry {
   private static instance: ServiceRegistry;
@@ -27,6 +28,7 @@ export class ServiceRegistry {
   public companyService: CompanyService;
   public payrollCalculationService: PayrollCalculationService;
   public deductionTypeService: DeductionTypeService;
+  public staffPaymentConfigService: StaffPaymentConfigService;
 
   private constructor() {
     this.paymentTypeService = new PaymentTypeService();
@@ -39,6 +41,7 @@ export class ServiceRegistry {
     this.companyService = new CompanyService();
     this.payrollCalculationService = new PayrollCalculationService();
     this.deductionTypeService = new DeductionTypeService();
+    this.staffPaymentConfigService = new StaffPaymentConfigService();
   }
 
   /**

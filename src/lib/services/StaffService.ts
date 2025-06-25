@@ -36,6 +36,11 @@ export class StaffService extends BaseService {
     }
   }
 
+  // Alias for backwards compatibility
+  async getByCompanyId(companyId: string): Promise<StaffMember[]> {
+    return this.getStaffByCompany(companyId);
+  }
+
   /**
    * Get a single staff member by ID
    */

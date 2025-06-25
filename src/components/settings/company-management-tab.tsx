@@ -41,7 +41,6 @@ import {
 import { PlusCircle, Edit, Trash2, Building, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getSupabaseClient } from '@/lib/supabase';
-import type { Company as UserDataCompany } from '@/lib/userData';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Papa from 'papaparse';
@@ -50,39 +49,9 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from '@/lib/utils';
-
-// Utility: Convert camelCase company to snake_case for backend
-function companyToBackend(company: Company | Omit<Company, 'id'>): Record<string, unknown> {
-  return {
-    ...(('id' in company) && { id: company.id }),
-    name: company.name,
-    tin_number: company.tinNumber,
-    address: company.address,
-    email: company.email,
-    phone: company.phone,
-    primary_business: company.primaryBusiness,
-  };
-}
-// Utility: Convert backend company to camelCase for frontend
-function companyFromBackend(company: Record<string, unknown>): Company {
-  return {
-    id: company.id as string,
-    name: company.name as string,
-    tinNumber: company.tin_number as string,
-    address: company.address as string,
-    email: company.email as string,
-    phone: company.phone as string,
-    primaryBusiness: company.primary_business as string,
-  };
-}
-
-export interface Company extends UserDataCompany {
-  tinNumber?: string;
-  address?: string;
-  email?: string;
-  phone?: string;
-  primaryBusiness?: string;
-}
+import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
+import { Company } from '@/lib/types';
+import { companyFromBackend, companyToBackend } from '@/lib/mappings/company-mappings';
 
 export const initialCompaniesDataForSeed: Company[] = [
   {
@@ -117,12 +86,6 @@ const defaultNewCompany: Omit<Company, 'id'> = {
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
-
 export default function CompanyManagementTab() {
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -138,6 +101,7 @@ export default function CompanyManagementTab() {
   const [compCurrentPage, setCompCurrentPage] = useState(1);
   const [compRowsPerPage, setCompRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [dialogFeedback, setDialogFeedback] = useState<FeedbackMessage | null>(null);
   const [selectedCompanyItems, setSelectedCompanyItems] = useState<Set<string>>(new Set());
   const [isBulkDeleteCompaniesDialogOpen, setIsBulkDeleteCompaniesDialogOpen] = useState(false);
 
@@ -183,13 +147,24 @@ export default function CompanyManagementTab() {
 
   const handleAddCompanyClick = () => {
     setFeedback(null);
+    setDialogFeedback(null);
     setEditingCompany(null);
+    setFormData(defaultNewCompany);
     setIsCompanyDialogOpen(true);
   };
 
   const handleEditCompanyClick = (company: Company) => {
     setFeedback(null);
+    setDialogFeedback(null);
     setEditingCompany(company);
+    setFormData({
+      name: company.name,
+      tinNumber: company.tinNumber || '',
+      address: company.address || '',
+      email: company.email || '',
+      phone: company.phone || '',
+      primaryBusiness: company.primaryBusiness || '',
+    });
     setIsCompanyDialogOpen(true);
   };
 
@@ -218,9 +193,9 @@ export default function CompanyManagementTab() {
   const confirmBulkDeleteCompanies = async () => { await deleteCompaniesByIds(Array.from(selectedCompanyItems)); setIsBulkDeleteCompaniesDialogOpen(false); };
 
   const handleSaveCompany = async () => {
-    setFeedback(null);
+    setDialogFeedback(null);
     if (!formData.name || !formData.tinNumber) {
-      setFeedback({type: 'error', message: "Validation Error", details: "Company Name and TIN Number are required."});
+      setDialogFeedback({type: 'error', message: "Validation Error", details: "Company Name and TIN Number are required."});
       return;
     }
     try {
@@ -245,7 +220,7 @@ export default function CompanyManagementTab() {
     } catch (error) {
       // Log the error for debugging
       console.error('Save Company Error:', error);
-      setFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${error instanceof Error ? error.message : 'Unknown error'}`});
+      setDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save company. ${error instanceof Error ? error.message : 'Unknown error'}`});
     }
   };
 
@@ -413,44 +388,10 @@ export default function CompanyManagementTab() {
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} companies added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; }
           let details = "";
           if (papaParseErrors.length > 0 || validationSkippedLog.length > 0) { details += ` ${papaParseErrors.length + validationSkippedLog.length} row(s) had issues.`; if (validationSkippedLog.length > 0) details += ` First validation skip: ${validationSkippedLog[0]}`; else if (papaParseErrors.length > 0) details += ` First parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}`; }
-          setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});
-        }
+          setFeedback({type: feedbackType, message: `${feedbackTitle}: ${feedbackMessage}`, details});        }
       }); if (event.target) event.target.value = '';
     }
   };
-
-  const renderFeedbackMessage = () => {
-    if (!feedback) return null;
-    let IconComponent;
-    let variant: "default" | "destructive" = "default";
-    let additionalAlertClasses = "";
-
-    switch (feedback.type) {
-      case 'success':
-        IconComponent = CheckCircle2;
-        variant = "default";
-        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
-        break;
-      case 'error':
-        IconComponent = AlertTriangle;
-        variant = "destructive";
-        break;
-      case 'info':
-        IconComponent = Info;
-        variant = "default";
-        break;
-      default:
-        return null;
-    }
-    return (
-      <Alert variant={variant} className={cn("mb-4", additionalAlertClasses)}>
-        <IconComponent className="h-4 w-4" />
-        <AlertTitle>{feedback.message}</AlertTitle>
-        {Boolean(feedback.details) && <AlertDescription>{feedback.details}</AlertDescription>}
-      </Alert>
-    );
-  };
-
 
   if (!isLoaded) {
       return <div>Loading companies...</div>;
@@ -469,7 +410,7 @@ export default function CompanyManagementTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {renderFeedbackMessage()}
+        <FeedbackAlert feedback={feedback} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-4">
             <div className="relative w-full sm:max-w-xs md:max-w-sm lg:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -560,7 +501,7 @@ export default function CompanyManagementTab() {
         )}
       </CardContent>
 
-      <Dialog open={isCompanyDialogOpen} onOpenChange={(isOpen) => { setIsCompanyDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}>
+      <Dialog open={isCompanyDialogOpen} onOpenChange={(isOpen) => { setIsCompanyDialogOpen(isOpen); if(!isOpen) { setDialogFeedback(null); } }}>
         <DialogContent className="sm:max-w-[725px]">
           <DialogHeader>
             <DialogTitle>{editingCompany ? "Edit Company" : "Add New Company"}</DialogTitle>
@@ -568,6 +509,9 @@ export default function CompanyManagementTab() {
               {editingCompany ? "Update the company's details." : "Fill in the details for the new company."}
             </DialogDescription>
           </DialogHeader>
+          
+          <FeedbackAlert feedback={dialogFeedback} />
+          
           <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4" tabIndex={0}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

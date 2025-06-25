@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { LifeBuoy, Mail, Phone, MessageSquare, BookOpenText, HelpCircle, Loader2 } from "lucide-react"; 
 import Link from "next/link";
-import { createClient } from '@/lib/supabase';
+// Legacy import - replaced by OOP services
+// import { createClient } from '@/lib/supabase';
 
 export default function SupportPage() {
   const [primaryAdminEmail, setPrimaryAdminEmail] = useState<string | null>(null);
@@ -21,6 +22,9 @@ export default function SupportPage() {
       setIsLoadingAdminData(true);
 
       try {
+        // TODO: Create UserService for user management
+        // For now, using legacy import
+        const { createClient } = await import('@/lib/supabase');
         const supabase = createClient();
         
         // Query for primary admin user from Supabase

@@ -1,0 +1,60 @@
+/**
+ * Services and Utilities Index
+ * Exports all OOP services and utility classes for easy importing
+ */
+
+// Base classes
+export { BaseService } from '../services/BaseService';
+
+// Service classes
+export { PaymentTypeService } from '../services/PaymentTypeService';
+export { StaffPaymentConfigService } from '../services/StaffPaymentConfigService';
+export { StaffService } from '../services/StaffService';
+export { CustomFieldDefinitionService } from '../services/CustomFieldDefinitionService';
+export { PayrollService } from '../services/PayrollService';
+export { UserService } from '../services/UserService';
+export { TaxService } from '../services/TaxService';
+export { DeductionService } from '../services/DeductionService';
+export { CompanyService } from '../services/CompanyService';
+export { PayrollCalculationService } from '../services/PayrollCalculationService';
+export { DeductionTypeService } from '../services/DeductionTypeService';
+
+// Service registry
+export { ServiceRegistry, getServices } from '../services/ServiceRegistry';
+
+// Utility classes
+export { 
+  CurrencyFormatter, 
+  DateFormatter, 
+  Validator, 
+  FileExporter, 
+  CSVParser 
+} from '../utils/UtilityClasses';
+export { PayrollUtils } from '../utils/PayrollUtils';
+export { PayrollValidation } from '../utils/PayrollValidation';
+export { PayrollPermissions } from '../utils/PayrollPermissions';
+
+// Type definitions
+export type { PaymentType } from '../types/payments';
+export type { CreatePaymentTypeData, UpdatePaymentTypeData } from '../services/PaymentTypeService';
+export type { StaffPaymentConfig } from '../types/staff';
+export type { 
+  CreateStaffPaymentConfigData, 
+  UpdateStaffPaymentConfigData 
+} from '../services/StaffPaymentConfigService';
+export type { Staff, CreateStaffData, UpdateStaffData } from '../services/StaffService';
+export type { StaffMember, StaffStatus, EmployeeCategory } from '../types/staff';
+export type { 
+  PayrollRunSummary, 
+  PayrollStatus, 
+  PayrollRunDetail,
+  EmployeePayrollRecord
+} from '../types/payroll';
+export type { 
+  User, 
+  UserRole, 
+  AuthenticatedUser, 
+  UserProfile
+} from '../services/UserService';
+export type { CustomFieldDefinition } from '../types/custom-fields';
+export type { Deduction, DeductionType, DeductionRecord } from '../types/deductions';

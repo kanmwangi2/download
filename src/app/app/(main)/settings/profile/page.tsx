@@ -12,116 +12,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getSupabaseClient } from '@/lib/supabase';
+import { getServices, type UserProfile } from '@/lib/oop';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const supabase = getSupabaseClient();
+import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
 
 const defaultPlaceholderImage = "https://placehold.co/150x150.png";
 
-
-interface UserProfileDetails {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-}
-
-const initialProfileDetails: UserProfileDetails = {
+const initialProfileDetails: UserProfile = {
   firstName: "",
   lastName: "",
   email: "",
   phone: "",
 };
 
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
-
-// Helper: get current user from Supabase
-async function getCurrentUserFromSupabase() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) return null;
-  const meta = data.user.user_metadata || {};
-  return {
-    id: data.user.id,
-    email: meta.email || data.user.email || '',
-    firstName: meta.firstName || '',
-    lastName: meta.lastName || '',
-    phone: meta.phone || '',
-  };
-}
-
-// --- Robust CRUD helpers for user profile ---
-
-// Helper: fetch user profile from Supabase (robust)
-async function fetchUserProfile(userId: string): Promise<UserProfileDetails> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error || !data) throw new Error(error?.message || 'User profile not found');
-  return {
-    firstName: data.first_name || '',
-    lastName: data.last_name || '',
-    email: data.email || '',
-    phone: data.phone || '',
-  };
-}
-
-// Helper: update user profile in Supabase (robust)
-async function updateUserProfile(userId: string, profile: UserProfileDetails): Promise<UserProfileDetails> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .update({
-      first_name: profile.firstName,
-      last_name: profile.lastName,
-      email: profile.email,
-      phone: profile.phone,
-    })
-    .eq('id', userId)
-    .select()
-    .single();
-  if (error || !data) throw new Error(error?.message || 'Failed to update user profile');
-  return {
-    firstName: data.first_name || '',
-    lastName: data.last_name || '',
-    email: data.email || '',
-    phone: data.phone || '',
-  };
-}
-
-// Helper: update user password in Supabase (robust)
-async function updateUserPassword(userId: string, newPassword: string) {
-  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error || !data?.user) throw new Error(error?.message || 'Failed to update password');
-}
-
-// Helper: fetch avatar from Supabase (robust)
-async function fetchUserAvatar(userId: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('user_avatars')
-    .select('avatar_url')
-    .eq('user_id', userId)
-    .maybeSingle(); // Use maybeSingle instead of single
-  if (error) throw new Error(error.message);
-  return data?.avatar_url || null;
-}
-
-// Helper: update avatar in Supabase (robust)
-async function updateUserAvatar(userId: string, avatarUrl: string) {
-  const { error } = await supabase
-    .from('user_avatars')
-    .upsert({ user_id: userId, avatar_url: avatarUrl });
-  if (error) throw new Error(error.message);
-}
-
 export default function UserProfilePage() {
-  const [userDetails, setUserDetails] = useState<UserProfileDetails>(initialProfileDetails);
+  const [userDetails, setUserDetails] = useState<UserProfile>(initialProfileDetails);
   const [passwordDetails, setPasswordDetails] = useState({
     currentPassword: "",
     newPassword: "",
@@ -142,44 +48,38 @@ export default function UserProfilePage() {
   const [passwordFeedback, setPasswordFeedback] = useState<FeedbackMessage | null>(null);
   const [avatarFeedback, setAvatarFeedback] = useState<FeedbackMessage | null>(null);
 
+  // Get OOP services
+  const services = getServices();
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const user = await getCurrentUserFromSupabase();
+        // Use UserService to get current user and profile data
+        const user = await services.userService.getCurrentUser();
         if (!user) {
           setIsLoaded(true);
           setFeedback({ type: 'error', message: 'User not authenticated', details: 'Please log in again.' });
-          return;        }
+          return;
+        }
         setCurrentUserId(user.id);
-        // Avatar
+
+        // Set user details from the authenticated user object
+        setUserDetails({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || ''
+        });
+
+        // Fetch avatar using UserService
         let avatar = null;
         try {
-          avatar = await fetchUserAvatar(user.id);
+          avatar = await services.userService.getAvatar(user.id);
         } catch (avatarErr) {
           setAvatarFeedback({ type: 'error', message: 'Avatar Load Failed', details: String(avatarErr) });
         }
         setCroppedImage(avatar || defaultPlaceholderImage);
-        // Profile
-        let profile = null;
-        try {
-          profile = await fetchUserProfile(user.id);
-        } catch (profileErr) {
-          setFeedback({ type: 'error', message: 'Profile Load Failed', details: String(profileErr) });
-        }
-        if (profile) {
-          setUserDetails({
-            firstName: profile.firstName || '',
-            lastName: profile.lastName || '',
-            email: profile.email || user.email || '',            phone: profile.phone || ''
-          });
-        } else {
-          setUserDetails({
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            email: user.email || '',            phone: user.phone || ''
-          });
-        }
+
       } catch (err) {
         setFeedback({ type: 'error', message: 'Profile Load Error', details: String(err) });
       } finally {
@@ -187,12 +87,12 @@ export default function UserProfilePage() {
       }
     };
     loadProfile();
-  }, []);
+  }, [services]);
 
   const handleUserInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFeedback(null);
     const { name, value } = e.target;
-    setUserDetails(prev => ({ ...prev, [name]: value }));
+    setUserDetails((prev: UserProfile) => ({ ...prev, [name]: value }));
   };
 
   const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,13 +110,8 @@ export default function UserProfilePage() {
     }
 
     try {
-      await updateUserProfile(currentUserId, userDetails);
-      // --- Update Supabase Auth user metadata for name sync ---
-      await supabase.auth.updateUser({
-        data: {
-          first_name: userDetails.firstName,
-          last_name: userDetails.lastName,
-        }      });
+      // Use UserService to update profile
+      await services.userService.updateProfile(currentUserId, userDetails);
       setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
     } catch (error: any) {
       setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error?.message || String(error)) });
@@ -253,10 +148,12 @@ export default function UserProfilePage() {
     }
 
     try {
-      await updateUserPassword(currentUserId, passwordDetails.newPassword);
+      // Use UserService to update password
+      await services.userService.updatePassword(passwordDetails.newPassword);
       setPasswordFeedback({ type: 'success', message: "Password Updated", details: "Your password has been successfully changed." });
-      setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });    } catch {
-      setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. Please try again." });
+      setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+    } catch (error: any) {
+      setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. " + (error?.message || String(error)) });
     }
   };
 
@@ -264,11 +161,13 @@ export default function UserProfilePage() {
     setAvatarFeedback(null);
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageSrc(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImageSrc(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -279,7 +178,8 @@ export default function UserProfilePage() {
       if (canvas && currentUserId) {
         const croppedImgDataUrl = canvas.toDataURL('image/jpeg');
         setCroppedImage(croppedImgDataUrl);
-        await updateUserAvatar(currentUserId, croppedImgDataUrl);
+        // Use UserService to update avatar
+        await services.userService.updateAvatar(currentUserId, croppedImgDataUrl);
         setAvatarFeedback({ type: 'success', message: "Profile Picture Saved", details: "Your new profile picture has been saved." });
         setImageSrc(null);
       } else {
@@ -294,47 +194,16 @@ export default function UserProfilePage() {
     setCroppedImage(defaultPlaceholderImage);
     if (currentUserId) {
       try {
-        await updateUserAvatar(currentUserId, defaultPlaceholderImage);
+        // Use UserService to update avatar to default
+        await services.userService.updateAvatar(currentUserId, defaultPlaceholderImage);
       } catch (error) {
-        console.error("Error removing profile picture from Supabase", error);
+        console.error("Error removing profile picture via service", error);
       }
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     setAvatarFeedback({ type: 'success', message: "Profile Picture Removed", details: "Your profile picture has been reset to default." });
-  };
-
-  const renderFeedbackMessage = (feedbackObj: FeedbackMessage | null) => {
-    if (!feedbackObj) return null;
-    let IconComponent;
-    let variant: "default" | "destructive" = "default";
-    let additionalAlertClasses = "";
-
-    switch (feedbackObj.type) {
-      case 'success':
-        IconComponent = CheckCircle2;
-        variant = "default";
-        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
-        break;
-      case 'error':
-        IconComponent = AlertTriangle;
-        variant = "destructive";
-        break;
-      case 'info':
-        IconComponent = Info;
-        variant = "default";
-        break;
-      default:
-        return null;
-    }
-    return (
-      <Alert variant={variant} className={cn("mt-4", additionalAlertClasses)}>
-        <IconComponent className="h-4 w-4" />
-        <AlertTitle>{feedbackObj.message}</AlertTitle>
-        {feedbackObj.details && <AlertDescription>{feedbackObj.details}</AlertDescription>}
-      </Alert>
-    );
   };
 
   if (!isLoaded) {
@@ -369,7 +238,9 @@ export default function UserProfilePage() {
           Manage your personal information, password, and profile picture. Data is securely stored in Supabase.
         </p>
       </div>
-       {renderFeedbackMessage(feedback) || renderFeedbackMessage(avatarFeedback) || renderFeedbackMessage(passwordFeedback)}
+       <FeedbackAlert feedback={feedback} />
+       <FeedbackAlert feedback={avatarFeedback} />
+       <FeedbackAlert feedback={passwordFeedback} />
 
       <Tabs defaultValue="picture" className="space-y-4">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
@@ -404,7 +275,7 @@ export default function UserProfilePage() {
                         height={150}
                         className="rounded-full aspect-square object-cover border"
                         data-ai-hint="profile avatar"
-                        unoptimized={croppedImage?.startsWith('blob:') || croppedImage?.startsWith('data:')}
+                        unoptimized={(croppedImage?.startsWith('blob:') || croppedImage?.startsWith('data:')) ?? false}
                         key={croppedImage}
                     />
                     <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>

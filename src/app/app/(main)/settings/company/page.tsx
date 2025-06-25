@@ -17,16 +17,15 @@ import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Eye, EyeOff, Edit, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { Loader2, Building, Save, PercentCircle, Users, UserCog, PlusCircle, Trash2, Search, Upload, CheckCircle2, AlertTriangle, Info, Download, FileText, FileSpreadsheet, FileType } from 'lucide-react';
+import { Loader2, Building, Save, PercentCircle, Users, UserCog, PlusCircle, Trash2, Search, Upload, AlertTriangle, Download, FileText, FileSpreadsheet, FileType } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import type { UserRole } from '@/lib/userData';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 export interface Department {
   id: string;
@@ -86,12 +85,6 @@ const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 const sanitizeFilename = (name: string | null | undefined): string => {
     if (!name) return 'UnknownCompany';
     return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-};
-
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
 };
 
 // --- Supabase migration: Remove all legacy utility calls and constants ---
@@ -254,6 +247,10 @@ export default function CompanySettingsPage() {
 
   const [accessGranted, setAccessGranted] = useState<boolean | null>(null);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+
+  // Dialog-specific feedback states
+  const [departmentDialogFeedback, setDepartmentDialogFeedback] = useState<FeedbackMessage | null>(null);
+  const [companyUserDialogFeedback, setCompanyUserDialogFeedback] = useState<FeedbackMessage | null>(null);
 
 
   useEffect(() => {
@@ -430,12 +427,28 @@ export default function CompanySettingsPage() {
     const { name, value } = e.target;
     setDepartmentFormData(prev => ({ ...prev, [name]: value }));
   };
-  const handleAddDepartmentClick = () => { setFeedback(null); setEditingDepartment(null); setIsDepartmentDialogOpen(true); };  const handleEditDepartmentClick = (department: Department) => { setFeedback(null); setEditingDepartment(department); setIsDepartmentDialogOpen(true); };
+  const handleAddDepartmentClick = () => { 
+    setDepartmentDialogFeedback(null); 
+    setEditingDepartment(null); 
+    setIsDepartmentDialogOpen(true); 
+  };
+  
+  const handleEditDepartmentClick = (department: Department) => { 
+    setDepartmentDialogFeedback(null); 
+    setEditingDepartment(department); 
+    setIsDepartmentDialogOpen(true); 
+  };
 
   const handleSaveDepartment = async () => {
-    setFeedback(null);
-    if (!selectedCompanyId) { setFeedback({type: 'error', message: "Error", details: "No company selected."}); return; }
-    if (!departmentFormData.name.trim()) { setFeedback({type: 'error', message: "Validation Error", details: "Department name cannot be empty."}); return; }
+    setDepartmentDialogFeedback(null);
+    if (!selectedCompanyId) { 
+      setDepartmentDialogFeedback({type: 'error', message: "Error", details: "No company selected."}); 
+      return; 
+    }
+    if (!departmentFormData.name.trim()) { 
+      setDepartmentDialogFeedback({type: 'error', message: "Validation Error", details: "Department name cannot be empty."}); 
+      return; 
+    }
     try {
       if (editingDepartment) {
         const updatedDept: Department = { ...editingDepartment, ...departmentFormData, companyId: selectedCompanyId };
@@ -448,8 +461,10 @@ export default function CompanySettingsPage() {
         setAllDepartments(prev => [newDepartment, ...prev]);
         setFeedback({type: 'success', message: "Department Added", details: `Department "${newDepartment.name}" has been added.`});
       }
-    } catch (error) { setFeedback({type: 'error', message: "Save Failed", details: `Could not save department. ${(error as Error).message}`}); }
-    setIsDepartmentDialogOpen(false);
+      setIsDepartmentDialogOpen(false);
+    } catch (error) { 
+      setDepartmentDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save department. ${(error as Error).message}`}); 
+    }
   };
 
   const handleCompanyUserInputFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -462,8 +477,17 @@ export default function CompanySettingsPage() {
     }
   };
 
-  const handleAddCompanyUserClick = () => { setFeedback(null); setEditingCompanyUser(null); setIsCompanyUserDialogOpen(true); };
-  const handleEditCompanyUserClick = (user: User) => { setFeedback(null); setEditingCompanyUser(user); setIsCompanyUserDialogOpen(true); };
+  const handleAddCompanyUserClick = () => { 
+    setCompanyUserDialogFeedback(null); 
+    setEditingCompanyUser(null); 
+    setIsCompanyUserDialogOpen(true); 
+  };
+  
+  const handleEditCompanyUserClick = (user: User) => { 
+    setCompanyUserDialogFeedback(null); 
+    setEditingCompanyUser(user); 
+    setIsCompanyUserDialogOpen(true); 
+  };
   const handleDeleteCompanyUserClick = (user: User) => { setFeedback(null); setCompanyUserToDelete(user); setIsDeleteCompanyUserDialogOpen(true); };
 
   const deleteCompanyUsersByIds = async (idsToDelete: string[]) => {
@@ -493,11 +517,23 @@ export default function CompanySettingsPage() {
   const confirmBulkDeleteCompanyUsers = async () => { await deleteCompanyUsersByIds(Array.from(selectedCompanyUserItems)); setIsBulkDeleteCompanyUsersDialogOpen(false); };
 
   const handleSaveCompanyUser = async () => {
-    setFeedback(null);
-    if (!selectedCompanyId) { setFeedback({type: 'error', message: "Error", details: "No company selected."}); return; }
-    if (!companyUserFormData.firstName || !companyUserFormData.lastName || !companyUserFormData.email) { setFeedback({type: 'error', message: "Validation Error", details: "First name, last name, and email are required."}); return; }
-    if (!editingCompanyUser && !companyUserFormData.password) { setFeedback({type: 'error', message: "Validation Error", details: "Password is required for new users."}); return; }
-    if (companyUserFormData.role !== "Payroll Preparer" && companyUserFormData.role !== "Payroll Approver") { setFeedback({type: 'error', message: "Validation Error", details: "Invalid role selected. Only Preparer or Approver allowed here."}); return; }
+    setCompanyUserDialogFeedback(null);
+    if (!selectedCompanyId) { 
+      setCompanyUserDialogFeedback({type: 'error', message: "Error", details: "No company selected."}); 
+      return; 
+    }
+    if (!companyUserFormData.firstName || !companyUserFormData.lastName || !companyUserFormData.email) { 
+      setCompanyUserDialogFeedback({type: 'error', message: "Validation Error", details: "First name, last name, and email are required."}); 
+      return; 
+    }
+    if (!editingCompanyUser && !companyUserFormData.password) { 
+      setCompanyUserDialogFeedback({type: 'error', message: "Validation Error", details: "Password is required for new users."}); 
+      return; 
+    }
+    if (companyUserFormData.role !== "Payroll Preparer" && companyUserFormData.role !== "Payroll Approver") { 
+      setCompanyUserDialogFeedback({type: 'error', message: "Validation Error", details: "Invalid role selected. Only Preparer or Approver allowed here."}); 
+      return; 
+    }
 
     const newEmail = companyUserFormData.email.trim().toLowerCase();
     if (newEmail !== originalEmailForEdit.toLowerCase()) {
@@ -507,7 +543,7 @@ export default function CompanySettingsPage() {
           .eq('email', newEmail)
           .maybeSingle();
         if (existingUserWithNewEmail && (!editingCompanyUser || existingUserWithNewEmail.id !== editingCompanyUser.id)) {
-            setFeedback({type: 'error', message: "Email Exists", details: "This email address is already in use by another account."});
+            setCompanyUserDialogFeedback({type: 'error', message: "Email Exists", details: "This email address is already in use by another account."});
             return;
         }
     }
@@ -533,8 +569,11 @@ export default function CompanySettingsPage() {
       }
       setIsCompanyUserDialogOpen(false);
     } catch (error: any) {
-        if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) { setFeedback({type: 'error', message: "Save Failed", details: "Email address already exists globally."});
-        } else { setFeedback({type: 'error', message: "Save Failed", details: `Could not save user: ${error.message || 'Unknown error'}`}); }
+        if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) { 
+          setCompanyUserDialogFeedback({type: 'error', message: "Save Failed", details: "Email address already exists globally."});
+        } else { 
+          setCompanyUserDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save user: ${error.message || 'Unknown error'}`}); 
+        }
     }
   };
 
@@ -799,38 +838,6 @@ export default function CompanySettingsPage() {
     }
   };
 
-  const renderFeedbackMessage = () => {
-    if (!feedback) return null;
-    let IconComponent;
-    let variant: "default" | "destructive" = "default";
-    let additionalAlertClasses = "";
-
-    switch (feedback.type) {
-      case 'success':
-        IconComponent = CheckCircle2;
-        variant = "default";
-        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
-        break;
-      case 'error':
-        IconComponent = AlertTriangle;
-        variant = "destructive";
-        break;
-      case 'info':
-        IconComponent = Info;
-        variant = "default";
-        break;
-      default:
-        return null;
-    }
-    return (
-      <Alert variant={variant} className={cn("my-4", additionalAlertClasses)}>
-        <IconComponent className="h-4 w-4" />
-        <AlertTitle>{feedback.message}</AlertTitle>
-        {feedback.details && <AlertDescription>{feedback.details}</AlertDescription>}
-      </Alert>
-    );
-  };
-
   if (isLoadingCompanyContext || accessGranted === null) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Verifying access and loading company information...</div>;
   }
@@ -870,7 +877,7 @@ export default function CompanySettingsPage() {
       <input type="file" ref={departmentImportFileInputRef} onChange={handleDepartmentFileUpload} accept=".csv" className="hidden" />
       <input type="file" ref={companyUsersImportFileInputRef} onChange={handleCompanyUserFileUpload} accept=".csv" className="hidden" />
       <div><div className="flex items-center gap-2 mb-1"><Building className="mr-2 h-7 w-7 text-primary" /><h1 className="text-3xl font-bold tracking-tight font-headline">Company Settings</h1></div><p className="text-muted-foreground mb-2">Manage your company&apos;s profile, tax exemptions, departments, and company-specific user access.</p></div>
-      {renderFeedbackMessage()}
+      <FeedbackAlert feedback={feedback} />
 
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-4">
@@ -963,18 +970,88 @@ export default function CompanySettingsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isDepartmentDialogOpen} onOpenChange={(isOpen) => { setIsDepartmentDialogOpen(isOpen); if(!isOpen) setFeedback(null); }}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingDepartment ? "Edit Department" : "Add New Department"}</DialogTitle><DialogDescription>{editingDepartment ? "Update department." : "Fill in details."}</DialogDescription></DialogHeader><div className="grid gap-4 py-4" tabIndex={0}><div className="space-y-2"><Label htmlFor="departmentName">Department Name *</Label><Input id="departmentName" name="name" value={departmentFormData.name} onChange={handleDepartmentInputChange} placeholder="e.g., Engineering" /></div><div className="space-y-2"><Label htmlFor="departmentDescription">Description</Label><Textarea id="departmentDescription" name="description" value={departmentFormData.description} onChange={handleDepartmentInputChange} placeholder="Briefly describe" /></div></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsDepartmentDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveDepartment}>Save</Button></DialogFooter></DialogContent></Dialog>
-
-      <Dialog open={isCompanyUserDialogOpen} onOpenChange={(isOpen) => {setIsCompanyUserDialogOpen(isOpen); if(!isOpen) setFeedback(null);}}>
-        <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{editingCompanyUser ? "Edit User" : "Add New User to Company"}</DialogTitle><DialogDescription>{editingCompanyUser ? "Update user details." : "Fill in details for the new user."}</DialogDescription></DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2" tabIndex={0}>
-            <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="cu_firstName">First Name *</Label><Input id="cu_firstName" name="firstName" value={companyUserFormData.firstName} onChange={handleCompanyUserInputFormChange} required /></div><div className="space-y-2"><Label htmlFor="cu_lastName">Last Name *</Label><Input id="cu_lastName" name="lastName" value={companyUserFormData.lastName} onChange={handleCompanyUserInputFormChange} required /></div></div>
-            <div className="space-y-2"><Label htmlFor="cu_email">Email *</Label><Input id="cu_email" name="email" type="email" value={companyUserFormData.email} onChange={handleCompanyUserInputFormChange} required disabled={!!editingCompanyUser && pageCurrentUserRole === 'Company Admin'} /></div>
-            <div className="space-y-2"><Label htmlFor="cu_phone">Phone</Label><Input id="cu_phone" name="phone" type="tel" value={companyUserFormData.phone || ""} onChange={handleCompanyUserInputFormChange} /></div>
-            <div className="space-y-2"><Label htmlFor="cu_password">Password {editingCompanyUser ? "(Leave blank to keep)" : "*"}</Label><div className="relative"><Input id="cu_password" name="password" type={showPasswordInCompanyUserDialog ? "text" : "password"} value={companyUserFormData.password || ""} onChange={handleCompanyUserInputFormChange} required={!editingCompanyUser} className="pr-10"/><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={()=>setShowPasswordInCompanyUserDialog(!showPasswordInCompanyUserDialog)} tabIndex={-1}>{showPasswordInCompanyUserDialog ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</Button></div></div>
-            <div className="space-y-2"><Label htmlFor="cu_role">Role *</Label><Select value={companyUserFormData.role} onValueChange={(value) => handleCompanyUserRoleChange(value as UserRole)} required><SelectTrigger id="cu_role"><SelectValue placeholder="Select role" /></SelectTrigger><SelectContent><SelectItem value="Payroll Preparer">Payroll Preparer</SelectItem><SelectItem value="Payroll Approver">Payroll Approver</SelectItem></SelectContent></Select></div>
+      <Dialog open={isDepartmentDialogOpen} onOpenChange={(isOpen) => { 
+        setIsDepartmentDialogOpen(isOpen); 
+        if(!isOpen) setDepartmentDialogFeedback(null); 
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingDepartment ? "Edit Department" : "Add New Department"}</DialogTitle>
+            <DialogDescription>{editingDepartment ? "Update department." : "Fill in details."}</DialogDescription>
+          </DialogHeader>
+          <FeedbackAlert feedback={departmentDialogFeedback} />
+          <div className="grid gap-4 py-4" tabIndex={0}>
+            <div className="space-y-2">
+              <Label htmlFor="departmentName">Department Name *</Label>
+              <Input id="departmentName" name="name" value={departmentFormData.name} onChange={handleDepartmentInputChange} placeholder="e.g., Engineering" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="departmentDescription">Description</Label>
+              <Textarea id="departmentDescription" name="description" value={departmentFormData.description} onChange={handleDepartmentInputChange} placeholder="Briefly describe" />
+            </div>
           </div>
-          <DialogFooter className="pt-4 border-t"><Button type="button" variant="outline" onClick={() => setIsCompanyUserDialogOpen(false)}>Cancel</Button><Button type="button" onClick={handleSaveCompanyUser}>Save User</Button></DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDepartmentDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveDepartment}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCompanyUserDialogOpen} onOpenChange={(isOpen) => {
+        setIsCompanyUserDialogOpen(isOpen); 
+        if(!isOpen) setCompanyUserDialogFeedback(null);
+      }}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>{editingCompanyUser ? "Edit User" : "Add New User to Company"}</DialogTitle>
+            <DialogDescription>{editingCompanyUser ? "Update user details." : "Fill in details for the new user."}</DialogDescription>
+          </DialogHeader>
+          <FeedbackAlert feedback={companyUserDialogFeedback} />
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2" tabIndex={0}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cu_firstName">First Name *</Label>
+                <Input id="cu_firstName" name="firstName" value={companyUserFormData.firstName} onChange={handleCompanyUserInputFormChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cu_lastName">Last Name *</Label>
+                <Input id="cu_lastName" name="lastName" value={companyUserFormData.lastName} onChange={handleCompanyUserInputFormChange} required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cu_email">Email *</Label>
+              <Input id="cu_email" name="email" type="email" value={companyUserFormData.email} onChange={handleCompanyUserInputFormChange} required disabled={!!editingCompanyUser && pageCurrentUserRole === 'Company Admin'} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cu_phone">Phone</Label>
+              <Input id="cu_phone" name="phone" type="tel" value={companyUserFormData.phone || ""} onChange={handleCompanyUserInputFormChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cu_password">Password {editingCompanyUser ? "(Leave blank to keep)" : "*"}</Label>
+              <div className="relative">
+                <Input id="cu_password" name="password" type={showPasswordInCompanyUserDialog ? "text" : "password"} value={companyUserFormData.password || ""} onChange={handleCompanyUserInputFormChange} required={!editingCompanyUser} className="pr-10"/>
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={()=>setShowPasswordInCompanyUserDialog(!showPasswordInCompanyUserDialog)} tabIndex={-1}>
+                  {showPasswordInCompanyUserDialog ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cu_role">Role *</Label>
+              <Select value={companyUserFormData.role} onValueChange={(value) => handleCompanyUserRoleChange(value as UserRole)} required>
+                <SelectTrigger id="cu_role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Payroll Preparer">Payroll Preparer</SelectItem>
+                  <SelectItem value="Payroll Approver">Payroll Approver</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setIsCompanyUserDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveCompanyUser}>Save User</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <AlertDialog open={isDeleteCompanyUserDialogOpen} onOpenChange={setIsDeleteCompanyUserDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Remove user "{companyUserToDelete?.firstName} {companyUserToDelete?.lastName}" from this company?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteCompanyUser} className="bg-destructive hover:bg-destructive/90">Remove User</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

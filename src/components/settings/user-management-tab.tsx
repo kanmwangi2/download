@@ -47,12 +47,11 @@ import {
 } from "@/components/ui/table";
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
 import { getSupabaseClient } from '@/lib/supabase';
-import { 
-    type UserRole, 
-    type Company, 
-    type User
-} from '@/lib/userData';
+import { type Company } from '@/lib/types/company';
+import { type User, type UserUI, type UserRole, USER_ROLE_VALUES } from '@/lib/types/user';
+import { userFromBackend, userToBackend } from '@/lib/mappings/user-mappings';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -64,33 +63,6 @@ import { cn } from '@/lib/utils';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
-const USER_ROLE_VALUES = [
-  "Primary Admin",
-  "App Admin",
-  "Company Admin",
-  "Payroll Approver",
-  "Payroll Preparer"
-];
-
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
-
-import { userToBackend, userFromBackend } from '@/lib/case-conversion';
-// UI type for all state and form logic
-export type UserUI = {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: UserRole;
-  assignedCompanyIds: string[];
-  password?: string;
-  phone?: string;
-};
-
 const defaultNewUserFormDataUI: UserUI = {
   firstName: "",
   lastName: "",
@@ -99,10 +71,11 @@ const defaultNewUserFormDataUI: UserUI = {
   assignedCompanyIds: [],
   password: "",
   phone: "",
+  status: 'Active'
 };
 
 export default function UserManagementTab() {
-  const [allUsers, setAllUsers] = useState<UserUI[]>([]); 
+  const [allUsers, setAllUsers] = useState<User[]>([]); 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserUI>(defaultNewUserFormDataUI);
@@ -117,6 +90,7 @@ export default function UserManagementTab() {
   const [userCurrentPage, setUserCurrentPage] = useState(1);
   const [userRowsPerPage, setUserRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [dialogFeedback, setDialogFeedback] = useState<FeedbackMessage | null>(null);
   const [selectedUserItems, setSelectedUserItems] = useState<Set<string>>(new Set());
   const [isBulkDeleteUsersDialogOpen, setIsBulkDeleteUsersDialogOpen] = useState(false);
   const [availableCompaniesForAssignment, setAvailableCompaniesForAssignment] = useState<Company[]>([]);
@@ -130,7 +104,7 @@ export default function UserManagementTab() {
         const supabase = getSupabaseClient();
         const { data: users, error: userError } = await supabase.from('users').select('*');
         if (userError) throw userError;
-        setAllUsers((users || []).map(userFromBackend));
+        setAllUsers(users || []);
         const { data: companies, error: companyError } = await supabase.from('companies').select('*');
         if (companyError) throw companyError;
         setAvailableCompaniesForAssignment(companies || []);      } catch {
@@ -151,20 +125,21 @@ export default function UserManagementTab() {
   useEffect(() => {
     setShowPasswordInDialog(false); 
     if (editingUser) {
-      // Map backend User (snake_case) to UI User (camelCase)
       const uiUser = userFromBackend(editingUser);
       let assignedIds = [...(uiUser.assignedCompanyIds || [])];
       if (uiUser.role === "Primary Admin" || uiUser.role === "App Admin") {
         assignedIds = availableCompaniesForAssignment.map(c => c.id);
       }
       setFormData({
-        id: uiUser.id,
+        id: uiUser.id ?? "",
         firstName: uiUser.firstName,
         lastName: uiUser.lastName,
-        email: uiUser.email,        phone: uiUser.phone || "",
+        email: uiUser.email,
+        phone: uiUser.phone || "",
         role: uiUser.role,
         assignedCompanyIds: assignedIds,
         password: "",
+        status: uiUser.status,
       });
     } else {
       let initialAssignedIds = defaultNewUserFormDataUI.assignedCompanyIds || [];
@@ -225,21 +200,21 @@ export default function UserManagementTab() {
 
 
   const handleSaveUser = async () => {
-    setFeedback(null);
+    setDialogFeedback(null);
     if (editingUser && editingUser.role === "Primary Admin" && formData.role !== "Primary Admin") {
-        setFeedback({type: 'error', message: "Action Denied", details: "The Primary Admin's role cannot be changed."});
+        setDialogFeedback({type: 'error', message: "Action Denied", details: "The Primary Admin's role cannot be changed."});
         return;
     }
     if (formData.role === "Primary Admin" && currentPrimaryAdmin && editingUser?.id !== currentPrimaryAdmin.id) {
-        setFeedback({type: 'error', message: "Action Denied", details: "There can only be one Primary Admin. Please change the role."});
+        setDialogFeedback({type: 'error', message: "Action Denied", details: "There can only be one Primary Admin. Please change the role."});
         return;
     }
     if (!formData.firstName || !formData.lastName || !formData.email) {
-      setFeedback({type: 'error', message: "Validation Error", details: "First name, last name, and email are required."});
+      setDialogFeedback({type: 'error', message: "Validation Error", details: "First name, last name, and email are required."});
       return;
     }
     if (!editingUser && !formData.password) {
-       setFeedback({type: 'error', message: "Validation Error", details: "Password is required for new users."});
+       setDialogFeedback({type: 'error', message: "Validation Error", details: "Password is required for new users."});
       return;
     }
     const newEmail = formData.email.trim().toLowerCase();
@@ -250,23 +225,23 @@ export default function UserManagementTab() {
           ? availableCompaniesForAssignment.map(c => c.id)
           : formData.assignedCompanyIds;
       if (editingUser) {
-        const updatedUser = userToBackend({ ...editingUser, ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds });
+        const updatedUser = userToBackend({ ...userFromBackend(editingUser), ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds });
         const { error } = await supabase.from('users').update(updatedUser).eq('id', editingUser.id);
         if (error) throw error;
-        setAllUsers(prevUsers => prevUsers.map((user) => user.id === editingUser.id ? { ...formData, id: editingUser.id } : user));
+        setAllUsers(prevUsers => prevUsers.map((user) => user.id === editingUser.id ? { ...editingUser, ...updatedUser } : user));
         setFeedback({type: 'success', message: "User Updated", details: `${formData.firstName} ${formData.lastName}'s details have been updated.`});
       } else {
-        const { data: inserted, error } = await supabase.from('users').insert(userToBackend({ ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds })).select();
+        const { data: inserted, error } = await supabase.from('users').insert(userToBackend({ ...formData, email: newEmail, assignedCompanyIds: finalAssignedCompanyIds, status: 'Active' })).select();
         if (error) throw error;
         if (inserted && inserted.length > 0) {
-          setAllUsers(prevUsers => [...prevUsers, userFromBackend(inserted[0])]);
+          setAllUsers(prevUsers => [...prevUsers, inserted[0]]);
           setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
         } else {
           setFeedback({type: 'success', message: "User Added", details: `${formData.firstName} ${formData.lastName} has been added.`});
         }
       }
       setIsUserDialogOpen(false);    } catch (error) {
-      setFeedback({type: 'error', message: "Save Failed", details: `Could not save user. ${error instanceof Error ? error.message : 'Unknown error'}`});
+      setDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save user. ${error instanceof Error ? error.message : 'Unknown error'}`});
     }
   };
 
@@ -283,18 +258,20 @@ export default function UserManagementTab() {
   const filteredUsersSource = useMemo(() => {
     if (!userSearchTerm) return allUsers;
     const lowerSearchTerm = userSearchTerm.toLowerCase();
-    return allUsers.filter(user => 
-      user.firstName.toLowerCase().includes(lowerSearchTerm) ||
-      user.lastName.toLowerCase().includes(lowerSearchTerm) ||
-      user.email.toLowerCase().includes(lowerSearchTerm) ||
-      user.role.toLowerCase().includes(lowerSearchTerm)
-    );
+    return allUsers.filter(user => {
+      const uiUser = userFromBackend(user);
+      return uiUser.firstName.toLowerCase().includes(lowerSearchTerm) ||
+      uiUser.lastName.toLowerCase().includes(lowerSearchTerm) ||
+      uiUser.email.toLowerCase().includes(lowerSearchTerm) ||
+      uiUser.role.toLowerCase().includes(lowerSearchTerm)
+    });
   }, [allUsers, userSearchTerm]);
+
   const userTotalItems = filteredUsersSource.length;
   const userTotalPages = Math.ceil(userTotalItems / (userRowsPerPage || 10)) || 1;
   const userStartIndex = (userCurrentPage - 1) * (userRowsPerPage || 10);
   const userEndIndex = userStartIndex + (userRowsPerPage || 10);
-  const paginatedUsers = filteredUsersSource.slice(userStartIndex, userEndIndex);
+  const paginatedUsers = useMemo(() => filteredUsersSource.slice(userStartIndex, userEndIndex).map(userFromBackend), [filteredUsersSource, userStartIndex, userEndIndex]);
 
   const handleSelectUserRow = (itemId: string, checked: boolean) => {
     setSelectedUserItems(prev => { const newSelected = new Set(prev); if (checked) newSelected.add(itemId); else newSelected.delete(itemId); return newSelected; });
@@ -310,7 +287,7 @@ export default function UserManagementTab() {
   };
   const isAllUsersOnPageSelected = paginatedUsers.length > 0 && paginatedUsers.every(item => item.id && selectedUserItems.has(item.id));
 
-  const globalUsersExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'firstName', label: 'FirstName' }, { key: 'lastName', label: 'LastName' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'role', label: 'Role' }, { key: 'assignedCompanyIds', label: 'AssignedCompanyIDs', isIdLike: true}];
+  const globalUsersExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'first_name', label: 'FirstName' }, { key: 'last_name', label: 'LastName' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'role', label: 'Role' }, { key: 'assigned_company_ids', label: 'AssignedCompanyIDs', isIdLike: true}];
 
   const exportGlobalUserData = (fileType: "csv" | "xlsx" | "pdf") => {
     setFeedback(null);
@@ -321,11 +298,12 @@ export default function UserManagementTab() {
     const headers = globalUsersExportColumns.map(c => c.label);
     const dataToExport = allUsers.map(user => {
       const row: Record<string, string | number> = {};
-      globalUsersExportColumns.forEach(col => {        let value: string | number | string[] | undefined;
-        if (col.key === 'assignedCompanyIds') {
-          value = user.assignedCompanyIds.join(',');
+      globalUsersExportColumns.forEach(col => {
+        let value: string | number | string[] | undefined;
+        if (col.key === 'assigned_company_ids') {
+          value = user.assigned_company_ids.join(',');
         } else {
-          value = user[col.key as keyof UserUI];
+          value = user[col.key as keyof User];
         }
         if (col.isIdLike) {
           row[col.label] = String(value || '');
@@ -395,11 +373,11 @@ export default function UserManagementTab() {
         header: true, skipEmptyLines: true,
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: Record<string, unknown>[] = [];
+          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: (Omit<User, 'created_at' | 'updated_at' | 'id'> & { id?: string, password?: string})[] = [];
           const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
           const supabase = getSupabaseClient();
           const { data: existingUsersRaw = [], error: fetchUsersError } = await supabase.from('users').select('*');
-          const existingUsers = (existingUsersRaw || []).map(userFromBackend);
+          const existingUsers: User[] = existingUsersRaw || [];
           if (fetchUsersError) {
             setFeedback({type: 'error', message: "Import Failed", details: `Could not fetch users from Supabase: ${fetchUsersError.message}`});
             return;
@@ -418,13 +396,13 @@ export default function UserManagementTab() {
                 if (existingUserByEmail && existingUserByEmail.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} conflicts with existing user ${existingUserByEmail.id}.`); continue;}
                 if (existingUserById.role === "Primary Admin" && role !== "Primary Admin") { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Primary Admin role cannot be changed.`); continue; }
                 if (role === "Primary Admin" && currentPrimaryAdmin && currentPrimaryAdmin.id !== id) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: Another user is already Primary Admin.`); continue; }
-                itemsToBulkUpsert.push(userToBackend({ ...existingUserById, firstName, lastName, email, phone, role, password: password || existingUserById.password, assignedCompanyIds: assignedCompanyIdsArray })); updatedCount++;
+                itemsToBulkUpsert.push(userToBackend({ ...userFromBackend(existingUserById), firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray })); updatedCount++;
               } else { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: User ID not found for update.`); continue; }
             } else { 
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
               if (role === "Primary Admin" && primaryAdminExists) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Primary Admin already exists.`); continue; }
-              itemsToBulkUpsert.push(userToBackend({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray })); newCount++; // Do not assign id manually
+              itemsToBulkUpsert.push(userToBackend({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray, status: 'Active' })); newCount++; // Do not assign id manually
             }
           }
           if (itemsToBulkUpsert.length > 0) {
@@ -434,7 +412,7 @@ export default function UserManagementTab() {
               return;
             }
             const { data: updatedListRaw = [], error: refreshError } = await supabase.from('users').select('*');
-            const updatedList = (updatedListRaw || []).map(userFromBackend);
+            const updatedList = updatedListRaw || [];
             if (!refreshError) setAllUsers(updatedList);
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info'; if (newCount > 0 || updatedCount > 0) { feedbackTitle = "Import Successful"; feedbackMessage = `${newCount} users added, ${updatedCount} updated.`; feedbackType = 'success'; } else if (rawData.length > 0 && papaParseErrors.length === 0 && validationSkippedLog.length === 0) { feedbackMessage = `CSV processed. ${rawData.length} rows checked. No changes.`; } else { feedbackMessage = "No changes applied."; } 
@@ -444,38 +422,6 @@ export default function UserManagementTab() {
         }
       }); if (event.target) event.target.value = '';
     }
-  };
-
-  const renderFeedbackMessage = () => {
-    if (!feedback) return null;
-    let IconComponent;
-    let variant: "default" | "destructive" = "default";
-    let additionalAlertClasses = "";
-
-    switch (feedback.type) {
-      case 'success':
-        IconComponent = CheckCircle2;
-        variant = "default";
-        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
-        break;
-      case 'error':
-        IconComponent = AlertTriangle;
-        variant = "destructive";
-        break;
-      case 'info':
-        IconComponent = Info;
-        variant = "default";
-        break;
-      default:
-        return null;
-    }
-    return (
-      <Alert variant={variant} className={cn("mb-4", additionalAlertClasses)}>
-        <IconComponent className="h-4 w-4" />
-        <AlertTitle>{feedback.message}</AlertTitle>
-        {Boolean(feedback.details) && <AlertDescription>{feedback.details}</AlertDescription>}
-      </Alert>
-    );
   };
 
   if (!isLoaded) {
@@ -493,7 +439,7 @@ export default function UserManagementTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {renderFeedbackMessage()}
+        <FeedbackAlert feedback={feedback} />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-4">
             <div className="relative w-full sm:max-w-xs md:max-w-sm lg:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -538,7 +484,13 @@ export default function UserManagementTab() {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={() => setEditingUser(userToBackend(user))} 
+                      onClick={() => {
+                        const userToEdit = allUsers.find(u => u.id === user.id);
+                        if (userToEdit) {
+                          setEditingUser(userToEdit);
+                          setIsUserDialogOpen(true);
+                        }
+                      }}
                       title="Edit User"
                     >
                       <Edit className="h-4 w-4" />
@@ -546,7 +498,13 @@ export default function UserManagementTab() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setUserToDelete(userToBackend(user))}
+                      onClick={() => {
+                        const userToDelete = allUsers.find(u => u.id === user.id);
+                        if (userToDelete) {
+                          setUserToDelete(userToDelete);
+                          setIsDeleteDialogOpen(true);
+                        }
+                      }}
                       disabled={user.role === "Primary Admin"}
                       title={user.role === "Primary Admin" ? "Cannot delete Primary Admin" : "Delete User"}
                       className={user.role === "Primary Admin" ? "text-muted-foreground cursor-not-allowed" : "text-destructive hover:text-destructive"}
@@ -592,7 +550,7 @@ export default function UserManagementTab() {
         )}
       </CardContent>
 
-      <Dialog open={isUserDialogOpen} onOpenChange={(isOpen) => {setIsUserDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}>
+      <Dialog open={isUserDialogOpen} onOpenChange={(isOpen) => {setIsUserDialogOpen(isOpen); if (!isOpen) setDialogFeedback(null);}}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
@@ -600,6 +558,9 @@ export default function UserManagementTab() {
               {editingUser ? "Update the user's details." : "Fill in the details for the new user."}
             </DialogDescription>
           </DialogHeader>
+          
+          <FeedbackAlert feedback={dialogFeedback} />
+          
           <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2" tabIndex={0}>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

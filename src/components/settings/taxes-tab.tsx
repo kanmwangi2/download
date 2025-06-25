@@ -10,8 +10,11 @@ import { PAYE_BANDS as DEFAULT_PAYE_BANDS, PENSION_EMPLOYER_RATE as DEFAULT_PENS
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getSupabaseClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { useCompany } from '@/context/CompanyContext';
 
 export interface TaxSettingsData {
+  id?: string; // Now optional, as it might not exist for a new company
+  companyId?: string; // Added to explicitly manage company context
   payeBand1Limit: number;
   payeBand2Limit: number;
   payeBand3Limit: number;
@@ -28,22 +31,33 @@ export interface TaxSettingsData {
   ramaEmployeeRate: number;
 }
 
-const getDefaultSettings = (): TaxSettingsData => ({
-  payeBand1Limit: DEFAULT_PAYE_BANDS.BAND1_LIMIT,
-  payeBand2Limit: DEFAULT_PAYE_BANDS.BAND2_LIMIT,
-  payeBand3Limit: DEFAULT_PAYE_BANDS.BAND3_LIMIT,
-  payeRate1: DEFAULT_PAYE_BANDS.RATE1 * 100,
-  payeRate2: DEFAULT_PAYE_BANDS.RATE2 * 100,
-  payeRate3: DEFAULT_PAYE_BANDS.RATE3 * 100,
-  payeRate4: DEFAULT_PAYE_BANDS.RATE4 * 100,
-  pensionEmployerRate: DEFAULT_PENSION_EMPLOYER_RATE * 100,
-  pensionEmployeeRate: DEFAULT_PENSION_EMPLOYEE_RATE * 100,
-  maternityEmployerRate: DEFAULT_MATERNITY_EMPLOYER_RATE * 100,
-  maternityEmployeeRate: DEFAULT_MATERNITY_EMPLOYEE_RATE * 100,
-  cbhiRate: DEFAULT_CBHI_RATE * 100,
-  ramaEmployerRate: DEFAULT_RAMA_EMPLOYER_RATE * 100,
-  ramaEmployeeRate: DEFAULT_RAMA_EMPLOYEE_RATE * 100,
-});
+const getDefaultSettings = (companyId: string | null): TaxSettingsData => {
+  const defaultValues = {
+    payeBand1Limit: DEFAULT_PAYE_BANDS.BAND1_LIMIT,
+    payeBand2Limit: DEFAULT_PAYE_BANDS.BAND2_LIMIT,
+    payeBand3Limit: DEFAULT_PAYE_BANDS.BAND3_LIMIT,
+    payeRate1: DEFAULT_PAYE_BANDS.RATE1 * 100,
+    payeRate2: DEFAULT_PAYE_BANDS.RATE2 * 100,
+    payeRate3: DEFAULT_PAYE_BANDS.RATE3 * 100,
+    payeRate4: DEFAULT_PAYE_BANDS.RATE4 * 100,
+    pensionEmployerRate: DEFAULT_PENSION_EMPLOYER_RATE * 100,
+    pensionEmployeeRate: DEFAULT_PENSION_EMPLOYEE_RATE * 100,
+    maternityEmployerRate: DEFAULT_MATERNITY_EMPLOYER_RATE * 100,
+    maternityEmployeeRate: DEFAULT_MATERNITY_EMPLOYEE_RATE * 100,
+    cbhiRate: DEFAULT_CBHI_RATE * 100,
+    ramaEmployerRate: DEFAULT_RAMA_EMPLOYER_RATE * 100,
+    ramaEmployeeRate: DEFAULT_RAMA_EMPLOYEE_RATE * 100,
+  };
+
+  if (companyId) {
+    return {
+      ...defaultValues,
+      companyId: companyId,
+    };
+  }
+
+  return defaultValues;
+};
 
 type FeedbackMessage = {
   type: 'success' | 'error' | 'info';
@@ -53,37 +67,47 @@ type FeedbackMessage = {
 
 import { objectToSnakeCase, objectToCamelCase } from '@/lib/case-conversion';
 
-// ...existing code...
-
 export default function TaxesTab() {
-  const [settings, setSettings] = useState<TaxSettingsData>(() => getDefaultSettings());
+  const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
+  const [settings, setSettings] = useState<TaxSettingsData>(() => getDefaultSettings(selectedCompanyId));
   const [isLoaded, setIsLoaded] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
 
   useEffect(() => {
     const loadSettings = async () => {
+      if (!selectedCompanyId || isLoadingCompanyContext) {
+        if (!isLoadingCompanyContext) setIsLoaded(true);
+        return;
+      }
       setIsLoaded(false);
       setFeedback(null);
       try {
         const supabase = getSupabaseClient();
-        const { data, error } = await supabase.from('tax_settings').select('*').single();
+        const { data, error } = await supabase
+          .from('tax_settings')
+          .select('*')
+          .eq('company_id', selectedCompanyId)
+          .single();
+
         if (error && error.code !== 'PGRST116') throw error; // PGRST116: No rows found
+
         if (data) {
           setSettings(objectToCamelCase(data));
         } else {
-          const defaultSettings = getDefaultSettings();
+          const defaultSettings = getDefaultSettings(selectedCompanyId);
           setSettings(defaultSettings);
-          await supabase.from('tax_settings').upsert([objectToSnakeCase(defaultSettings)]);
+          // No need to upsert here, let the user save explicitly
         }
       } catch (error) {
-        console.error("Error loading global tax settings from Supabase:", error);
-        setSettings(getDefaultSettings());
+        console.error(`Error loading tax settings for company ${selectedCompanyId}:`, error);
+        setSettings(getDefaultSettings(selectedCompanyId));
         setFeedback({ type: 'error', message: 'Error loading tax settings.', details: (error as Error).message });
       }
       setIsLoaded(true);
     };
+
     loadSettings();
-  }, []);
+  }, [selectedCompanyId, isLoadingCompanyContext]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFeedback(null);
@@ -94,8 +118,13 @@ export default function TaxesTab() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!selectedCompanyId) {
+      setFeedback({ type: 'error', message: "No Company Selected", details: "Please select a company before saving settings." });
+      return;
+    }
     setFeedback(null);
-    const numericSettings: TaxSettingsData = {
+
+    const numericSettings: Omit<TaxSettingsData, 'id' | 'companyId'> = {
         payeBand1Limit: Number(settings.payeBand1Limit) || 0,
         payeBand2Limit: Number(settings.payeBand2Limit) || 0,
         payeBand3Limit: Number(settings.payeBand3Limit) || 0,
@@ -111,14 +140,26 @@ export default function TaxesTab() {
         ramaEmployerRate: Number(settings.ramaEmployerRate) || 0,
         ramaEmployeeRate: Number(settings.ramaEmployeeRate) || 0,
     };
+
+    const settingsToSave = {
+      ...numericSettings,
+      company_id: selectedCompanyId,
+      id: settings.id, // Pass existing ID for upsert to work correctly
+    };
+
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from('tax_settings').upsert([objectToSnakeCase(numericSettings)]);
+      const { data, error } = await supabase.from('tax_settings').upsert(objectToSnakeCase(settingsToSave), { onConflict: 'company_id' }).select().single();
+
       if (error) throw error;
-      setSettings(numericSettings);
-      setFeedback({ type: 'success', message: "Global Tax Settings Saved", details: "Tax configurations for the application have been saved." });
+
+      if (data) {
+        setSettings(objectToCamelCase(data));
+      }
+      
+      setFeedback({ type: 'success', message: "Tax Settings Saved", details: `Tax configurations for the selected company have been saved.` });
     } catch (error) {
-      console.error("Error saving global tax settings to Supabase:", error);
+      console.error(`Error saving tax settings for company ${selectedCompanyId}:`, error);
       setFeedback({ type: 'error', message: "Save Failed", details: "Could not save tax settings." });
     }
   };
@@ -156,17 +197,34 @@ export default function TaxesTab() {
   };
 
 
-  if (!isLoaded) {
-      return <div className="flex justify-center items-center h-32"><Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading global tax settings...</div>;
+  if (isLoadingCompanyContext || !isLoaded) {
+      return <div className="flex justify-center items-center h-32"><Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading tax settings...</div>;
+  }
+
+  if (!selectedCompanyId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Global Tax Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="default" className={cn("mb-4")}>
+            <Info className="h-4 w-4" />
+            <AlertTitle>No Company Selected</AlertTitle>
+            <AlertDescription>Please select a company from the dropdown in the sidebar to manage its tax settings.</AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <Card>
         <CardHeader>
-          <CardTitle>Global Tax Settings</CardTitle>
+          <CardTitle>Tax Settings</CardTitle>
           <CardDescription>
-            Manage statutory tax rates, contributions, and limits for the entire application. These settings apply to all companies.
+            Manage statutory tax rates, contributions, and limits for the selected company.
             Changes saved here will persist in Supabase. Default values are from <code>src/lib/taxConfig.ts</code>. All monetary values are in RWF.
           </CardDescription>
         </CardHeader>
@@ -251,7 +309,7 @@ export default function TaxesTab() {
         </CardContent>
         <CardFooter>
           <Button type="submit">
-            <Save className="mr-2 h-4 w-4" /> Save Global Tax Settings
+            <Save className="mr-2 h-4 w-4" /> Save Tax Settings
           </Button>
         </CardFooter>
       </Card>

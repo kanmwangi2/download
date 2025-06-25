@@ -1,0 +1,243 @@
+/**
+ * UserService
+ * Service for managing user authentication and profile data following OOP principles
+ */
+import { BaseService } from './BaseService';
+
+export type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Payroll Preparer' | 'Payroll Approver' | 'Employee';
+
+export interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  role: UserRole;
+  assigned_company_ids: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string; // Added phone
+  role: UserRole;
+  assignedCompanyIds: string[];
+}
+
+export class UserService extends BaseService {
+  private readonly userProfileTableName = 'user_profiles';
+  private readonly userAvatarTableName = 'user_avatars';
+
+  /**
+   * Get current authenticated user
+   */
+  async getCurrentUser(): Promise<AuthenticatedUser | null> {
+    try {
+      // Get current user from Supabase auth
+      const { data: { user }, error: userError } = await this.supabase.auth.getUser();
+      if (userError || !user) {
+        console.warn('User not authenticated:', userError?.message);
+        return null;
+      }
+
+      // Fetch user profile
+      const { data: userProfile, error: profileError } = await this.supabase
+        .from(this.userProfileTableName)
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        this.handleError(profileError, 'fetch user profile');
+        return null;
+      }
+
+      return {
+        id: userProfile.id,
+        email: userProfile.email,
+        firstName: userProfile.first_name,
+        lastName: userProfile.last_name,
+        phone: userProfile.phone || '', // Added phone
+        role: userProfile.role,
+        assignedCompanyIds: userProfile.assigned_company_ids || [],
+      };
+    } catch (error) {
+      this.handleError(error, 'get current user');
+      return null;
+    }
+  }
+
+  /**
+   * Get user by ID
+   */
+  async getById(userId: string): Promise<User | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from(this.userProfileTableName)
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found
+        }
+        this.handleError(error, 'fetch user');
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      this.handleError(error, 'fetch user');
+      return null;
+    }
+  }
+
+  /**
+   * Update user profile details.
+   * Also updates the auth.users metadata.
+   */
+  async updateProfile(userId: string, profileData: UserProfile): Promise<UserProfile> {
+    try {
+      // Update the user_profiles table
+      const { data: profile, error: profileError } = await this.supabase
+        .from(this.userProfileTableName)
+        .update({
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
+          email: profileData.email,
+          phone: profileData.phone,
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (profileError) {
+        this.handleError(profileError, 'update user profile');
+      }
+
+      // Update the auth.users metadata
+      const { error: authError } = await this.supabase.auth.updateUser({
+        data: {
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
+        },
+      });
+
+      if (authError) {
+        this.handleError(authError, 'update auth user metadata');
+      }
+
+      return {
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        email: profile.email,
+        phone: profile.phone,
+      };
+    } catch (error) {
+      this.handleError(error, 'update user profile');
+    }
+  }
+
+  /**
+   * Update the user's password.
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        this.handleError(error, 'update password');
+      }
+    } catch (error) {
+      this.handleError(error, 'update password');
+    }
+  }
+
+  /**
+   * Get the user's avatar URL.
+   */
+  async getAvatar(userId: string): Promise<string | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from(this.userAvatarTableName)
+        .select('avatar_url')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        this.handleError(error, 'fetch user avatar');
+      }
+      return data?.avatar_url || null;
+    } catch (error) {
+      this.handleError(error, 'fetch user avatar');
+    }
+  }
+
+  /**
+   * Update or insert the user's avatar URL.
+   */
+  async updateAvatar(userId: string, avatarUrl: string): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from(this.userAvatarTableName)
+        .upsert({ user_id: userId, avatar_url: avatarUrl });
+
+      if (error) {
+        this.handleError(error, 'update user avatar');
+      }
+    } catch (error) {
+      this.handleError(error, 'update user avatar');
+    }
+  }
+
+  /**
+   * Check user permissions for payroll operations
+   */
+  static canCreatePayrollRun(userRole: UserRole): boolean {
+    return ['Primary Admin', 'App Admin', 'Company Admin', 'Payroll Preparer'].includes(userRole);
+  }
+
+  /**
+   * Check user permissions for deleting payroll runs
+   */
+  static canDeletePayrollRun(userRole: UserRole, runStatus: string): { allowed: boolean; title: string } {
+    if (userRole === 'Primary Admin' || userRole === 'App Admin') {
+      return { allowed: true, title: 'Delete Run (Admin)' };
+    }
+    
+    if (userRole === 'Company Admin' || userRole === 'Payroll Preparer') {
+      if (runStatus === 'Draft' || runStatus === 'Rejected') {
+        return { allowed: true, title: 'Delete Draft/Rejected Run' };
+      }
+      return { allowed: false, title: 'Cannot delete runs not in Draft or Rejected state' };
+    }
+    
+    if (userRole === 'Payroll Approver') {
+      return { allowed: false, title: 'Payroll Approvers cannot delete runs' };
+    }
+    
+    return { allowed: false, title: 'Permission Denied' };
+  }
+
+  /**
+   * Check if user can access a specific company
+   */
+  static canAccessCompany(user: AuthenticatedUser, companyId: string): boolean {
+    if (user.role === 'Primary Admin' || user.role === 'App Admin') {
+      return true; // Admins can access all companies
+    }
+    
+    return user.assignedCompanyIds.includes(companyId);
+  }
+}

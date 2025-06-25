@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -33,103 +32,35 @@ import {
   InfoIcon, FileSpreadsheet as FileSpreadsheetIcon, FileType as FileTypePdfIcon
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { StaffMember } from '@/lib/staffData';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useCompany } from '@/context/CompanyContext';
-import type { PaymentType } from '@/lib/paymentTypesData';
-import { DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID, initialPaymentTypesForCompanySeed } from '@/lib/paymentTypesData';
-import type { DeductionType as CompanyDeductionType } from '@/lib/deductionTypesData';
-import { initialDeductionTypesForCompanySeed as initialCompanyDeductionTypesSeed } from '@/lib/deductionTypesData';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
+import { FeedbackMessage } from '@/components/ui/feedback-alert';
 
-// Missing type definitions - these need to be created or imported from the correct modules
-interface StaffPaymentDetails {
-  [paymentTypeId: string]: number;
-}
+// OOP Services
+import { ServiceRegistry } from '@/lib/services/ServiceRegistry';
+import { PayrollCalculationService } from '@/lib/services/PayrollCalculationService';
+import { CompanyService } from '@/lib/services/CompanyService';
+import { TaxService } from '@/lib/services/TaxService';
+import { StaffService } from '@/lib/services/StaffService';
+import { StaffPaymentConfigService } from '@/lib/services/StaffPaymentConfigService';
+import { DeductionService } from '@/lib/services/DeductionService';
+import { PaymentTypeService } from '@/lib/services/PaymentTypeService';
+import { DeductionTypeService } from '@/lib/services/DeductionTypeService';
 
-interface TaxSettingsData {
-  payeBand1Limit: number;
-  payeBand2Limit: number;
-  payeBand3Limit: number;
-  payeRate1: number;
-  payeRate2: number;
-  payeRate3: number;
-  payeRate4: number;
-  pensionEmployerRate: number;
-  pensionEmployeeRate: number;
-  maternityEmployerRate: number;
-  maternityEmployeeRate: number;
-  cbhiRate: number;
-  ramaEmployerRate: number;
-  ramaEmployeeRate: number;
-}
 
-interface CompanyProfileData {
-  name: string;
-  address: string;
-  registrationNumber: string;
-  taxId: string;
-  contactEmail: string;
-  contactPhone: string;
-  currency: string;
-  isPayeActive: boolean;
-  isPensionActive: boolean;
-  isMaternityActive: boolean;
-  isCbhiActive: boolean;
-  isRamaActive: boolean;
-  primaryBusiness: string;
-}
-
-interface PayrollRunSummary {
-  id: string;
-  companyId: string;
-  month: string;
-  year: number;
-  employees: number;
-  grossSalary: number;
-  deductions: number;
-  netPay: number;
-  status: PayrollStatus;
-  rejectionReason?: string;
-}
-
-interface Deduction {
-  id: string;
-  staffId: string;
-  companyId: string;
-  deductionTypeId: string;
-  monthlyDeduction: number;
-  balance: number;
-  startDate: string;
-  deductedSoFar?: number;
-  originalAmount?: number;
-}
-
-// Use the same type for FullDeductionRecord
-type FullDeductionRecord = Deduction;
-
-// Tax configuration constants - these would normally come from @/lib/taxConfig
-const DEFAULT_PAYE_BANDS = {
-  BAND1_LIMIT: 30000,
-  BAND2_LIMIT: 100000,
-  BAND3_LIMIT: 500000,
-  RATE1: 0,
-  RATE2: 0.2,
-  RATE3: 0.3,
-  RATE4: 0.4
-};
-
-const DEFAULT_PENSION_EMPLOYER_RATE = 0.03;
-const DEFAULT_PENSION_EMPLOYEE_RATE = 0.03;
-const DEFAULT_MATERNITY_EMPLOYER_RATE = 0.003;
-const DEFAULT_MATERNITY_EMPLOYEE_RATE = 0.003;
-const DEFAULT_CBHI_RATE = 0.075;
-const DEFAULT_RAMA_EMPLOYER_RATE = 0.01;
-const DEFAULT_RAMA_EMPLOYEE_RATE = 0.01;
+// Centralized Types
+import { CompanyProfileData, GlobalApplicationCompany } from '@/lib/types/company';
+import { PayrollRunDetail, PayrollRunSummary, PayrollStatus, EmployeePayrollRecord } from '@/lib/types/payroll';
+import { StaffMember, StaffPaymentConfig, StaffPaymentDetails } from '@/lib/types/staff';
+import { TaxSettingsData } from '@/lib/types/tax';
+import { Deduction, DeductionRecord } from '@/lib/types/deductions';
+import { PaymentType } from '@/lib/types/payments';
+import { DeductionType } from '@/lib/types/deductionTypes';
 
 // Utility function that would normally come from @/lib/utils
 function cn(...classes: (string | undefined | null | boolean)[]): string {
@@ -138,82 +69,6 @@ function cn(...classes: (string | undefined | null | boolean)[]): string {
 
 // Supabase client - using the correct function name
 const createClient = getSupabaseClient;
-
-// Types
-export type PayrollStatus = "Draft" | "To Approve" | "Rejected" | "Approved";
-
-interface GlobalApplicationCompany {
-  id: string;
-  name: string;
-  tinNumber?: string;
-  address?: string;
-  email?: string;
-  phone?: string;
-  primaryBusiness?: string;
-}
-
-interface AppliedDeductionDetail {
-  deductionId: string;
-  deductionTypeId: string;
-  amountApplied: number;
-}
-
-export interface EmployeePayrollRecord {
-  employeeId: string;
-  firstName: string;
-  lastName: string;
-  staffNumber?: string;
-  rssbNumber?: string;
-  designation?: string;
-  dynamicGrossEarnings: Record<string, number>;
-  appliedDeductionAmounts: Record<string, number>;
-  grossSalary: number;
-  employerRssb: number;
-  employeeRssb: number;
-  employerPension: number;
-  employeePension: number;
-  employerMaternity: number;
-  employeeMaternity: number;
-  totalPension: number;
-  totalMaternity: number;
-  paye: number;
-  employerRama: number;
-  employeeRama: number;
-  totalRama: number;
-  netPayBeforeCbhi: number;
-  cbhiDeduction: number;
-  netPayAfterCbhi: number;
-  totalDeductionsAppliedThisRun: number;
-  finalNetPay: number;
-  appliedDeductions: AppliedDeductionDetail[];
-  companyId: string;
-}
-
-export interface PayrollRunDetail {
-  id: string; companyId: string;
-  month: string; year: number; status: PayrollStatus; rejectionReason?: string;
-  employees: EmployeePayrollRecord[];
-  totalEmployees: number;
-
-  dynamicTotalDeductionAmounts: Record<string, number>;
-  dynamicTotalGrossEarnings: Record<string, number>;
-
-  totalGrossSalary: number;
-  totalEmployerRssb: number; totalEmployeeRssb: number; totalEmployerPension: number; totalEmployeePension: number;
-  totalEmployerMaternity: number; totalEmployeeMaternity: number; totalTotalPension: number; totalTotalMaternity: number;
-  totalEmployerRama: number;
-  totalEmployeeRama: number;
-  totalTotalRama: number;
-  totalPaye: number; totalNetPayBeforeCbhi: number; totalCbhiDeduction: number; totalNetPayAfterCbhi: number;
-  totalTotalDeductionsAppliedThisRun: number;
-  totalFinalNetPay: number;
-}
-
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
 
 
 const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementType; textColor?: string }> = {
@@ -225,212 +80,6 @@ const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementTy
 
 const DIALOG_ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
-const getDefaultTaxSettings = (): TaxSettingsData => ({
-    payeBand1Limit: DEFAULT_PAYE_BANDS.BAND1_LIMIT, payeBand2Limit: DEFAULT_PAYE_BANDS.BAND2_LIMIT,
-    payeBand3Limit: DEFAULT_PAYE_BANDS.BAND3_LIMIT, payeRate1: DEFAULT_PAYE_BANDS.RATE1 * 100,
-    payeRate2: DEFAULT_PAYE_BANDS.RATE2 * 100, payeRate3: DEFAULT_PAYE_BANDS.RATE3 * 100,
-    payeRate4: DEFAULT_PAYE_BANDS.RATE4 * 100, pensionEmployerRate: DEFAULT_PENSION_EMPLOYER_RATE * 100,
-    pensionEmployeeRate: DEFAULT_PENSION_EMPLOYEE_RATE * 100, maternityEmployerRate: DEFAULT_MATERNITY_EMPLOYER_RATE * 100,
-    maternityEmployeeRate: DEFAULT_MATERNITY_EMPLOYEE_RATE * 100, cbhiRate: DEFAULT_CBHI_RATE * 100,
-    ramaEmployerRate: DEFAULT_RAMA_EMPLOYER_RATE * 100,
-    ramaEmployeeRate: DEFAULT_RAMA_EMPLOYEE_RATE * 100,
-});
-
-const calculatePAYEInternal = (grossSalary: number, taxSettings: TaxSettingsData, isPayeActive: boolean): number => {
-    if (!isPayeActive) return 0;
-    let calculatedPaye = 0;
-    const rate1 = taxSettings.payeRate1 / 100; const rate2 = taxSettings.payeRate2 / 100;
-    const rate3 = taxSettings.payeRate3 / 100; const rate4 = taxSettings.payeRate4 / 100;
-    if (grossSalary <= taxSettings.payeBand1Limit) calculatedPaye = grossSalary * rate1;
-    else {
-        calculatedPaye = taxSettings.payeBand1Limit * rate1;
-        if (grossSalary > taxSettings.payeBand1Limit) calculatedPaye += (Math.min(grossSalary, taxSettings.payeBand2Limit) - taxSettings.payeBand1Limit) * rate2;
-        if (grossSalary > taxSettings.payeBand2Limit) calculatedPaye += (Math.min(grossSalary, taxSettings.payeBand3Limit) - taxSettings.payeBand2Limit) * rate3;
-        if (grossSalary > taxSettings.payeBand3Limit) calculatedPaye += (grossSalary - taxSettings.payeBand3Limit) * rate4;
-    }
-    return Math.max(0, calculatedPaye || 0);
-};
-
-const calculateNetForGross = (
-    currentGross: number, currentGrossTransportAllowance: number, currentBasicPay: number, taxSettings: TaxSettingsData,
-    companyExemptions: Pick<CompanyProfileData, 'isPayeActive' | 'isPensionActive' | 'isMaternityActive' | 'isCbhiActive' | 'isRamaActive'>
-): number => {
-    const effectivePensionEmployeeRate = companyExemptions.isPensionActive ? taxSettings.pensionEmployeeRate / 100 : 0;
-    const effectiveMaternityEmployeeRate = companyExemptions.isMaternityActive ? taxSettings.maternityEmployeeRate / 100 : 0;
-    const effectiveRamaEmployeeRate = companyExemptions.isRamaActive ? taxSettings.ramaEmployeeRate / 100 : 0;
-    const effectiveCbhiRate = companyExemptions.isCbhiActive ? taxSettings.cbhiRate / 100 : 0;
-
-    const employeePension = (currentGross || 0) * effectivePensionEmployeeRate;
-    const grossExclTransportForMat = Math.max(0, (currentGross || 0) - (currentGrossTransportAllowance || 0));
-    const employeeMaternity = grossExclTransportForMat * effectiveMaternityEmployeeRate;
-    const employeeRama = (currentBasicPay || 0) * effectiveRamaEmployeeRate;
-    const employeeRssb = (employeePension || 0) + (employeeMaternity || 0) + (employeeRama || 0);
-
-    const paye = calculatePAYEInternal(currentGross || 0, taxSettings, companyExemptions.isPayeActive);
-    const netPayBeforeCbhi = (currentGross || 0) - ((employeeRssb || 0) + (paye || 0));
-    const cbhiDeduction = Math.max(0, netPayBeforeCbhi || 0) * effectiveCbhiRate;
-    return (netPayBeforeCbhi || 0) - (cbhiDeduction || 0);
-};
-
-function findAdditionalGrossForNetIncrement(
-    targetNetIncrement: number, accumulatedGrossSalary: number, accumulatedGrossTransport: number, accumulatedBasicPay: number,
-    isCurrentComponentTransport: boolean, isCurrentComponentBasicPay: boolean, taxSettings: TaxSettingsData,
-    companyExemptions: Pick<CompanyProfileData, 'isPayeActive' | 'isPensionActive' | 'isMaternityActive' | 'isCbhiActive' | 'isRamaActive'>
-): number {
-    if (targetNetIncrement <= 0) return 0;
-
-    let low = 0;
-    let high = targetNetIncrement * 3; 
-    let additionalGrossGuess = targetNetIncrement * 1.5; 
-    const MAX_ITERATIONS = 50;
-    const TOLERANCE = 0.50; 
-
-    const baselineNet = calculateNetForGross(accumulatedGrossSalary, accumulatedGrossTransport, accumulatedBasicPay, taxSettings, companyExemptions);
-
-    for (let i = 0; i < MAX_ITERATIONS; i++) {
-        const currentTotalGross = accumulatedGrossSalary + additionalGrossGuess;
-        const currentTotalGrossTransport = isCurrentComponentTransport ? accumulatedGrossTransport + additionalGrossGuess : accumulatedGrossTransport;
-        const currentTotalBasicPay = isCurrentComponentBasicPay ? accumulatedBasicPay + additionalGrossGuess : accumulatedBasicPay;
-
-        const newNet = calculateNetForGross(currentTotalGross, currentTotalGrossTransport, currentTotalBasicPay, taxSettings, companyExemptions);
-        const achievedNetIncrement = newNet - baselineNet;
-        
-        const difference = achievedNetIncrement - targetNetIncrement;
-
-        if (Math.abs(difference) <= TOLERANCE) {
-            return Math.max(0, additionalGrossGuess);
-        }
-
-        if (difference < 0) {
-            low = additionalGrossGuess;
-        } else {
-            high = additionalGrossGuess;
-        }
-        additionalGrossGuess = (low + high) / 2;
-    }
-    console.warn(`Gross-up for net increment ${targetNetIncrement} did not converge within ${MAX_ITERATIONS} iterations. Returning best guess: ${additionalGrossGuess}.`);
-    return Math.max(0, additionalGrossGuess);
-}
-
-const calculateMockEmployeeRecord = (
-    staffMember: StaffMember, paymentConfig: StaffPaymentDetails, activeDeductionsForStaff: FullDeductionRecord[],
-    taxSettings: TaxSettingsData, companyExemptions: Pick<CompanyProfileData, 'isPayeActive' | 'isPensionActive' | 'isMaternityActive' | 'isCbhiActive' | 'isRamaActive'>,
-    companyPaymentTypes: PaymentType[], companyDeductionTypes: CompanyDeductionType[], companyId: string
-): EmployeePayrollRecord => {
-    const dynamicCalculatedGrossEarnings: Record<string, number> = {};
-    let accumulatedGrossSalaryForAllComponents = 0; let accumulatedGrossTransportComponentSum = 0; let accumulatedBasicPayComponentSum = 0;
-    const sortedPaymentTypes = [...companyPaymentTypes].sort((a, b) => a.orderNumber - b.orderNumber);
-    for (const paymentType of sortedPaymentTypes) {
-        const componentAmountFromConfig = paymentConfig[paymentType.id] || 0;
-        let calculatedGrossAmountForThisComponent = 0;
-        const isCurrentComponentTransport = paymentType.id === DEFAULT_TRANSPORT_ALLOWANCE_ID;
-        const isCurrentComponentBasicPay = paymentType.id === DEFAULT_BASIC_PAY_ID;
-        if (paymentType.type === "Gross") { calculatedGrossAmountForThisComponent = componentAmountFromConfig; }
-        else { calculatedGrossAmountForThisComponent = findAdditionalGrossForNetIncrement(componentAmountFromConfig, accumulatedGrossSalaryForAllComponents, accumulatedGrossTransportComponentSum, accumulatedBasicPayComponentSum, isCurrentComponentTransport, isCurrentComponentBasicPay, taxSettings, companyExemptions); }
-        dynamicCalculatedGrossEarnings[paymentType.id] = calculatedGrossAmountForThisComponent;
-        accumulatedGrossSalaryForAllComponents += calculatedGrossAmountForThisComponent;
-        if (isCurrentComponentTransport) { accumulatedGrossTransportComponentSum += calculatedGrossAmountForThisComponent; }
-        if (isCurrentComponentBasicPay) { accumulatedBasicPayComponentSum += calculatedGrossAmountForThisComponent; }
-    }
-    const finalTotalGrossSalary = accumulatedGrossSalaryForAllComponents;
-    const calculatedGrossBasicPay = dynamicCalculatedGrossEarnings[DEFAULT_BASIC_PAY_ID] || 0;
-    
-    const effectivePenER = companyExemptions.isPensionActive ? taxSettings.pensionEmployerRate / 100 : 0;
-    const effectivePenEER = companyExemptions.isPensionActive ? taxSettings.pensionEmployeeRate / 100 : 0;
-    const effectiveMatER = companyExemptions.isMaternityActive ? taxSettings.maternityEmployerRate / 100 : 0;
-    const effectiveMatEER = companyExemptions.isMaternityActive ? taxSettings.maternityEmployeeRate / 100 : 0;
-    const effectiveRamaER = companyExemptions.isRamaActive ? taxSettings.ramaEmployerRate / 100 : 0;
-    const effectiveRamaEER = companyExemptions.isRamaActive ? taxSettings.ramaEmployeeRate / 100 : 0;
-    const effectiveCbhiR = companyExemptions.isCbhiActive ? taxSettings.cbhiRate / 100 : 0;
-    
-    const empRama = (calculatedGrossBasicPay || 0) * effectiveRamaER;
-    const eeRama = (calculatedGrossBasicPay || 0) * effectiveRamaEER;
-    const totRama = (empRama || 0) + (eeRama || 0);
-
-    const empPen = (finalTotalGrossSalary || 0) * effectivePenER;
-    const grossExclTransMat = Math.max(0, (finalTotalGrossSalary || 0) - (accumulatedGrossTransportComponentSum || 0));
-    const empMat = grossExclTransMat * effectiveMatER; 
-    const empRssb = (empPen || 0) + (empMat || 0) + (empRama || 0);
-    
-    const eePen = (finalTotalGrossSalary || 0) * effectivePenEER; 
-    const eeMat = grossExclTransMat * effectiveMatEER;
-    const eeRssb = (eePen || 0) + (eeMat || 0) + (eeRama || 0);
-    
-    const totPen = (empPen || 0) + (eePen || 0); 
-    const totMat = (empMat || 0) + (eeMat || 0);
-    const payeVal = calculatePAYEInternal(finalTotalGrossSalary || 0, taxSettings, companyExemptions.isPayeActive);
-    const netBCbhi = (finalTotalGrossSalary || 0) - ((eeRssb || 0) + (payeVal || 0));
-    const cbhiDed = Math.max(0, netBCbhi || 0) * effectiveCbhiR; 
-    const netACbhi = Math.max(0, (netBCbhi || 0) - (cbhiDed || 0));
-
-    const appliedDeductionAmounts: Record<string, number> = {}; const allAppliedDeductionDetailsThisRun: AppliedDeductionDetail[] = [];
-    let remainingNetPayForDeductions = netACbhi; let totalDeductionsAppliedThisRun = 0;
-    const sortedDeductionTypes = [...companyDeductionTypes].sort((a,b) => a.orderNumber - b.orderNumber);
-    for (const dedType of sortedDeductionTypes) {
-        const typeSpecificStaffDeductions = activeDeductionsForStaff.filter(d => d.deductionTypeId === dedType.id && (d.balance || 0) > 0 && d.companyId === companyId)
-                                                .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-        let cumulativeDeductedForThisType = 0;
-        for (const staffDed of typeSpecificStaffDeductions) {
-            if (remainingNetPayForDeductions <= 0) break;
-            const potentialDeductionAmount = Math.min(staffDed.monthlyDeduction || 0, staffDed.balance || 0);
-            const actualAmountApplied = Math.min(potentialDeductionAmount, remainingNetPayForDeductions);
-            if (actualAmountApplied > 0) {
-                allAppliedDeductionDetailsThisRun.push({ deductionId: staffDed.id, deductionTypeId: dedType.id, amountApplied: actualAmountApplied });
-                cumulativeDeductedForThisType += actualAmountApplied;
-                remainingNetPayForDeductions -= actualAmountApplied;
-                totalDeductionsAppliedThisRun += actualAmountApplied;
-            }
-        }
-        if (cumulativeDeductedForThisType > 0) { appliedDeductionAmounts[dedType.id] = cumulativeDeductedForThisType; }
-    }
-    const finalNet = (netACbhi || 0) - totalDeductionsAppliedThisRun;
-    return {
-        employeeId: staffMember.id, companyId, firstName: staffMember.first_name, lastName: staffMember.last_name, staffNumber: staffMember.staff_number, rssbNumber: staffMember.staff_rssb_number, designation: staffMember.designation || "N/A",
-        dynamicGrossEarnings: dynamicCalculatedGrossEarnings, 
-        appliedDeductionAmounts, 
-        grossSalary: finalTotalGrossSalary || 0, employerRssb: empRssb || 0, employeeRssb: eeRssb || 0,
-        employerPension: empPen || 0, employeePension: eePen || 0, employerMaternity: empMat || 0, employeeMaternity: eeMat || 0,
-        employerRama: empRama || 0, employeeRama: eeRama || 0,
-        totalRama: totRama || 0,
-        totalPension: totPen || 0, totalMaternity: totMat || 0, paye: payeVal || 0, netPayBeforeCbhi: netBCbhi || 0,
-        cbhiDeduction: cbhiDed || 0, netPayAfterCbhi: netACbhi || 0, totalDeductionsAppliedThisRun, finalNetPay: finalNet || 0,
-        appliedDeductions: allAppliedDeductionDetailsThisRun
-    };
-};
-
-const calculateRunTotals = (employees: EmployeePayrollRecord[], companyPaymentTypes: PaymentType[], companyDeductionTypes: CompanyDeductionType[]): Partial<PayrollRunDetail> => {
-    const dynamicTotalDeductionAmounts: Record<string, number> = {};
-    companyDeductionTypes.forEach(dt => dynamicTotalDeductionAmounts[dt.id] = 0);
-    employees.forEach(emp => {
-        Object.entries(emp.appliedDeductionAmounts).forEach(([typeId, amount]) => {
-            dynamicTotalDeductionAmounts[typeId] = (dynamicTotalDeductionAmounts[typeId] || 0) + (amount || 0);
-        });
-    });
-
-    const dynamicTotalGrossEarnings: Record<string, number> = {};
-    companyPaymentTypes.forEach(pt => {
-        dynamicTotalGrossEarnings[pt.id] = employees.reduce((sum, emp) => sum + (emp.dynamicGrossEarnings[pt.id] || 0), 0);
-    });
-
-    return {
-        totalEmployees: employees.length,
-        dynamicTotalDeductionAmounts,
-        dynamicTotalGrossEarnings,
-        totalGrossSalary: employees.reduce((s, e) => s + (e.grossSalary || 0), 0),
-        totalEmployerRssb: employees.reduce((s, e) => s + (e.employerRssb || 0), 0), totalEmployeeRssb: employees.reduce((s, e) => s + (e.employeeRssb || 0), 0),
-        totalEmployerPension: employees.reduce((s, e) => s + (e.employerPension || 0), 0), totalEmployeePension: employees.reduce((s, e) => s + (e.employeePension || 0), 0),
-        totalEmployerMaternity: employees.reduce((s, e) => s + (e.employerMaternity || 0), 0), totalEmployeeMaternity: employees.reduce((s, e) => s + (e.employeeMaternity || 0), 0),
-        totalEmployerRama: employees.reduce((s, e) => s + (e.employerRama || 0), 0), totalEmployeeRama: employees.reduce((s, e) => s + (e.employeeRama || 0), 0),
-        totalTotalRama: employees.reduce((s, e) => s + (e.totalRama || 0), 0),
-        totalTotalPension: employees.reduce((s, e) => s + (e.totalPension || 0), 0), totalTotalMaternity: employees.reduce((s, e) => s + (e.totalMaternity || 0), 0),
-        totalPaye: employees.reduce((s, e) => s + (e.paye || 0), 0),
-        totalNetPayBeforeCbhi: employees.reduce((s, e) => s + (e.netPayBeforeCbhi || 0), 0), totalCbhiDeduction: employees.reduce((s, e) => s + (e.cbhiDeduction || 0), 0),
-        totalNetPayAfterCbhi: employees.reduce((s, e) => s + (e.netPayAfterCbhi || 0), 0),
-        totalTotalDeductionsAppliedThisRun: employees.reduce((s, e) => s + (e.totalDeductionsAppliedThisRun || 0), 0),
-        totalFinalNetPay: employees.reduce((s, e) => s + (e.finalNetPay || 0), 0),
-    };
-};
-
 const formatNumberForTable = (amount?: number) => (amount === undefined || amount === null || isNaN(amount) ? "0" : Math.round(amount).toLocaleString('en-US'));
 const formatCurrencyForCard = (amount?: number) => `RWF ${formatNumberForTable(amount)}`;
 const sanitizeFilename = (name: string | null | undefined): string => { if (!name) return 'UnknownCompany'; return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, ''); };
@@ -439,26 +88,75 @@ export default function PayrollRunDetailPage() {
   const router = useRouter(); const params = useParams();
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
   const runId = typeof params.id === 'string' ? params.id : '';
-  const [currentTaxSettings, setCurrentTaxSettings] = useState<TaxSettingsData>(() => getDefaultTaxSettings());
+
+  // OOP Services
+  const serviceRegistry = ServiceRegistry.getInstance();
+  const payrollCalculationService = useMemo(() => serviceRegistry.payrollCalculationService, [serviceRegistry]);
+  const companyService = useMemo(() => serviceRegistry.companyService, [serviceRegistry]);
+  const taxService = useMemo(() => serviceRegistry.taxService, [serviceRegistry]);
+  const staffService = useMemo(() => serviceRegistry.staffService, [serviceRegistry]);
+  const staffPaymentConfigService = useMemo(() => serviceRegistry.staffPaymentConfigService, [serviceRegistry]);
+  const deductionService = useMemo(() => serviceRegistry.deductionService, [serviceRegistry]);
+  const paymentTypeService = useMemo(() => serviceRegistry.paymentTypeService, [serviceRegistry]);
+  const deductionTypeService = useMemo(() => serviceRegistry.deductionTypeService, [serviceRegistry]);
+  const payrollService = useMemo(() => serviceRegistry.payrollService, [serviceRegistry]);
+
+  const [currentTaxSettings, setCurrentTaxSettings] = useState<TaxSettingsData | null>(null);
   const [payrollRun, setPayrollRun] = useState<PayrollRunDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true); const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState(""); const [isPayrollProcessed, setIsPayrollProcessed] = useState(false);
   const [allStaff, setAllStaff] = useState<StaffMember[]>([]);
-  const [allPaymentConfigs, setAllPaymentConfigs] = useState<Record<string, StaffPaymentDetails>>({});
-  const [allDeductions, setAllDeductions] = useState<FullDeductionRecord[]>([]);
+  const [allPaymentConfigs, setAllPaymentConfigs] = useState<StaffPaymentConfig[]>([]);
+  const [allDeductions, setAllDeductions] = useState<Deduction[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
   const [companyPaymentTypes, setCompanyPaymentTypes] = useState<PaymentType[]>([]);
-  const [companyDeductionTypes, setCompanyDeductionTypes] = useState<CompanyDeductionType[]>([]);
+  const [companyDeductionTypes, setCompanyDeductionTypes] = useState<DeductionType[]>([]);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
-  const [activeDeductionTypeColumns, setActiveDeductionTypeColumns] = useState<CompanyDeductionType[]>([]);
+  const [activeDeductionTypeColumns, setActiveDeductionTypeColumns] = useState<DeductionType[]>([]);
   const [activePaymentTypeColumns, setActivePaymentTypeColumns] = useState<PaymentType[]>([]);
   const [activeStatutoryColumns, setActiveStatutoryColumns] = useState<string[]>([]);
   const [pageFeedback, setPageFeedback] = useState<FeedbackMessage | null>(null);
   const [dialogCurrentPage, setDialogCurrentPage] = useState(1);
-  const [dialogRowsPerPage, setDialogRowsPerPage] = useState(DIALOG_ROWS_PER_PAGE_OPTIONS[0]);
+  const [dialogRowsPerPage, setDialogRowsPerPage] = useState<number>(DIALOG_ROWS_PER_PAGE_OPTIONS[0] ?? 10);
   const [payrollJustProcessedMessage, setPayrollJustProcessedMessage] = useState<string | null>(null);
 
-  const tableTotals = useMemo(() => (payrollRun && payrollRun.employees ? calculateRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes) : calculateRunTotals([], companyPaymentTypes, companyDeductionTypes)), [payrollRun, companyPaymentTypes, companyDeductionTypes]);
+  const memoizedPayrollDetailColumns = useMemo(() => {
+    const baseColumns: { key: string; label: string; isNumeric: boolean; accessor: (emp: EmployeePayrollRecord) => string | number | undefined; }[] = [
+      { key: 'employeeName', label: 'Employee Name', isNumeric: false, accessor: (emp: EmployeePayrollRecord) => emp.employeeName },
+      { key: 'grossSalary', label: 'Gross Salary', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.grossSalary },
+    ];
+
+    const paymentTypeColumns = activePaymentTypeColumns.map(pt => ({
+      key: `dyn_earn_${pt.id}`,
+      label: pt.name,
+      isNumeric: true,
+      accessor: (emp: EmployeePayrollRecord) => emp.dynamicGrossEarnings?.[pt.id] || 0,
+    }));
+
+    const statutoryColumns = [
+        { key: 'totalGrossEarnings', label: 'Total Gross', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.totalGrossEarnings },
+        { key: 'employerRssb', label: 'Empl\'r RSSB', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.employerRssb },
+        { key: 'employeeRssb', label: 'Empl\'e RSSB', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.employeeRssb },
+        { key: 'paye', label: 'PAYE', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.paye },
+        { key: 'cbhiDeduction', label: 'CBHI', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.cbhiDeduction },
+    ];
+
+    const deductionTypeColumns = activeDeductionTypeColumns.map(dt => ({
+      key: `dyn_ded_${dt.id}`,
+      label: dt.name,
+      isNumeric: true,
+      accessor: (emp: EmployeePayrollRecord) => emp.appliedDeductionAmounts?.[dt.id] || 0,
+    }));
+
+    const finalColumns = [
+        { key: 'totalDeductionsAppliedThisRun', label: 'Total Deductions', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.totalDeductionsAppliedThisRun },
+        { key: 'finalNetPay', label: 'Final Net Pay', isNumeric: true, accessor: (emp: EmployeePayrollRecord) => emp.finalNetPay },
+    ];
+
+    return [...baseColumns, ...paymentTypeColumns, ...statutoryColumns, ...deductionTypeColumns, ...finalColumns];
+  }, [activePaymentTypeColumns, activeDeductionTypeColumns]);
+
+  const tableTotals = useMemo(() => (payrollRun && payrollRun.employees ? payrollCalculationService.calculatePayrollRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes) : payrollCalculationService.calculatePayrollRunTotals([], companyPaymentTypes, companyDeductionTypes)), [payrollRun, companyPaymentTypes, companyDeductionTypes, payrollCalculationService]);
 
   const paginatedDialogEmployees = useMemo(() => {
     if (!payrollRun || !payrollRun.employees) return [];
@@ -468,19 +166,21 @@ export default function PayrollRunDetailPage() {
   }, [payrollRun, dialogCurrentPage, dialogRowsPerPage]);
 
   const dialogTotalItems = payrollRun?.employees?.length || 0;
-  const dialogTotalPages = Math.ceil(dialogTotalItems / dialogRowsPerPage) || 1;
+  const dialogTotalPages = Math.ceil(dialogTotalItems / (dialogRowsPerPage || 1));
   
-  const setDynamicColumnsBasedOnRun = (run: PayrollRunDetail, cDeductionTypes: CompanyDeductionType[], cPaymentTypes: PaymentType[]) => {
+  const setDynamicColumnsBasedOnRun = (run: PayrollRunDetail, cDeductionTypes: DeductionType[], cPaymentTypes: PaymentType[]) => {
     if (!run || !run.employees || run.employees.length === 0) {
         setActiveDeductionTypeColumns([]);
         setActivePaymentTypeColumns([]);
         setActiveStatutoryColumns([]);
         return;
     }
-    const totalsForRun = calculateRunTotals(run.employees, cPaymentTypes, cDeductionTypes);    const activePayTypesInRun = cPaymentTypes
+    const totalsForRun = payrollCalculationService.calculatePayrollRunTotals(run.employees, cPaymentTypes, cDeductionTypes);
+    const activePayTypesInRun = cPaymentTypes
         .filter(pt => (totalsForRun.dynamicTotalGrossEarnings?.[pt.id] ?? 0) > 0)
         .sort((a, b) => a.orderNumber - b.orderNumber);
-    setActivePaymentTypeColumns(activePayTypesInRun);    const activeDedTypesInRun = cDeductionTypes
+    setActivePaymentTypeColumns(activePayTypesInRun);
+    const activeDedTypesInRun = cDeductionTypes
         .filter(dt => (totalsForRun.dynamicTotalDeductionAmounts?.[dt.id] ?? 0) > 0)
         .sort((a, b) => a.orderNumber - b.orderNumber);
     setActiveDeductionTypeColumns(activeDedTypesInRun);
@@ -499,6 +199,7 @@ export default function PayrollRunDetailPage() {
     });
     setActiveStatutoryColumns(activeStats);
   };
+
   useEffect(() => {
     const loadInitialData = async () => {
         if (isLoadingCompanyContext || !selectedCompanyId || !runId) {
@@ -511,47 +212,36 @@ export default function PayrollRunDetailPage() {
         try {
             const supabase = createClient();
             
-            // Load tax settings from Supabase
-            const { data: taxSettings } = await supabase
-                .from('tax_settings')
-                .select('*')
-                .limit(1)
-                .single();
-            setCurrentTaxSettings(taxSettings || getDefaultTaxSettings());
-              // Load staff data
-            const { data: staffFromDB } = await supabase
-                .from('staff_members')
-                .select('*')
-                .eq('company_id', selectedCompanyId);
-            setAllStaff(staffFromDB || []);            // Load payment configurations - convert array to Record
-            const { data: paymentConfigsFromDB } = await supabase
-                .from('staff_payment_configs')
-                .select('*')
-                .eq('company_id', selectedCompanyId);
-            const paymentConfigsRecord: Record<string, StaffPaymentDetails> = {};
-            (paymentConfigsFromDB || []).forEach((config: any) => {
-                paymentConfigsRecord[config.staff_id] = config;
-            });
-            setAllPaymentConfigs(paymentConfigsRecord);
-              // Load deductions
-            const { data: deductionsFromDB } = await supabase
-                .from('staff_deductions')
-                .select('*')
-                .eq('company_id', selectedCompanyId);
+            const [
+                taxSettings,
+                staffFromDB,
+                paymentConfigsFromDB,
+                deductionsFromDB,
+                profileFromDB,
+                paymentTypesFromDB,
+                dedTypesFromDB,
+                runDetail
+            ] = await Promise.all([
+                taxService.getTaxSettings(selectedCompanyId),
+                staffService.getStaffByCompany(selectedCompanyId),
+                staffPaymentConfigService.getByCompanyId(selectedCompanyId),
+                deductionService.getDeductionsByCompany(selectedCompanyId),
+                companyService.getCompanyProfile(selectedCompanyId),
+                paymentTypeService.getPaymentTypesByCompany(selectedCompanyId),
+                deductionTypeService.getDeductionTypesByCompany(selectedCompanyId),
+                payrollService.getPayrollRunDetail(runId, selectedCompanyId)
+            ]);
+
+            setCurrentTaxSettings(taxSettings);
+            setAllStaff(staffFromDB || []);
+            setAllPaymentConfigs(paymentConfigsFromDB || []);
             setAllDeductions(deductionsFromDB || []);
-              // Load company profile
-            const { data: profileFromDB } = await supabase
-                .from('companies')
-                .select('*')
-                .eq('id', selectedCompanyId)
-                .single();
-                
+            
             if (!profileFromDB && selectedCompanyId) {
-              const { data: globalCompanies } = await supabase
-                  .from('companies')
-                  .select('*');
+              const { data: globalCompanies } = await supabase.from('companies').select('*');
               const currentGlobalCompany = globalCompanies?.find((c: GlobalApplicationCompany) => c.id === selectedCompanyId);
               const newProfileForCompany: CompanyProfileData = {
+                id: selectedCompanyId,
                 name: selectedCompanyName || currentGlobalCompany?.name || `Company ${selectedCompanyId}`,
                 address: currentGlobalCompany?.address || "",
                 registrationNumber: "",
@@ -562,51 +252,18 @@ export default function PayrollRunDetailPage() {
                 isPayeActive: true, isPensionActive: true, isMaternityActive: true, isCbhiActive: true, isRamaActive: true,
                 primaryBusiness: currentGlobalCompany?.primaryBusiness || "",
               };
-              await supabase
-                  .from('company_profiles')
-                  .upsert({ id: selectedCompanyId, ...newProfileForCompany });
+              await companyService.updateCompanyProfile(newProfileForCompany);
               setCompanyProfile(newProfileForCompany);
             } else {
-                if (profileFromDB && typeof profileFromDB.isRamaActive === 'undefined') {
-                    profileFromDB.isRamaActive = true;
+                if (profileFromDB && typeof (profileFromDB as any).isRamaActive === 'undefined') {
+                    (profileFromDB as any).isRamaActive = true;
                 }
                 setCompanyProfile(profileFromDB || null);
             }
 
-            // Load payment types
-            let { data: paymentTypesFromDB } = await supabase
-                .from('payment_types')
-                .select('*')
-                .eq('company_id', selectedCompanyId);
-                
-            if ((!paymentTypesFromDB || paymentTypesFromDB.length === 0) && selectedCompanyId) { 
-                const defaultTypes = initialPaymentTypesForCompanySeed(selectedCompanyId); 
-                await supabase.from('payment_types').upsert(defaultTypes);
-                paymentTypesFromDB = defaultTypes; 
-            }
             setCompanyPaymentTypes((paymentTypesFromDB || []).sort((a: PaymentType, b: PaymentType) => a.orderNumber - b.orderNumber));
+            setCompanyDeductionTypes((dedTypesFromDB || []).sort((a: DeductionType, b: DeductionType) => a.orderNumber - b.orderNumber));
 
-            // Load deduction types
-            let { data: dedTypesFromDB } = await supabase
-                .from('deduction_types')
-                .select('*')
-                .eq('company_id', selectedCompanyId);
-                
-            if ((!dedTypesFromDB || dedTypesFromDB.length === 0) && selectedCompanyId) { 
-                const defaultDedTypes = initialCompanyDeductionTypesSeed(selectedCompanyId); 
-                await supabase.from('deduction_types').upsert(defaultDedTypes);
-                dedTypesFromDB = defaultDedTypes; 
-            }
-            setCompanyDeductionTypes((dedTypesFromDB || []).sort((a: CompanyDeductionType, b: CompanyDeductionType) => a.orderNumber - b.orderNumber));
-
-            // Load payroll run details
-            const { data: runDetail } = await supabase
-                .from('payroll_run_details')
-                .select('*')
-                .eq('id', runId)
-                .eq('company_id', selectedCompanyId)
-                .single();
-                
             if (runDetail) {
                 setPayrollRun(runDetail);
                 const processed = runDetail.employees && runDetail.employees.length > 0;
@@ -615,61 +272,72 @@ export default function PayrollRunDetailPage() {
                     setDynamicColumnsBasedOnRun(runDetail, dedTypesFromDB || [], paymentTypesFromDB || []);
                     setIsDetailViewOpen(true);
                 }
-            } else {                const { data: summary } = await supabase
-                    .from('payroll_runs')
-                    .select('*')
-                    .eq('id', runId)
-                    .eq('company_id', selectedCompanyId)
-                    .single();
-                    
+            } else {
+                const summary = await payrollService.getPayrollRunSummary(runId, selectedCompanyId);
                 if (summary) {
+                    const totals = payrollCalculationService.calculatePayrollRunTotals([], paymentTypesFromDB || [], dedTypesFromDB || []);
                     const newDetailShell: PayrollRunDetail = {
                         id: summary.id, companyId: selectedCompanyId, month: summary.month, year: summary.year,
-                        status: summary.status, employees: [], ...(calculateRunTotals([], paymentTypesFromDB || [], dedTypesFromDB || []) as any),
-                        rejectionReason: summary.rejectionReason
+                        status: summary.status, employees: [],
+                        ...totals
                     };
-                    setPayrollRun(newDetailShell); setIsPayrollProcessed(false);
+                    if (summary.rejectionReason) {
+                        newDetailShell.rejectionReason = summary.rejectionReason;
+                    }
+                    setPayrollRun(newDetailShell);
+                    setIsPayrollProcessed(false);
                     setPageFeedback({type: 'info', message: `Payroll run for ${summary.month} ${summary.year} is in Draft. Please 'Run Payroll' to process.`});
-                } else { router.push("/app/payroll"); }
+                } else {
+                    router.push("/app/payroll");
+                }
             }
-        } catch (error) { console.error("Error loading payroll detail page data:", error); router.push("/app/payroll"); }
+        } catch (error) {
+            console.error("Error loading payroll detail page data:", error);
+            router.push("/app/payroll");
+        }
         setIsLoading(false);
     };
     loadInitialData();
-  }, [runId, selectedCompanyId, isLoadingCompanyContext, router, selectedCompanyName]);
+  }, [runId, selectedCompanyId, isLoadingCompanyContext, router, selectedCompanyName, companyService, deductionService, deductionTypeService, paymentTypeService, payrollCalculationService, staffPaymentConfigService, staffService, taxService, payrollService]);
+
   const updatePayrollRunStateAndStorage = async (updatedRun: PayrollRunDetail) => {
     if (!selectedCompanyId) return;
     try {
-        const supabase = createClient();
-        await supabase
-            .from('payroll_run_details')
-            .upsert(updatedRun);
-            
-        const runTotalsForSummary = calculateRunTotals(updatedRun.employees, companyPaymentTypes, companyDeductionTypes);
-        const updatedSummary: PayrollRunSummary = {
-            id: updatedRun.id, companyId: selectedCompanyId, month: updatedRun.month, year: updatedRun.year, employees: updatedRun.employees.length,
+        const runTotalsForSummary = payrollCalculationService.calculatePayrollRunTotals(updatedRun.employees, companyPaymentTypes, companyDeductionTypes);
+        
+        const summaryData: PayrollRunSummary = {
+            id: updatedRun.id,
+            companyId: selectedCompanyId,
+            month: updatedRun.month,
+            year: updatedRun.year,
+            employees: updatedRun.employees.length,
             grossSalary: runTotalsForSummary.totalGrossSalary || 0,
             deductions: (runTotalsForSummary.totalEmployeeRssb || 0) + (runTotalsForSummary.totalPaye || 0) + (runTotalsForSummary.totalCbhiDeduction || 0) + (runTotalsForSummary.totalTotalDeductionsAppliedThisRun || 0),
-            netPay: runTotalsForSummary.totalFinalNetPay || 0, status: updatedRun.status, rejectionReason: updatedRun.rejectionReason,
-        };        await supabase
-            .from('payroll_runs')
-            .upsert(updatedSummary);
+            netPay: runTotalsForSummary.totalFinalNetPay || 0,
+            status: updatedRun.status,
+            rejectionReason: updatedRun.rejectionReason || "",
+        };
+
+        await payrollService.updatePayrollRun(updatedRun, summaryData);
         setPayrollRun(updatedRun);
-    } catch (error) { console.error("Error saving payroll run data:", error); throw error; }
+    } catch (error) {
+        console.error("Error saving payroll run data:", error);
+        throw error;
+    }
   };
 
- const handleRunPayroll = async () => {
+  const handleRunPayroll = async () => {
     setPageFeedback(null);
     setPayrollJustProcessedMessage(null);
     if (!selectedCompanyId) {
         setPageFeedback({type: 'error', message: "Error: No company is currently selected. Please select a company and try again."});
         return;
     }
-    if (!companyProfile) {
-        setPageFeedback({type: 'error', message: `Error: Company profile for ${selectedCompanyName || 'the selected company'} is missing or incomplete.`, details: "Please go to 'Company Settings' to configure it, especially tax exemptions, before running payroll."});
+    if (!companyProfile || !currentTaxSettings) {
+        setPageFeedback({type: 'error', message: `Error: Company profile or tax settings for ${selectedCompanyName || 'the selected company'} is missing or incomplete.`, details: "Please go to 'Company Settings' to configure it, especially tax exemptions, before running payroll."});
         return;
     }
-    const activeStaffForCompany = allStaff.filter(s => s.status === "Active" && s.company_id === selectedCompanyId);
+    const activeStaffForCompany = allStaff.filter(s => s.status === "Active" && s.companyId === selectedCompanyId);
     if (activeStaffForCompany.length === 0) {
         setPageFeedback({type: 'error', message: "Error: No active staff members found for this company.", details: "Please add or activate staff before running payroll."});
         return;
@@ -695,14 +363,34 @@ export default function PayrollRunDetailPage() {
         isRamaActive: companyProfile.isRamaActive,
     };
 
-    const processedEmployees: EmployeePayrollRecord[] = activeStaffForCompany.map(staff => {
-        const paymentConfig = allPaymentConfigs[staff.id] || {};
-        const activeDeductionsForStaff = allDeductions.filter(d => d.staffId === staff.id && (d.balance || 0) > 0 && d.companyId === selectedCompanyId);
-        return calculateMockEmployeeRecord(staff, paymentConfig, activeDeductionsForStaff, currentTaxSettings, companyExemptions, companyPaymentTypes, companyDeductionTypes, selectedCompanyId);
-    });
+    const processedEmployees: EmployeePayrollRecord[] = activeStaffForCompany.reduce((acc, staff) => {
+        const paymentConfigsForStaff = allPaymentConfigs.filter(p => p.staffId === staff.id && p.isActive);
 
-    const totals = calculateRunTotals(processedEmployees, companyPaymentTypes, companyDeductionTypes);
-    const updatedRun: PayrollRunDetail = { ...payrollRun, companyId: selectedCompanyId, employees: processedEmployees, status: "Draft", rejectionReason: undefined, ...(totals as Partial<PayrollRunDetail>) };
+        if (paymentConfigsForStaff.length > 0) {
+            const staffPaymentDetails: StaffPaymentDetails = paymentConfigsForStaff.reduce((details, config) => {
+                details[config.paymentTypeId] = config.amount;
+                return details;
+            }, {} as StaffPaymentDetails);
+
+            const activeDeductionsForStaff = allDeductions.filter(d => d.staffId === staff.id && d.balance > 0);
+            const employeeRecord = payrollCalculationService.calculateEmployeePayrollRecord(staff, staffPaymentDetails, activeDeductionsForStaff, currentTaxSettings, companyExemptions, companyPaymentTypes, companyDeductionTypes, selectedCompanyId);
+            acc.push(employeeRecord);
+        } else {
+            console.warn(`Skipping staff member ${staff.id} (${staff.firstName} ${staff.lastName}) from payroll run as they have no active payment configuration.`);
+        }
+        return acc;
+    }, [] as EmployeePayrollRecord[]);
+
+    const totals = payrollCalculationService.calculatePayrollRunTotals(processedEmployees, companyPaymentTypes, companyDeductionTypes);
+    const updatedRun: PayrollRunDetail = {
+        id: payrollRun.id,
+        companyId: selectedCompanyId,
+        month: payrollRun.month,
+        year: payrollRun.year,
+        employees: processedEmployees,
+        status: "Draft",
+        ...totals
+    };
     setPayrollRun(updatedRun);
     setIsPayrollProcessed(true);
     setPayrollJustProcessedMessage(`Payroll for ${payrollRun.month} ${payrollRun.year} has been successfully processed.`);
@@ -721,16 +409,23 @@ export default function PayrollRunDetailPage() {
         setPageFeedback({type: 'error', message: "Error: Payroll must be processed before saving as draft."}); 
         return; 
     }
-    const draftToSave: PayrollRunDetail = { ...payrollRun, status: "Draft", rejectionReason: undefined, companyId: selectedCompanyId };
+    const draftToSave: PayrollRunDetail = {
+        id: payrollRun.id,
+        companyId: selectedCompanyId,
+        month: payrollRun.month,
+        year: payrollRun.year,
+        status: "Draft",
+        employees: payrollRun.employees,
+        ...payrollCalculationService.calculatePayrollRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes)
+    };
     try { 
         await updatePayrollRunStateAndStorage(draftToSave); 
-        // TODO: Add audit logging to Supabase
-        // await logAuditEvent("Payroll Draft Saved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} saved as Draft.`, selectedCompanyId, selectedCompanyName);
         setPageFeedback({type: 'success', message: "Payroll draft saved successfully."}); 
     } catch (error) { 
         setPageFeedback({type: 'error', message: "Error: Could not save payroll draft.", details: (error as Error).message}); 
     }
   };
+
  const handleSendForApproval = async () => {
     setPageFeedback(null);
     setPayrollJustProcessedMessage(null);
@@ -738,56 +433,61 @@ export default function PayrollRunDetailPage() {
         setPageFeedback({type: 'error', message: "Error: Payroll must be processed before sending for approval."}); 
         return; 
     }
-    const draftData: PayrollRunDetail = { ...payrollRun, status: "Draft", rejectionReason: undefined, companyId: selectedCompanyId };
+    const baseData: PayrollRunDetail = {
+        id: payrollRun.id,
+        companyId: selectedCompanyId,
+        month: payrollRun.month,
+        year: payrollRun.year,
+        status: "Draft",
+        employees: payrollRun.employees,
+        ...payrollCalculationService.calculatePayrollRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes)
+    };
     try { 
-        await updatePayrollRunStateAndStorage(draftData); 
-        const forApprovalData: PayrollRunDetail = { ...draftData, status: "To Approve" as PayrollStatus }; 
+        await updatePayrollRunStateAndStorage(baseData); 
+        const forApprovalData: PayrollRunDetail = { ...baseData, status: "To Approve" as PayrollStatus }; 
         await updatePayrollRunStateAndStorage(forApprovalData); 
-        // TODO: Add audit logging to Supabase
-        // await logAuditEvent("Payroll Sent for Approval", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} sent for approval.`, selectedCompanyId, selectedCompanyName);
         setPageFeedback({type: 'success', message: "Payroll sent for approval successfully."}); 
     } catch (error) { 
         setPageFeedback({type: 'error', message: "Error: Could not send payroll for approval.", details: (error as Error).message}); 
     }
-  };  const handleApproveRun = async () => {
+  };
+
+  const handleApproveRun = async () => {
     setPageFeedback(null);
     setPayrollJustProcessedMessage(null);
     if (!payrollRun || !selectedCompanyId) return;
-    const updatedRunData = { ...payrollRun, status: "Approved" as PayrollStatus, rejectionReason: undefined, companyId: selectedCompanyId };
+    const updatedRunData: PayrollRunDetail = {
+        id: payrollRun.id,
+        companyId: selectedCompanyId,
+        month: payrollRun.month,
+        year: payrollRun.year,
+        status: "Approved",
+        employees: payrollRun.employees,
+        ...payrollCalculationService.calculatePayrollRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes)
+    };
     try {
       await updatePayrollRunStateAndStorage(updatedRunData);
-      // TODO: Add audit logging to Supabase
-      // await logAuditEvent("Payroll Approved", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} approved.`, selectedCompanyId, selectedCompanyName);
       setPageFeedback({type: 'success', message: "Payroll approved successfully."});
       
-      const supabase = createClient();
-      const { data: approvedRunDetails } = await supabase
-          .from('payroll_run_details')
-          .select('*')
-          .eq('id', updatedRunData.id)
-          .eq('company_id', selectedCompanyId)
-          .single();
+      const approvedRunDetails = await payrollService.getPayrollRunDetail(updatedRunData.id, selectedCompanyId);
           
       if (!approvedRunDetails || !approvedRunDetails.employees) { 
           console.warn("Could not fetch approved run details for deduction update."); 
           setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + " Warning: Could not fetch approved run details for deduction update."} : {type: 'info', message: 'Warning', details: 'Could not fetch approved run details for deduction update.'});
           return; 
       }
-        const { data: allCurrentDeductionRecords } = await supabase
-          .from('staff_deductions')
-          .select('*')
-          .eq('company_id', selectedCompanyId);
-          
-      const deductionsToActuallyUpdateInDB: FullDeductionRecord[] = []; let deductionsUpdatedCount = 0;
+      
+      const deductionsToActuallyUpdateInDB: Deduction[] = []; let deductionsUpdatedCount = 0;
       for (const empRecord of approvedRunDetails.employees) {
         if (empRecord.appliedDeductions && empRecord.appliedDeductions.length > 0) {
-            for (const appliedDed of empRecord.appliedDeductions) {                const dedRecordToUpdate = (allCurrentDeductionRecords || []).find((d: FullDeductionRecord) => d.id === appliedDed.deductionId && d.companyId === selectedCompanyId);
+            for (const appliedDed of empRecord.appliedDeductions) {
+                const dedRecordToUpdate = allDeductions.find(d => d.id === appliedDed.deductionId);
                 if (dedRecordToUpdate) {
                     let recordInBatch = deductionsToActuallyUpdateInDB.find(d => d.id === dedRecordToUpdate.id);
                     if (!recordInBatch) { 
                         recordInBatch = { ...dedRecordToUpdate };
-                        deductionsToActuallyUpdateInDB.push(recordInBatch as FullDeductionRecord);
-                    }                    // At this point recordInBatch is guaranteed to exist, so we can safely update it
+                        deductionsToActuallyUpdateInDB.push(recordInBatch);
+                    }
                     if (recordInBatch) {
                         recordInBatch.deductedSoFar = (recordInBatch.deductedSoFar || 0) + (appliedDed.amountApplied || 0);
                         recordInBatch.balance = Math.max(0, (recordInBatch.originalAmount || 0) - (recordInBatch.deductedSoFar || 0));
@@ -798,7 +498,7 @@ export default function PayrollRunDetailPage() {
         }
       }
       if (deductionsToActuallyUpdateInDB.length > 0) {
-        await supabase.from('staff_deductions').upsert(deductionsToActuallyUpdateInDB);
+        await deductionService.updateDeductionRecords(deductionsToActuallyUpdateInDB);
         setAllDeductions(prevDeds => { const updatedMap = new Map(prevDeds.map(d => [d.id, d])); deductionsToActuallyUpdateInDB.forEach(updated => updatedMap.set(updated.id, updated)); return Array.from(updatedMap.values()); });
         setPageFeedback(prev => prev ? {...prev, details: (prev?.details || "") + ` ${deductionsUpdatedCount} deduction record(s) reconciled.`} : {type: 'info', message: 'Success', details: `${deductionsUpdatedCount} deduction record(s) reconciled.`});
       }
@@ -806,214 +506,128 @@ export default function PayrollRunDetailPage() {
         setPageFeedback({type: 'error', message: "Error: Could not approve payroll.", details: (error as Error).message}); 
     }
   };
+
   const handleOpenRejectDialog = () => { setPageFeedback(null); setPayrollJustProcessedMessage(null); setRejectionReason(payrollRun?.rejectionReason || ""); setIsRejectDialogOpen(true); };
+  
   const handleConfirmRejectRun = async () => { 
       setPageFeedback(null);
       setPayrollJustProcessedMessage(null);
-      if (payrollRun && rejectionReason.trim() !== "" && selectedCompanyId) { 
-          const updatedRun = { ...payrollRun, status: "Rejected" as PayrollStatus, rejectionReason: rejectionReason.trim(), companyId: selectedCompanyId }; 
+      if (payrollRun && rejectionReason.trim() !== "" && selectedCompanyId) {
+          const updatedRun: PayrollRunDetail = {
+              id: payrollRun.id,
+              companyId: selectedCompanyId,
+              month: payrollRun.month,
+              year: payrollRun.year,
+              status: "Rejected",
+              rejectionReason: rejectionReason,
+              employees: payrollRun.employees,
+              ...payrollCalculationService.calculatePayrollRunTotals(payrollRun.employees, companyPaymentTypes, companyDeductionTypes)
+          };
           try { 
               await updatePayrollRunStateAndStorage(updatedRun); 
-              // TODO: Add audit logging to Supabase
-              // await logAuditEvent("Payroll Rejected", `Payroll run ID ${payrollRun.id} for ${payrollRun.month} ${payrollRun.year} rejected. Reason: ${rejectionReason.trim()}`, selectedCompanyId, selectedCompanyName);
-              setIsPayrollProcessed(true); 
-              setPageFeedback({type: 'success', message: "Payroll rejected successfully."}); 
               setIsRejectDialogOpen(false); 
-          } catch (error) {
-              setPageFeedback({type: 'error', message:"Error: Could not reject payroll.", details: (error as Error).message});
-          } 
-      } else { 
-          setPageFeedback({type: 'error', message: "Error: Rejection reason is required."}); 
-      } 
+              setRejectionReason(""); 
+              setPageFeedback({type: 'success', message: "Payroll run rejected successfully."}); 
+          } catch (error) { 
+              setPageFeedback({type: 'error', message: "Error: Could not reject payroll run.", details: (error as Error).message}); 
+          }
+      } else {
+          setPageFeedback({type: 'error', message: "Rejection reason cannot be empty."});
+      }
   };
+
   const handleEditRun = () => {
-    setPageFeedback(null);
+    if (!payrollRun) return;
+    setIsPayrollProcessed(false);
     setPayrollJustProcessedMessage(null);
-    if (payrollRun && selectedCompanyId) {
-        if (payrollRun.status === "Draft" || payrollRun.status === "Rejected") {
-            setIsPayrollProcessed(false); setIsDetailViewOpen(false); setActiveDeductionTypeColumns([]); setActivePaymentTypeColumns([]);
-            setPageFeedback({type: 'info', message: "Payroll run is now editable. Please re-run payroll after making changes."});
-            const runToEdit: PayrollRunDetail = { ...payrollRun, companyId: selectedCompanyId, employees: [], ...(calculateRunTotals([], companyPaymentTypes, companyDeductionTypes) as Partial<PayrollRunDetail>) };
-            setPayrollRun(runToEdit);
-        } else { 
-            setPageFeedback({type: 'error', message: "Error: Cannot edit run with status: " + payrollRun.status}); 
-        }
-    }
+    setPageFeedback({ type: 'info', message: 'Payroll run has been reset. You can now make changes and re-run the payroll.' });
+    const resetRun = {
+        ...payrollRun,
+        employees: [],
+        ...payrollCalculationService.calculatePayrollRunTotals([], companyPaymentTypes, companyDeductionTypes)
+    };
+    setPayrollRun(resetRun);
+    setIsDetailViewOpen(false);
   };
-type PayrollColumnDefinition = {
-  key: string;
-  label: string;
-  isNumeric: boolean;
-  isIdLike?: boolean;
-  accessor?: (emp: EmployeePayrollRecord) => any;
-};
 
-  const memoizedPayrollDetailColumns = useMemo((): PayrollColumnDefinition[] => {
-    const baseColumns: PayrollColumnDefinition[] = [
-      { key: 'firstName', label: 'First Name', isNumeric: false }, { key: 'lastName', label: 'Last Name', isNumeric: false },
-      { key: 'staffNumber', label: 'Staff No.', isNumeric: false, isIdLike: true }, { key: 'rssbNumber', label: 'RSSB No.', isNumeric: false, isIdLike: true }
-    ];
-
-    const dynamicEarningsColumns: PayrollColumnDefinition[] = activePaymentTypeColumns.map(pt => ({
-      key: `dyn_earn_${pt.id}`, label: `${pt.name}`,
-      accessor: (emp: EmployeePayrollRecord) => emp.dynamicGrossEarnings?.[pt.id] || 0,
-      isNumeric: true
-    }));
-    
-    const statutoryColumnsBeforeDeductions: PayrollColumnDefinition[] = [
-        { key: 'grossSalary', label: 'Total Gross', isNumeric: true }, 
-        { key: 'employerRssb', label: 'Empr. RSSB', isNumeric: true },
-        { key: 'employeeRssb', label: 'Empe. RSSB', isNumeric: true }, 
-        { key: 'employerPension', label: 'Empr. Pension', isNumeric: true },
-        { key: 'employeePension', label: 'Empe. Pension', isNumeric: true }, 
-        { key: 'employerMaternity', label: 'Empr. Maternity', isNumeric: true },
-        { key: 'employeeMaternity', label: 'Empe. Maternity', isNumeric: true }, 
-        { key: 'employerRama', label: 'Empr. RAMA', isNumeric: true },
-        { key: 'employeeRama', label: 'Empe. RAMA', isNumeric: true },
-        { key: 'totalRama', label: 'Total RAMA', isNumeric: true },
-        { key: 'totalPension', label: 'Total Pension', isNumeric: true }, 
-        { key: 'totalMaternity', label: 'Total Maternity', isNumeric: true }, 
-        { key: 'paye', label: 'PAYE', isNumeric: true },
-        { key: 'netPayBeforeCbhi', label: 'Net (Bef. CBHI)', isNumeric: true }, 
-        { key: 'cbhiDeduction', label: 'CBHI Ded.', isNumeric: true },
-        { key: 'netPayAfterCbhi', label: 'Net (Aft. CBHI)', isNumeric: true },
-    ];
-    
-    const statutoryColumnsAfterDeductions: PayrollColumnDefinition[] = [
-        { key: 'totalDeductionsAppliedThisRun', label: 'Total Applied Ded.', isNumeric: true },
-        { key: 'finalNetPay', label: 'Final Net Pay', isNumeric: true },
-    ];
-
-    const visibleStatutoryBefore = statutoryColumnsBeforeDeductions.filter(col => activeStatutoryColumns.includes(col.key));
-    const visibleStatutoryAfter = statutoryColumnsAfterDeductions.filter(col => activeStatutoryColumns.includes(col.key));
-
-    const dynamicDeductionCols: PayrollColumnDefinition[] = activeDeductionTypeColumns.map(dt => ({
-      key: `dyn_ded_${dt.id}`, label: dt.name,
-      accessor: (emp: EmployeePayrollRecord) => emp.appliedDeductionAmounts?.[dt.id] || 0,
-      isNumeric: true
-    }));
-
-    return [...baseColumns, ...dynamicEarningsColumns, ...visibleStatutoryBefore, ...dynamicDeductionCols, ...visibleStatutoryAfter];
-  }, [activePaymentTypeColumns, activeDeductionTypeColumns, activeStatutoryColumns]);
-
-
-  const exportPayrollDetails = (fileType: "csv" | "xlsx" | "pdf") => {
-    setPageFeedback(null);
-    setPayrollJustProcessedMessage(null);
-    if (!payrollRun || !isPayrollProcessed || payrollRun.employees.length === 0 || !selectedCompanyId) { 
-        setPageFeedback({type: 'error', message: "Error: Payroll must be processed before exporting."}); 
-        return; 
+  const exportPayrollDetails = (format: 'csv' | 'xlsx' | 'pdf') => {
+    if (!payrollRun || !payrollRun.employees || payrollRun.employees.length === 0) {
+        setPageFeedback({ type: 'error', message: 'No payroll data available to export.' });
+        return;
     }
-    const data = payrollRun.employees;
-    const companyNameForFile = companyProfile?.name ? sanitizeFilename(companyProfile.name) : (selectedCompanyName ? sanitizeFilename(selectedCompanyName) : 'UnknownCompany');
-    const fileName = `${companyNameForFile}_payroll_run_${payrollRun.id}_details_export.${fileType}`;
-    const exportColumns = memoizedPayrollDetailColumns;
-    const headers = exportColumns.map(col => col.label);
 
-    const dataForExport = data.map(emp => {
-        const row: Record<string, string | number> = {};
-        exportColumns.forEach(col => {
-            const value = typeof col.accessor === 'function' ? col.accessor(emp) : emp[col.key as keyof Omit<EmployeePayrollRecord, 'appliedDeductions' | 'companyId' | 'dynamicGrossEarnings' | 'appliedDeductionAmounts'>];
-            if (col.isIdLike) {
-                row[col.label] = String(value || '');
-            } else if (col.isNumeric) {
-                row[col.label] = Math.round((value as number) || 0);
-            } else {
-                row[col.label] = String(value || '');
-            }
+    const companyName = sanitizeFilename(selectedCompanyName);
+    const period = `${payrollRun.year}-${payrollRun.month}`;
+    const filename = `Payroll_Details_${companyName}_${period}`;
+
+    const columns = memoizedPayrollDetailColumns;
+    const data = payrollRun.employees.map(emp => {
+        const row: { [key:string]: any } = {};
+        columns.forEach(col => {
+            row[col.label] = col.accessor(emp);
         });
         return row;
     });
 
-    if (fileType === "csv") {
-        const csvData = dataForExport.map(row => {
-            const newRow: Record<string, string> = {};
-            headers.forEach(header => {
-                const colDef = exportColumns.find(c => c.label === header);
-                let cellValue = String(row[header] || (colDef?.isNumeric ? '0' : ''));
-                if (colDef?.isIdLike && /^\d+$/.test(cellValue) && cellValue.length > 0) {
-                    cellValue = `'${cellValue}`;
-                }
-                newRow[header] = cellValue;
-            });
-            return newRow;
-        });
-        const csvString = Papa.unparse(csvData, { header: true, columns: headers });
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a'); const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url); link.setAttribute('download', fileName);
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        setPageFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
-    } else if (fileType === "xlsx") {
-        const xlsxData = dataForExport.map(row => {
-            const newRow: Record<string, string|number>={};
-            headers.forEach(h => {
-                const colDef = exportColumns.find(c => c.label === h);
-                if (colDef?.isIdLike) newRow[h] = String(row[h] || '');
-                else newRow[h] = (typeof row[h] === 'number' ? row[h] : String(row[h] || ''));
-            });
-            return newRow;
-        });
-        const worksheet = XLSX.utils.json_to_sheet(xlsxData, {header: headers, skipHeader: false});
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Details");
-        XLSX.writeFile(workbook, fileName);
-        setPageFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
-    } else if (fileType === "pdf") {
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-        const margin = 36; const pageWidth = doc.internal.pageSize.getWidth();
-        doc.setFontSize(14).setFont('helvetica', 'bold');
-        doc.text(companyProfile?.name || "Company", margin, margin);
-        doc.setFontSize(10).setFont('helvetica', 'normal');
-        if(companyProfile?.address) doc.text(companyProfile.address, margin, margin + 12);
-        if(companyProfile?.taxId) doc.text(`TIN: ${companyProfile.taxId}`, margin, margin + 24);
-        doc.setFontSize(12).setFont('helvetica', 'bold');
-        doc.text(`Payroll Run: ${payrollRun.id} (${payrollRun.month} ${payrollRun.year})`, margin, margin + 40);
-      
-        const columnStylesForPdf: {[key: number]: any} = {};
-        exportColumns.forEach((col, index) => {
-            columnStylesForPdf[index] = { halign: col.isNumeric ? 'right' : 'left' };
-        });
-
-        const bodyData = dataForExport.map(empRow =>
-            exportColumns.map(col =>
-                col.isNumeric ? formatNumberForTable(empRow[col.label] as number) : String(empRow[col.label] || '')
-            )
-        );
-
-        const baseColumnsForTotals = exportColumns.filter(c => !c.isNumeric);
-        const totalsLabelColSpan = baseColumnsForTotals.length || 1;
-        const footerRowData: any[] = [{ content: 'Totals', colSpan: totalsLabelColSpan, styles: { fontStyle: 'bold', halign: 'right' } }];
-
-        exportColumns.slice(totalsLabelColSpan).forEach(col => {
+    const totalsRow: { [key: string]: any } = {};
+    columns.forEach((col, index) => {
+        if (index === 0) {
+            totalsRow[col.label] = 'Grand Totals';
+        } else if (col.isNumeric) {
             let totalValue;
-            if (col.key.startsWith('dyn_earn_')) { const paymentTypeId = col.key.substring(9); totalValue = (tableTotals as any).dynamicTotalGrossEarnings?.[paymentTypeId] || 0; }
-            else if (col.key.startsWith('dyn_ded_')) { const deductionTypeId = col.key.substring(8); totalValue = (tableTotals as any).dynamicTotalDeductionAmounts?.[deductionTypeId] || 0; }
+            if (col.key.startsWith('dyn_earn_')) { const paymentTypeId = col.key.substring(9); totalValue = tableTotals.dynamicTotalGrossEarnings?.[paymentTypeId] || 0; }
+            else if (col.key.startsWith('dyn_ded_')) { const deductionTypeId = col.key.substring(8); totalValue = tableTotals.dynamicTotalDeductionAmounts?.[deductionTypeId] || 0; }
             else if (col.key === 'totalDeductionsAppliedThisRun') { totalValue = tableTotals.totalTotalDeductionsAppliedThisRun; }
             else { const totalKey = `total${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`; totalValue = (tableTotals as any)[totalKey] ?? 0; }
-            footerRowData.push({ content: formatNumberForTable(totalValue), styles: { halign: 'right', fontStyle: 'bold' } });
-        });
+            totalsRow[col.label] = totalValue;
+        } else {
+            totalsRow[col.label] = '';
+        }
+    });
+    data.push(totalsRow);
+
+    if (format === 'csv') {
+        const csv = Papa.unparse(data);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `${filename}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else if (format === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll Details');
+        XLSX.writeFile(workbook, `${filename}.xlsx`);
+    } else if (format === 'pdf') {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        const head = [columns.map(c => c.label)];
+        const body = data.map(row => columns.map(c => {
+            const value = row[c.label];
+            if (c.isNumeric) {
+                return typeof value === 'number' ? formatNumberForTable(value) : String(value || '');
+            }
+            return String(value || '');
+        }));
 
         (doc as any).autoTable({
-            head: [headers], body: bodyData, foot: [footerRowData], startY: margin + 55,
-            styles: { fontSize: 5, cellPadding: 1, overflow: 'linebreak' },
-            headStyles: { fillColor: [102, 126, 234], fontSize: 6, textColor: [255,255,255] },
-            footStyles: { fillColor: [230, 230, 230], fontSize: 6, textColor: [0,0,0], fontStyle: 'bold'},
-            columnStyles: columnStylesForPdf, margin: { left: margin, right: margin, bottom: margin + 20 },
-            didDrawPage: (data: any) => {
-                const str = "Page " + doc.getNumberOfPages();
-                const pageHeightInner = doc.internal.pageSize.getHeight();
-                doc.setFontSize(8);
-                doc.text(str, data.settings.margin.left, pageHeightInner - (margin / 2));
-                doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth - data.settings.margin.right, pageHeightInner - (margin / 2), { align: 'right' });
-                doc.setFont('helvetica', 'italic').setTextColor(150);
-                doc.text("Powered by Cheetah Payroll", pageWidth / 2, pageHeightInner - (margin / 2) + 10, { align: 'center' });
-                doc.setFont('helvetica', 'normal').setTextColor(0);
-            }
+            head: head,
+            body: body,
+            startY: 20,
+            styles: { fontSize: 7 },
+            headStyles: { fillColor: [22, 163, 74] },
+            didDrawPage: function (data: any) {
+                doc.setFontSize(16);
+                doc.setTextColor(40);
+                doc.text('Payroll Details', data.settings.margin.left, 15);
+                doc.setFontSize(10);
+                if(payrollRun) {
+                  doc.text(`${selectedCompanyName} - ${payrollRun.month} ${payrollRun.year}`, data.settings.margin.left, 10);
+                }
+            },
         });
-        doc.save(fileName);
-        setPageFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
+        doc.save(`${filename}.pdf`);
     }
   };
 
@@ -1109,22 +723,15 @@ type PayrollColumnDefinition = {
                         {paginatedDialogEmployees.map((emp) => (
                             <TableRow key={emp.employeeId}>
                             {memoizedPayrollDetailColumns.map(col => {
-                                const value = typeof col.accessor === 'function' ? col.accessor(emp) : emp[col.key as keyof Omit<EmployeePayrollRecord, 'appliedDeductions' | 'companyId' | 'dynamicGrossEarnings' | 'appliedDeductionAmounts'>];
-                                const cellClassName = cn(
-                                col.isNumeric ? "text-right" : "text-left", "whitespace-nowrap min-w-[120px]",
-                                (col.key === 'grossSalary' || col.key === 'finalNetPay') && col.isNumeric ? "font-semibold" : ""
-                                );
+                                const value = col.accessor(emp);
                                 return (
-                                <TableCell key={`${emp.employeeId}-${col.key}`} className={cellClassName}>
-                                    {col.isNumeric ? formatNumberForTable(value as number) : String(value || '')}
-                                </TableCell>
+                                    <TableCell key={`${emp.employeeId}-${col.key}`} className={cn("whitespace-nowrap min-w-[120px]", col.isNumeric ? "text-right" : "text-left")}>
+                                        {col.isNumeric ? formatNumberForTable(value as number) : String(value || '')}
+                                    </TableCell>
                                 );
                             })}
                             </TableRow>
                         ))}
-                        {paginatedDialogEmployees.length === 0 && (
-                            <TableRow><TableCell colSpan={memoizedPayrollDetailColumns.length} className="text-center h-24">No employees on this page.</TableCell></TableRow>
-                        )}
                         </TableBody>
                         {payrollRun.employees.length > 0 && (
                         <ShadTableFooter>
@@ -1151,21 +758,41 @@ type PayrollColumnDefinition = {
                         Page {dialogCurrentPage} of {dialogTotalPages} ({dialogTotalItems} total employees)
                         </div>
                         <div className="flex items-center space-x-6 lg:space-x-8">
-                        <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium">Rows per page</p>
-                            <Select value={`${dialogRowsPerPage}`} onValueChange={(value) => {setDialogRowsPerPage(Number(value)); setDialogCurrentPage(1);}}>
-                            <SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={`${dialogRowsPerPage}`} /></SelectTrigger>
-                            <SelectContent side="top">
-                                {DIALOG_ROWS_PER_PAGE_OPTIONS.map((pageSize) => (<SelectItem key={`dialog-payroll-${pageSize}`} value={`${pageSize}`}>{pageSize}</SelectItem>))}
-                            </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => setDialogCurrentPage(1)} disabled={dialogCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                            <Button variant="outline" className="h-8 w-8 p-0" onClick={() => setDialogCurrentPage(prev => prev - 1)} disabled={dialogCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
-                            <Button variant="outline" className="h-8 w-8 p-0" onClick={() => setDialogCurrentPage(prev => prev + 1)} disabled={dialogCurrentPage === dialogTotalPages}><ChevronRight className="h-4 w-4" /></Button>
-                            <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => setDialogCurrentPage(dialogTotalPages)} disabled={dialogCurrentPage === dialogTotalPages}><ChevronsRight className="h-4 w-4" /></Button>
-                        </div>
+                            <div className="flex items-center space-x-2">
+                                <p className="text-sm font-medium">Rows per page</p>
+                                <Select
+                                    value={`${dialogRowsPerPage}`}
+                                    onValueChange={(value) => {
+                                        setDialogRowsPerPage(Number(value));
+                                        setDialogCurrentPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-[70px]">
+                                        <SelectValue placeholder={`${dialogRowsPerPage}`} />
+                                    </SelectTrigger>
+                                    <SelectContent side="top">
+                                        {DIALOG_ROWS_PER_PAGE_OPTIONS.map((pageSize) => (
+                                            <SelectItem key={`dialog-payroll-${pageSize}`} value={`${pageSize}`}>
+                                                {pageSize}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => setDialogCurrentPage(1)} disabled={dialogCurrentPage === 1}>
+                                    <ChevronsLeft className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" className="h-8 w-8 p-0" onClick={() => setDialogCurrentPage(prev => prev - 1)} disabled={dialogCurrentPage === 1}>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" className="h-8 w-8 p-0" onClick={() => setDialogCurrentPage(prev => prev + 1)} disabled={dialogCurrentPage === dialogTotalPages}>
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => setDialogCurrentPage(dialogTotalPages)} disabled={dialogCurrentPage === dialogTotalPages}>
+                                    <ChevronsRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>

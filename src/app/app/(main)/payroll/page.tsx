@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Eye, CheckCircle, XCircle, AlertTriangle, Hourglass, Search, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, Loader2, Info, CheckCircle2 } from "lucide-react";
+import { PlusCircle, Eye, CheckCircle, XCircle, AlertTriangle, Hourglass, Search, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -41,47 +41,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-
-import type { UserRole } from '@/lib/userData';
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from '@/context/CompanyContext';
-import { cn } from '@/lib/utils';
-import { createClient } from '@supabase/supabase-js';
+import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
-// Supabase client setup
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Import OOP services and utilities
+import {
+  getServices,
+  PayrollUtils,
+  PayrollValidation,
+  PayrollPermissions,
+  type PayrollRunSummary,
+  type PayrollStatus,
+  type AuthenticatedUser
+} from '@/lib/oop';
 
+const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
-export type PayrollStatus = "Draft" | "To Approve" | "Rejected" | "Approved";
-
-export interface PayrollRunSummary {
-  id: string;
-  companyId: string;
-  month: string;
-  year: number;
-  employees: number;
-  grossSalary: number;
-  deductions: number;
-  netPay: number;
-  status: PayrollStatus;
-  rejectionReason?: string;
-}
-
-interface CurrentUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: UserRole;
-  assignedCompanyIds: string[];
-}
-
+// Status configuration with icon mapping
 const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementType; textColor?: string }> = {
   Draft: { color: "bg-gray-500 hover:bg-gray-600", icon: Hourglass, textColor: "text-white" },
   "To Approve": { color: "bg-blue-500 hover:bg-blue-600", icon: AlertTriangle, textColor: "text-white" },
@@ -89,128 +69,88 @@ const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementTy
   Approved: { color: "bg-green-500 hover:bg-green-600", icon: CheckCircle, textColor: "text-white" },
 };
 
-
-const formatNumberForTable = (amount?: number): string => {
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return "0";
-  }
-  return Math.round(amount).toLocaleString('en-US');
-};
-
-const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
-
-const monthNameToNumberString = (monthName: string): string => {
-    const date = new Date(Date.parse(monthName +" 1, 2000"));
-    const monthNumber = date.getMonth() + 1;
-    return monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
-};
-
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
-
 export default function PayrollPage() {
   const router = useRouter();
   const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
+  
+  // State management
   const [allPayrollRunsData, setAllPayrollRunsData] = useState<PayrollRunSummary[]>([]);
-  const [isCreateRunDialogOpen, setIsCreateRunDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
+  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0] || 10);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // Dialog states
+  const [isCreateRunDialogOpen, setIsCreateRunDialogOpen] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isDeleteDialogForItemOpen, setIsDeleteDialogForItemOpen] = useState(false);
   const [runToDeleteSingle, setRunToDeleteSingle] = useState<PayrollRunSummary | null>(null);
+  
+  // Feedback states
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [createRunDialogFeedback, setCreateRunDialogFeedback] = useState<FeedbackMessage | null>(null);
+  const [deleteRunDialogFeedback, setDeleteRunDialogFeedback] = useState<FeedbackMessage | null>(null);
+  const [bulkDeleteRunsDialogFeedback, setBulkDeleteRunsDialogFeedback] = useState<FeedbackMessage | null>(null);
 
-
+  // Load data effect
   useEffect(() => {
-    const loadSummaries = async () => {
-      if (isLoadingCompanyContext || !selectedCompanyId || typeof window === 'undefined') {
-         if (!isLoadingCompanyContext && !selectedCompanyId) {
-            setAllPayrollRunsData([]);
-            setIsLoaded(true);
+    const loadData = async () => {
+      if (isLoadingCompanyContext || !selectedCompanyId) {
+        if (!isLoadingCompanyContext && !selectedCompanyId) {
+          setAllPayrollRunsData([]);
+          setIsLoaded(true);
         }
         return;
       }
+
       setIsLoaded(false);
       setFeedback(null);
+
       try {
-        // Fetch payroll run summaries from Supabase (snake_case)
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const services = getServices();
+        
+        // Load current user
+        const user = await services.userService.getCurrentUser();
+        setCurrentUser(user);
 
-        // Get current user from Supabase auth
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          setCurrentUser(null);
-          throw userError || new Error("User not authenticated");
+        if (!user) {
+          setFeedback({ type: 'error', message: "Authentication Required", details: "Please log in to access payroll data." });
+          setIsLoaded(true);
+          return;
         }
 
-        // Fetch user profile (assuming you have a 'users' table)
-        const { data: userProfile, error: profileError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError || !userProfile) {
-          setCurrentUser(null);
-          throw profileError || new Error("User profile not found");
+        // Check if user can access this company's payroll data
+        if (!PayrollPermissions.canAccessCompanyPayroll(user, selectedCompanyId)) {
+          setFeedback({ type: 'error', message: "Access Denied", details: "You don't have permission to access payroll data for this company." });
+          setAllPayrollRunsData([]);
+          setIsLoaded(true);
+          return;
         }
 
-        setCurrentUser({
-          id: userProfile.id,
-          email: userProfile.email,
-          firstName: userProfile.first_name,
-          lastName: userProfile.last_name,
-          role: userProfile.role,
-          assignedCompanyIds: userProfile.assigned_company_ids || [],
-        });        // Fetch payroll run summaries for the selected company (snake_case)
-        const { data: summaries, error } = await supabase
-          .from("payroll_runs")
-          .select("*")
-          .eq("company_id", selectedCompanyId);
+        // Load payroll runs for the company
+        const payrollRuns = await services.payrollService.getByCompanyId(selectedCompanyId);
+        setAllPayrollRunsData(payrollRuns);
 
-        if (error) {
-          throw error;
-        }
-        // Map backend (snake_case) to UI (camelCase)
-        setAllPayrollRunsData((summaries || []).map((s: any) => ({
-          id: s.id,
-          companyId: s.company_id,
-          month: s.month,
-          year: s.year,
-          employees: s.employees,
-          grossSalary: s.gross_salary,
-          deductions: s.deductions,
-          netPay: s.net_pay,
-          status: s.status,
-          rejectionReason: s.rejection_reason,
-        })));
       } catch (error) {
-        console.error("Error loading payroll summaries from Supabase:", error);
+        console.error("Error loading payroll data:", error);
+        setFeedback({ type: 'error', message: "Error Loading Data", details: (error as Error).message });
         setAllPayrollRunsData([]);
-        setFeedback({type: 'error', message: "Error loading payroll runs.", details: (error as Error).message });
       }
+
       setIsLoaded(true);
     };
-    loadSummaries();
+
+    loadData();
   }, [selectedCompanyId, isLoadingCompanyContext]);
 
-
-  const filteredRunsSource = useMemo(() => allPayrollRunsData.filter(
-    (run) =>
-      run.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      run.year.toString().includes(searchTerm) ||
-      run.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      run.id.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a,b) => b.year - a.year || Date.parse(`01 ${b.month} ${b.year}`) - Date.parse(`01 ${a.month} ${a.year}`)),
-  [allPayrollRunsData, searchTerm]);
+  // Computed values
+  const filteredRunsSource = useMemo(() => {
+    return allPayrollRunsData
+      .filter(run => PayrollUtils.generateSearchTerms(run, searchTerm))
+      .sort((a, b) => b.year - a.year || Date.parse(`01 ${b.month} ${b.year}`) - Date.parse(`01 ${a.month} ${a.year}`));
+  }, [allPayrollRunsData, searchTerm]);
 
   const totalItems = filteredRunsSource.length;
   const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
@@ -220,9 +160,10 @@ export default function PayrollPage() {
 
   const existingNonApprovedRunForCompany = useMemo(() => {
     if (!selectedCompanyId) return null;
-    return allPayrollRunsData.find(run => run.companyId === selectedCompanyId && run.status !== "Approved");
+    return allPayrollRunsData.find(run => run.company_id === selectedCompanyId && run.status !== "Approved");
   }, [allPayrollRunsData, selectedCompanyId]);
 
+  // Event handlers
   const handleSelectRow = (itemId: string, checked: boolean) => {
     setSelectedItems(prev => {
       const newSelected = new Set(prev);
@@ -241,27 +182,32 @@ export default function PayrollPage() {
       setSelectedItems(prev => new Set([...prev].filter(id => !pageItemIdsSet.has(id))));
     }
   };
-  const isAllOnPageSelected = paginatedRuns.length > 0 && paginatedRuns.every(item => selectedItems.has(item.id));
 
   const resetSelectionAndPage = () => {
     setSelectedItems(new Set());
     setCurrentPage(1);
   };
 
-
   const handleCreateRun = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFeedback(null);
-    if (!selectedCompanyId) {
-        setFeedback({ type: 'error', message: "Error", details: "No company selected." });
-        return;
+    setCreateRunDialogFeedback(null);
+
+    if (!selectedCompanyId || !currentUser) {
+      setCreateRunDialogFeedback({ type: 'error', message: "Error", details: "No company selected or user not authenticated." });
+      return;
     }
-    if (existingNonApprovedRunForCompany) {
-      setFeedback({
-        type: 'error',
-        message: "Action Restricted",
-        details: `A payroll run for ${existingNonApprovedRunForCompany.month} ${existingNonApprovedRunForCompany.year} (Status: ${existingNonApprovedRunForCompany.status}) is already in progress. Please complete or delete it before creating a new one.`,
-      });
+
+    // Check permissions
+    const canCreate = PayrollPermissions.canCreatePayrollRun(currentUser);
+    if (!canCreate.allowed) {
+      setCreateRunDialogFeedback({ type: 'error', message: "Permission Denied", details: canCreate.reason || "You cannot create payroll runs." });
+      return;
+    }
+
+    // Check business rules
+    const canCreateValidation = PayrollValidation.canCreatePayrollRun(allPayrollRunsData, "", 0, selectedCompanyId);
+    if (!canCreateValidation.canCreate) {
+      setCreateRunDialogFeedback({ type: 'error', message: "Action Restricted", details: canCreateValidation.reason || "Cannot create payroll run." });
       return;
     }
 
@@ -269,209 +215,164 @@ export default function PayrollPage() {
     const formData = new FormData(currentForm);
     const month = formData.get('month') as string;
     const year = parseInt(formData.get('year') as string);
-    const monthNumberStr = monthNameToNumberString(month);
-    const newRunId = `PR${year}${monthNumberStr}`;
+
+    // Validate data
+    const validation = PayrollUtils.validatePayrollRunData({ month, year, companyId: selectedCompanyId });
+    if (!validation.isValid) {
+      setCreateRunDialogFeedback({ type: 'error', message: "Validation Error", details: validation.errors.join(', ') });
+      return;
+    }
+
+    // Check for duplicates
+    const exists = await getServices().payrollService.existsForPeriod(selectedCompanyId, month, year);
+    if (exists) {
+      setCreateRunDialogFeedback({ 
+        type: 'error', 
+        message: "Duplicate Payroll Period", 
+        details: `A payroll run for ${month} ${year} already exists for this company.` 
+      });
+      return;
+    }
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);      // Check for duplicate
-      const { data: existingSummaries, error: fetchError } = await supabase
-        .from('payroll_runs')
-        .select('id')
-        .eq('company_id', selectedCompanyId)
-        .eq('id', newRunId);
-      if (fetchError) throw fetchError;
-      if (existingSummaries && existingSummaries.length > 0) {
-        setFeedback({
-          type: 'error',
-          message: "Duplicate Payroll Period",
-          details: `A payroll run for ${month} ${year} (ID: ${newRunId}) already exists for this company. Please edit the existing run or delete it if necessary.`,
-        });
-        return;
-      }
-      // Insert using snake_case for backend
-      const newRun = {
-        id: newRunId,
+      const services = getServices();
+      
+      const newRun = await services.payrollService.createWithGeneratedId({
         company_id: selectedCompanyId,
         month,
         year,
-        employees: 0,
-        gross_salary: 0,
-        deductions: 0,
-        net_pay: 0,
-        status: "Draft",
-      };      const { error: insertError } = await supabase
-        .from('payroll_runs')
-        .insert([newRun]);
-      if (insertError) throw insertError;
-      // Add to UI state as camelCase
-      setAllPayrollRunsData(prev => [{
-        id: newRunId,
-        companyId: selectedCompanyId,
-        month,
-        year,
-        employees: 0,
-        grossSalary: 0,
-        deductions: 0,
-        netPay: 0,
-        status: "Draft",
-      }, ...prev]);
-      setFeedback({ type: 'success', message: "Payroll Run Created", details: `Payroll run for ${month} ${year} (ID: ${newRunId}) created as Draft. You will be redirected to process it.` });
-      setIsCreateRunDialogOpen(false);
-      if (currentForm) {
+        status: 'Draft'
+      });
+
+      // Update UI state
+      setAllPayrollRunsData(prev => [newRun, ...prev]);
+      setCreateRunDialogFeedback({ 
+        type: 'success', 
+        message: "Payroll Run Created", 
+        details: `Payroll run for ${month} ${year} (ID: ${newRun.id}) created as Draft. You will be redirected to process it.` 
+      });
+
+      setTimeout(() => {
+        setIsCreateRunDialogOpen(false);
+        setCreateRunDialogFeedback(null);
         currentForm.reset();
-      }      resetSelectionAndPage();
-      router.push(`/app/payroll/${newRunId}`);
-    } catch {
-      setFeedback({ type: 'error', message: "Creation Failed", details: "Could not create payroll run." });
-    }
-  };
-
-  const canDeleteRun = (runStatus: PayrollStatus): { allowed: boolean; title: string } => {
-    if (!currentUser) return { allowed: false, title: "Login required" };
-    const { role } = currentUser;
-
-    if (role === "Primary Admin" || role === "App Admin") {
-      return { allowed: true, title: "Delete Run (Admin)" };
-    }
-    if (role === "Company Admin" || role === "Payroll Preparer") {
-      if (runStatus === "Draft" || runStatus === "Rejected") {
-        return { allowed: true, title: "Delete Draft/Rejected Run" };
-      }
-      return { allowed: false, title: "Cannot delete runs not in Draft or Rejected state" };
-    }
-    if (role === "Payroll Approver") {
-        return { allowed: false, title: "Payroll Approvers cannot delete runs" };
-    }
-    return { allowed: false, title: "Permission Denied" };
-  };
-
-  const deletePayrollRunsByIds = async (runIds: string[]) => {
-    setFeedback(null);
-    if (runIds.length === 0 || !selectedCompanyId) return;
-
-    const actualIdsToDeleteFromDB: string[] = [];
-    let skippedRunsCount = 0;
-
-    for (const runId of runIds) {
-        const run = allPayrollRunsData.find(r => r.id === runId && r.companyId === selectedCompanyId);
-        if (!run) continue;
-        const permission = canDeleteRun(run.status);
-        if (permission.allowed) {
-            actualIdsToDeleteFromDB.push(runId);
-        } else {
-            skippedRunsCount++;
-        }
-    }
-
-    if (actualIdsToDeleteFromDB.length === 0 && skippedRunsCount > 0) {
-        setFeedback({ type: 'info', message: "Deletion Denied", details: `Could not delete ${skippedRunsCount} run(s) due to permissions or status.` });
-        return;
-    }
-    if (actualIdsToDeleteFromDB.length === 0) return;
-
-    const deductionsReversedCount = 0;
-    try {
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
-        for (const id of actualIdsToDeleteFromDB) {
-            // Reverse deductions if needed (implement as needed in Supabase)            // Delete payroll run summary
-            await supabase.from('payroll_runs').delete().eq('id', id).eq('company_id', selectedCompanyId);
-            // Optionally delete details, etc.
-            await supabase.from('payroll_run_details').delete().eq('id', id).eq('company_id', selectedCompanyId);
-        }
-        setAllPayrollRunsData(prev => prev.filter(run => !(actualIdsToDeleteFromDB.includes(run.id) && run.companyId === selectedCompanyId)));
-        setSelectedItems(prev => {
-            const newSelected = new Set(prev);
-            actualIdsToDeleteFromDB.forEach(id => newSelected.delete(id));
-            return newSelected;
-        });
-
-        let successMessage = `Successfully deleted ${actualIdsToDeleteFromDB.length} payroll run(s).`;
-        if (deductionsReversedCount > 0) {
-            successMessage += ` ${deductionsReversedCount} applied deduction entries were reversed.`;
-        }
-        if (skippedRunsCount > 0) {
-            setFeedback({type: 'info', message: "Deletion Partially Completed", details: `${successMessage} ${skippedRunsCount} run(s) were skipped due to permissions or status.`});
-        } else {
-            setFeedback({type: 'success', message: "Payroll Run(s) Deleted", details: successMessage});
-        }
-
-        if (currentPage > 1 && paginatedRuns.length === actualIdsToDeleteFromDB.filter(id => paginatedRuns.some(pr => pr.id === id)).length && filteredRunsSource.slice((currentPage - 2) * rowsPerPage, (currentPage - 1) * rowsPerPage).length > 0) {
-          setCurrentPage(currentPage - 1);
-        } else if (currentPage > 1 && paginatedRuns.length === actualIdsToDeleteFromDB.filter(id => paginatedRuns.some(pr => pr.id === id)).length && filteredRunsSource.slice((currentPage-1)*rowsPerPage).length === 0){
-           setCurrentPage( Math.max(1, currentPage -1));
-        }
+        resetSelectionAndPage();
+        router.push(`/app/payroll/${newRun.id}`);
+      }, 1500);
 
     } catch (error) {
-        setFeedback({ type: 'error', message: "Delete Failed", details: `Could not delete payroll run(s). ${(error as Error).message}` });
+      setCreateRunDialogFeedback({ type: 'error', message: "Creation Failed", details: "Could not create payroll run." });
+    }
+  };
+
+  const deletePayrollRunsByIds = async (runIds: string[], isFromSingleDialog = false, isFromBulkDialog = false) => {
+    if (runIds.length === 0 || !selectedCompanyId || !currentUser) return;
+
+    const runsToDelte = allPayrollRunsData.filter(r => runIds.includes(r.id) && r.company_id === selectedCompanyId);
+    const validation = PayrollValidation.canBulkDeletePayrollRuns(runsToDelte);
+
+    if (!validation.canDelete && validation.deletableCount === 0) {
+      const feedbackMessage = { 
+        type: 'info' as const, 
+        message: "Deletion Denied", 
+        details: validation.reason || "Cannot delete selected runs." 
+      };
+      
+      if (isFromSingleDialog) setDeleteRunDialogFeedback(feedbackMessage);
+      else if (isFromBulkDialog) setBulkDeleteRunsDialogFeedback(feedbackMessage);
+      else setFeedback(feedbackMessage);
+      return;
+    }
+
+    const actualIdsToDelete = runsToDelte
+      .filter(run => PayrollPermissions.canDeletePayrollRun(currentUser, run.status).allowed)
+      .map(run => run.id);
+
+    if (actualIdsToDelete.length === 0) return;
+
+    try {
+      const services = getServices();
+      await services.payrollService.deleteByIds(actualIdsToDelete);
+
+      // Update UI state
+      setAllPayrollRunsData(prev => prev.filter(run => !actualIdsToDelete.includes(run.id)));
+      setSelectedItems(prev => {
+        const newSelected = new Set(prev);
+        actualIdsToDelete.forEach(id => newSelected.delete(id));
+        return newSelected;
+      });
+
+      const successMessage = `Successfully deleted ${actualIdsToDelete.length} payroll run(s).`;
+      const feedbackMessage = validation.undeletableCount > 0
+        ? { type: 'info' as const, message: "Deletion Partially Completed", details: `${successMessage} ${validation.undeletableCount} run(s) were skipped due to permissions.` }
+        : { type: 'success' as const, message: "Payroll Run(s) Deleted", details: successMessage };
+
+      if (isFromSingleDialog) setDeleteRunDialogFeedback(feedbackMessage);
+      else if (isFromBulkDialog) setBulkDeleteRunsDialogFeedback(feedbackMessage);
+      else setFeedback(feedbackMessage);
+
+      // Handle pagination
+      if (currentPage > 1 && paginatedRuns.length === actualIdsToDelete.filter(id => paginatedRuns.some(pr => pr.id === id)).length) {
+        setCurrentPage(Math.max(1, currentPage - 1));
+      }
+
+    } catch (error) {
+      const errorMessage = { type: 'error' as const, message: "Delete Failed", details: `Could not delete payroll run(s). ${(error as Error).message}` };
+      
+      if (isFromSingleDialog) setDeleteRunDialogFeedback(errorMessage);
+      else if (isFromBulkDialog) setBulkDeleteRunsDialogFeedback(errorMessage);
+      else setFeedback(errorMessage);
     }
   };
 
   const handleDeleteSingleRunClick = (run: PayrollRunSummary) => {
-    setFeedback(null);
-    const permission = canDeleteRun(run.status);
-    if (!permission.allowed) {
-        setFeedback({ type: 'error', message: "Deletion Denied", details: permission.title });
-        return;
+    setDeleteRunDialogFeedback(null);
+    
+    if (!currentUser) {
+      setFeedback({ type: 'error', message: "Authentication Required", details: "Please log in to delete payroll runs." });
+      return;
     }
+
+    const permission = PayrollPermissions.canDeletePayrollRun(currentUser, run.status);
+    if (!permission.allowed) {
+      setFeedback({ type: 'error', message: "Deletion Denied", details: permission.title });
+      return;
+    }
+    
     setRunToDeleteSingle(run);
     setIsDeleteDialogForItemOpen(true);
   };
 
   const confirmDeleteSingleRun = async () => {
     if (runToDeleteSingle) {
-        await deletePayrollRunsByIds([runToDeleteSingle.id]);
+      await deletePayrollRunsByIds([runToDeleteSingle.id], true, false);
     }
     setIsDeleteDialogForItemOpen(false);
     setRunToDeleteSingle(null);
+    setDeleteRunDialogFeedback(null);
   };
 
   const handleOpenBulkDeleteDialog = () => {
-    setFeedback(null);
+    setBulkDeleteRunsDialogFeedback(null);
     if (selectedItems.size === 0) {
-        setFeedback({ type: 'info', message: "No Selection", details: "Please select payroll runs to delete." });
-        return;
+      setFeedback({ type: 'info', message: "No Selection", details: "Please select payroll runs to delete." });
+      return;
     }
     setIsBulkDeleteDialogOpen(true);
   };
 
   const confirmBulkDeleteRuns = async () => {
-    await deletePayrollRunsByIds(Array.from(selectedItems));
+    await deletePayrollRunsByIds(Array.from(selectedItems), false, true);
     setIsBulkDeleteDialogOpen(false);
+    setBulkDeleteRunsDialogFeedback(null);
   };
 
-  const renderFeedbackMessage = () => {
-    if (!feedback) return null;
-    let IconComponent;
-    let alertVariant: "default" | "destructive" = "default";
-    let additionalAlertClasses = "";
+  // UI state calculations
+  const isAllOnPageSelected = paginatedRuns.length > 0 && paginatedRuns.every(item => selectedItems.has(item.id));
+  const runNewPayrollButtonDisabled = PayrollPermissions.isCreatePayrollDisabled(currentUser, selectedCompanyId, existingNonApprovedRunForCompany || null);
+  const runNewPayrollTooltipContent = PayrollPermissions.getCreatePayrollTooltip(currentUser, selectedCompanyId, existingNonApprovedRunForCompany || null);
 
-    switch (feedback.type) {
-      case 'success':
-        IconComponent = CheckCircle2;
-        alertVariant = "default";
-        additionalAlertClasses = "bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50 dark:text-green-300 dark:border-green-600 [&>svg]:text-green-600 dark:[&>svg]:text-green-400";
-        break;
-      case 'error':
-        IconComponent = AlertTriangle;
-        alertVariant = "destructive";
-        break;
-      case 'info':
-        IconComponent = Info;
-        alertVariant = "default";
-        break;
-      default:
-        return null;
-    }
-    return (
-      <Alert variant={alertVariant} className={cn("mb-4", additionalAlertClasses)}>
-        <IconComponent className="h-4 w-4" />
-        <AlertTitle>{feedback.message}</AlertTitle>
-        {feedback.details && <AlertDescription>{feedback.details}</AlertDescription>}
-      </Alert>
-    );
-  };
-
-
+  // Loading states
   if (isLoadingCompanyContext) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading company information...</div>;
   }
@@ -489,15 +390,9 @@ export default function PayrollPage() {
     );
   }
 
-  if (!isLoaded || !currentUser) {
-      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading payroll runs or authenticating...</div>;
+  if (!isLoaded) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading payroll runs...</div>;
   }
-  const canCurrentUserCreateRun = currentUser.role === 'Primary Admin' || currentUser.role === 'App Admin' || currentUser.role === 'Company Admin' || currentUser.role === 'Payroll Preparer';
-  const runNewPayrollButtonDisabled = !canCurrentUserCreateRun || !selectedCompanyId || !!existingNonApprovedRunForCompany;
-  const runNewPayrollTooltipContent = !selectedCompanyId ? "No company selected."
-                                    : !canCurrentUserCreateRun ? "You do not have permission to create payroll runs."
-                                    : existingNonApprovedRunForCompany ? `A run for ${existingNonApprovedRunForCompany.month} ${existingNonApprovedRunForCompany.year} (Status: ${existingNonApprovedRunForCompany.status}) is in progress.`
-                                    : "Run a new payroll for the selected company.";
 
   return (
     <div className="space-y-8">
@@ -515,24 +410,32 @@ export default function PayrollPage() {
 
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center"><SlidersHorizontal className="mr-2 h-6 w-6 text-primary" />Payroll Runs</CardTitle>
-            <CardDescription>List of all payroll runs for the current company.</CardDescription>
+          <CardTitle className="flex items-center"><SlidersHorizontal className="mr-2 h-6 w-6 text-primary" />Payroll Runs</CardTitle>
+          <CardDescription>List of all payroll runs for the current company.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mb-4">
             <div className="relative w-full sm:max-w-xs md:max-w-sm lg:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                  type="search"
-                  placeholder="Search by ID, month, year, or status..."
-                  className="w-full pl-10"
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); setSelectedItems(new Set()); setFeedback(null); }}
-                  disabled={!selectedCompanyId}
+                type="search"
+                placeholder="Search by ID, month, year, or status..."
+                className="w-full pl-10"
+                value={searchTerm}
+                onChange={(e) => { 
+                  setSearchTerm(e.target.value); 
+                  setCurrentPage(1); 
+                  setSelectedItems(new Set()); 
+                  setFeedback(null); 
+                }}
+                disabled={!selectedCompanyId}
               />
             </div>
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
-                <Dialog open={isCreateRunDialogOpen} onOpenChange={(isOpen) => { setIsCreateRunDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}>
+              <Dialog open={isCreateRunDialogOpen} onOpenChange={(isOpen) => { 
+                setIsCreateRunDialogOpen(isOpen); 
+                if (!isOpen) setCreateRunDialogFeedback(null);
+              }}>
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -548,72 +451,78 @@ export default function PayrollPage() {
                   </Tooltip>
                 </TooltipProvider>
                 <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
+                  <DialogHeader>
                     <DialogTitle>Run New Payroll</DialogTitle>
                     <DialogDescription>
-                        Select the month and year for the new payroll run.
+                      Select the month and year for the new payroll run.
                     </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateRun}>
+                  </DialogHeader>
+                  <FeedbackAlert feedback={createRunDialogFeedback} />
+                  <form onSubmit={handleCreateRun}>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="month" className="text-right">Month</Label>
                         <Select name="month" required defaultValue={new Date().toLocaleString('default', { month: 'long' })}>
-                            <SelectTrigger className="col-span-3">
+                          <SelectTrigger className="col-span-3">
                             <SelectValue placeholder="Select month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
-                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PayrollUtils.getAvailableMonths().map(month => (
+                              <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
                             ))}
-                            </SelectContent>
+                          </SelectContent>
                         </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="year" className="text-right">Year</Label>
                         <Select name="year" required defaultValue={new Date().getFullYear().toString()}>
-                            <SelectTrigger className="col-span-3">
+                          <SelectTrigger className="col-span-3">
                             <SelectValue placeholder="Select year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() -1].map(y => (
-                                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PayrollUtils.getAvailableYears().slice(5, 8).map(year => (
+                              <SelectItem key={year.value} value={year.value.toString()}>{year.label}</SelectItem>
                             ))}
-                            </SelectContent>
+                          </SelectContent>
                         </Select>
-                        </div>
+                      </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsCreateRunDialogOpen(false)}>Cancel</Button>
-                        <Button type="submit">Create Run</Button>
+                      <Button type="button" variant="outline" onClick={() => {
+                        setIsCreateRunDialogOpen(false);
+                        setCreateRunDialogFeedback(null);
+                      }}>Cancel</Button>
+                      <Button type="submit">Create Run</Button>
                     </DialogFooter>
-                    </form>
+                  </form>
                 </DialogContent>
-                </Dialog>
+              </Dialog>
             </div>
           </div>
-            {renderFeedbackMessage()}
-            {selectedItems.size > 0 && (
+          
+          <FeedbackAlert feedback={feedback} />
+          
+          {selectedItems.size > 0 && (
             <div className="my-4 flex items-center justify-between p-3 bg-muted/50 rounded-md">
-                <span className="text-sm text-muted-foreground">{selectedItems.size} run(s) selected</span>
-                <Button variant="destructive" onClick={handleOpenBulkDeleteDialog} disabled={!selectedCompanyId}>
+              <span className="text-sm text-muted-foreground">{selectedItems.size} run(s) selected</span>
+              <Button variant="destructive" onClick={handleOpenBulkDeleteDialog} disabled={!selectedCompanyId}>
                 <Trash2 className="mr-2 h-4 w-4" /> Delete Selected Runs
-                </Button>
+              </Button>
             </div>
-            )}
+          )}
 
-            <div className="rounded-md border">
+          <div className="rounded-md border">
             <div className="overflow-x-auto">
-                <Table>
+              <Table>
                 <TableHeader>
-                    <TableRow className="sticky top-0 z-10 bg-card">
+                  <TableRow className="sticky top-0 z-10 bg-card">
                     <TableHead className="sticky top-0 z-10 bg-card w-[50px]">
-                        <Checkbox
-                            checked={isAllOnPageSelected}
-                            onCheckedChange={(checked) => handleSelectAllOnPage(Boolean(checked))}
-                            aria-label="Select all on current page"
-                            disabled={paginatedRuns.length === 0}
-                        />
+                      <Checkbox
+                        checked={isAllOnPageSelected}
+                        onCheckedChange={(checked) => handleSelectAllOnPage(Boolean(checked))}
+                        aria-label="Select all on current page"
+                        disabled={paginatedRuns.length === 0}
+                      />
                     </TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card">Run ID</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card">Period</TableHead>
@@ -623,74 +532,74 @@ export default function PayrollPage() {
                     <TableHead className="sticky top-0 z-10 bg-card text-right">Net Pay</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card">Status</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card text-right">Actions</TableHead>
-                    </TableRow>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {paginatedRuns.map((run) => {
+                  {paginatedRuns.map((run) => {
                     const StatusIcon = statusConfig[run.status].icon;
-                    const deletePermission = canDeleteRun(run.status);
+                    const deletePermission = currentUser ? PayrollPermissions.canDeletePayrollRun(currentUser, run.status) : { allowed: false, title: 'Login required' };
+                    
                     return (
-                        <TableRow key={`${run.id}-${run.companyId}`} data-state={selectedItems.has(run.id) ? "selected" : ""}>
+                      <TableRow key={`${run.id}-${run.company_id}`} data-state={selectedItems.has(run.id) ? "selected" : ""}>
                         <TableCell>
-                            <Checkbox
+                          <Checkbox
                             checked={selectedItems.has(run.id)}
                             onCheckedChange={(checked) => handleSelectRow(run.id, Boolean(checked))}
                             aria-label={`Select row ${run.id}`}
-                            />
+                          />
                         </TableCell>
                         <TableCell className="font-medium">{run.id}</TableCell>
                         <TableCell>
-                            {run.month} {run.year}
-                            {run.status === "Rejected" && run.rejectionReason && (
-                            <p className="text-xs text-destructive mt-1" title={run.rejectionReason}>
-                                Reason: {run.rejectionReason.substring(0,30)}{run.rejectionReason.length > 30 ? "..." : ""}
+                          {run.month} {run.year}
+                          {run.status === "Rejected" && run.rejection_reason && (
+                            <p className="text-xs text-destructive mt-1" title={run.rejection_reason}>
+                              Reason: {run.rejection_reason.substring(0,30)}{run.rejection_reason.length > 30 ? "..." : ""}
                             </p>
-                            )}
+                          )}
                         </TableCell>
-                        <TableCell className="text-right">{formatNumberForTable(run.employees)}</TableCell>
-                        <TableCell className="text-right">{formatNumberForTable(run.grossSalary)}</TableCell>
-                        <TableCell className="text-right">{formatNumberForTable(run.deductions)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatNumberForTable(run.netPay)}</TableCell>
+                        <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.employees)}</TableCell>
+                        <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.gross_salary)}</TableCell>
+                        <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.deductions)}</TableCell>
+                        <TableCell className="text-right font-semibold">{PayrollUtils.formatNumberForTable(run.net_pay)}</TableCell>
                         <TableCell>
-                            <Badge className={`${statusConfig[run.status].color} ${statusConfig[run.status].textColor}`}>
+                          <Badge className={`${statusConfig[run.status].color} ${statusConfig[run.status].textColor}`}>
                             <StatusIcon className="mr-1 h-3 w-3" />
                             {run.status}
-                            </Badge>
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" title="View Details" asChild>
+                          <Button variant="ghost" size="icon" title="View Details" asChild>
                             <Link href={`/app/payroll/${run.id}`}>
-                                <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Link>
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                title={deletePermission.title}
-                                className={!deletePermission.allowed ? "text-muted-foreground cursor-not-allowed" : "text-destructive hover:text-destructive/90"}
-                                onClick={() => handleDeleteSingleRunClick(run)}
-                                disabled={!deletePermission.allowed}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={deletePermission.title}
+                            className={!deletePermission.allowed ? "text-muted-foreground cursor-not-allowed" : "text-destructive hover:text-destructive/90"}
+                            onClick={() => handleDeleteSingleRunClick(run)}
+                            disabled={!deletePermission.allowed}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
-                        </TableRow>
+                      </TableRow>
                     );
-                    })}
-                    {paginatedRuns.length === 0 && (
+                  })}
+                  {paginatedRuns.length === 0 && (
                     <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">
+                      <TableCell colSpan={9} className="text-center h-24">
                         No payroll runs found for the current company or matching criteria.
-                        </TableCell>
+                      </TableCell>
                     </TableRow>
-                    )}
+                  )}
                 </TableBody>
-                </Table>
+              </Table>
             </div>
-            </div>
+          </div>
         </CardContent>
       </Card>
-
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between py-4">
@@ -733,7 +642,11 @@ export default function PayrollPage() {
         </div>
       )}
 
-       <AlertDialog open={isDeleteDialogForItemOpen} onOpenChange={(isOpen) => {setIsDeleteDialogForItemOpen(isOpen); if (!isOpen) setFeedback(null);}}>
+      {/* Delete Single Run Dialog */}
+      <AlertDialog open={isDeleteDialogForItemOpen} onOpenChange={(isOpen) => {
+        setIsDeleteDialogForItemOpen(isOpen); 
+        if (!isOpen) setDeleteRunDialogFeedback(null);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -742,6 +655,7 @@ export default function PayrollPage() {
               ID {runToDeleteSingle?.id} ({runToDeleteSingle?.month} {runToDeleteSingle?.year}) and reverse any associated deductions.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <FeedbackAlert feedback={deleteRunDialogFeedback} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteSingleRun} className="bg-destructive hover:bg-destructive/90">
@@ -751,7 +665,11 @@ export default function PayrollPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={(isOpen) => {setIsBulkDeleteDialogOpen(isOpen); if (!isOpen) setFeedback(null);}}>
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={(isOpen) => {
+        setIsBulkDeleteDialogOpen(isOpen); 
+        if (!isOpen) setBulkDeleteRunsDialogFeedback(null);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle>
@@ -760,6 +678,7 @@ export default function PayrollPage() {
               This action cannot be undone. Only runs you have permission to delete will be affected, and their associated deductions will be reversed.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <FeedbackAlert feedback={bulkDeleteRunsDialogFeedback} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmBulkDeleteRuns} className="bg-destructive hover:bg-destructive/90">
@@ -768,7 +687,6 @@ export default function PayrollPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
 
       <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8">
         <p className="font-semibold text-primary/90">Note on Payroll Runs:</p>
@@ -782,5 +700,3 @@ export default function PayrollPage() {
     </div>
   );
 }
-// All localStorage and indexedDbUtils references have been removed. This page now relies solely on Supabase for user and payroll data.
-

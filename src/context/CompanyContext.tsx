@@ -28,14 +28,26 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
   const [isLoadingCompanyContext, setIsLoadingCompanyContext] = useState(true);
 
   const fetchCompanyFromProfile = useCallback(async () => {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // Assume user_metadata contains selectedCompanyId and selectedCompanyName
-      setSelectedCompanyIdState(user.user_metadata?.selectedCompanyId || null);
-      setSelectedCompanyNameState(user.user_metadata?.selectedCompanyName || null);
+    // Prevent Supabase calls during build/SSR
+    if (typeof window === 'undefined') {
+      setIsLoadingCompanyContext(false);
+      return;
     }
-    setIsLoadingCompanyContext(false);  }, []);
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Assume user_metadata contains selectedCompanyId and selectedCompanyName
+        setSelectedCompanyIdState(user.user_metadata?.selectedCompanyId || null);
+        setSelectedCompanyNameState(user.user_metadata?.selectedCompanyName || null);
+      }
+    } catch (error) {
+      console.error('Error fetching company from profile:', error);
+    } finally {
+      setIsLoadingCompanyContext(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchCompanyFromProfile();
@@ -43,23 +55,43 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
 
   const setSelectedCompanyId = useCallback(async (companyId: string | null) => {
     setSelectedCompanyIdState(companyId);
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.auth.updateUser({
-        data: { ...user.user_metadata, selectedCompanyId: companyId }
-      });
+    
+    // Prevent Supabase calls during build/SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.auth.updateUser({
+          data: { ...user.user_metadata, selectedCompanyId: companyId }
+        });
+      }
+    } catch (error) {
+      console.error('Error updating selected company:', error);
     }
   }, []);
 
   const setSelectedCompanyName = useCallback(async (name: string | null) => {
     setSelectedCompanyNameState(name);
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.auth.updateUser({
-        data: { ...user.user_metadata, selectedCompanyName: name }
-      });
+    
+    // Prevent Supabase calls during build/SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.auth.updateUser({
+          data: { ...user.user_metadata, selectedCompanyName: name }
+        });
+      }
+    } catch (error) {
+      console.error('Error updating selected company name:', error);
     }
   }, []);
 

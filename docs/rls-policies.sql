@@ -52,6 +52,7 @@ CREATE POLICY "Users can insert own profile" ON user_profiles
 -- =====================================================
 -- COMPANIES POLICIES
 -- Users can only access companies they're assigned to
+-- IMPORTANT: Allows new users to create their first company
 -- =====================================================
 CREATE POLICY "Users can view assigned companies" ON companies
   FOR SELECT USING (id = ANY(get_user_companies()));
@@ -67,17 +68,28 @@ CREATE POLICY "Admins can update companies" ON companies
     )
   );
 
-CREATE POLICY "Admins can insert companies" ON companies
+CREATE POLICY "Users can insert companies" ON companies
   FOR INSERT WITH CHECK (
+    -- Allow if user is already an admin in any company
     EXISTS (
       SELECT 1 FROM user_company_assignments 
       WHERE user_id = auth.uid() 
       AND role IN ('Primary Admin', 'App Admin', 'Company Admin')
     )
+    OR
+    -- Allow if user is authenticated but has no company assignments (first company)
+    (
+      auth.uid() IS NOT NULL 
+      AND NOT EXISTS (
+        SELECT 1 FROM user_company_assignments 
+        WHERE user_id = auth.uid()
+      )
+    )
   );
 
 -- =====================================================
 -- USER COMPANY ASSIGNMENTS POLICIES
+-- IMPORTANT: Allows users to assign themselves when creating first company
 -- =====================================================
 CREATE POLICY "Users can view own assignments" ON user_company_assignments
   FOR SELECT USING (user_id = auth.uid());
@@ -90,6 +102,26 @@ CREATE POLICY "Admins can manage assignments" ON user_company_assignments
       WHERE uca.user_id = auth.uid() 
       AND uca.company_id = user_company_assignments.company_id 
       AND uca.role IN ('Primary Admin', 'App Admin', 'Company Admin')
+    )
+  );
+
+CREATE POLICY "Users can create own first assignment" ON user_company_assignments
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid() AND
+    (
+      -- Allow if user is already an admin (can assign others)
+      EXISTS (
+        SELECT 1 FROM user_company_assignments uca
+        WHERE uca.user_id = auth.uid() 
+        AND uca.role IN ('Primary Admin', 'App Admin', 'Company Admin')
+      )
+      OR
+      -- Allow users to assign themselves to companies they just created
+      -- (when they have no existing assignments)
+      NOT EXISTS (
+        SELECT 1 FROM user_company_assignments 
+        WHERE user_id = auth.uid()
+      )
     )
   );
 

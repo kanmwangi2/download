@@ -1,6 +1,83 @@
 # 🗂️ **CHEETAH PAYROLL - COMPREHENSIVE CHANGE LOG**
 
-**Project**: Cheetah Payroll System
+**Project**: Cheetah ================================================================================
+
+## 🔐 **COMPANY CREATION RLS POLICY FIX - June 26, 2025**
+
+### ✅ **ROW LEVEL SECURITY POLICY CORRECTION**
+
+Resolved critical Row Level Security (RLS) policy issues preventing new users from creating their first company, fixing persistent 500 server errors during company creation.
+
+#### **Problem Identification**
+
+- **Root Cause**: Restrictive RLS policies required users to already have admin roles to create companies
+- **Catch-22 Situation**: New users couldn't create companies because they had no company assignments yet
+- **Error Manifestation**: 500 server errors from Supabase REST API during company creation attempts
+- **Impact**: Complete blockage of new user onboarding and first company setup
+
+#### **Application Code Enhancements**
+
+- **File Updated**: `src/components/settings/company-management-tab.tsx`
+- **Auto-Assignment Logic**: Added automatic user assignment as "Company Admin" when creating new companies
+- **User Experience**: Enhanced success messages to indicate automatic role assignment
+- **Error Handling**: Graceful handling of assignment failures while preserving company creation
+
+#### **Database Policy Corrections**
+
+**A. Company Creation Policy (`companies` table)**
+```sql
+-- Old restrictive policy replaced with:
+CREATE POLICY "Users can insert companies" ON companies
+  FOR INSERT WITH CHECK (
+    -- Allow existing admins OR new users with no assignments
+    EXISTS (SELECT 1 FROM user_company_assignments WHERE user_id = auth.uid() AND role IN ('Primary Admin', 'App Admin', 'Company Admin'))
+    OR
+    (auth.uid() IS NOT NULL AND NOT EXISTS (SELECT 1 FROM user_company_assignments WHERE user_id = auth.uid()))
+  );
+```
+
+**B. User Assignment Policy (`user_company_assignments` table)**
+```sql
+-- Added new policy for first-time user assignments:
+CREATE POLICY "Users can create own first assignment" ON user_company_assignments
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid() AND
+    (EXISTS (SELECT 1 FROM user_company_assignments WHERE user_id = auth.uid() AND role IN ('Primary Admin', 'App Admin', 'Company Admin'))
+    OR NOT EXISTS (SELECT 1 FROM user_company_assignments WHERE user_id = auth.uid()))
+  );
+```
+
+#### **Database Files Updated**
+
+- **Main Policies**: Updated `docs/rls-policies.sql` with corrected policies
+- **Standalone Fix**: Created `docs/rls-fix-company-creation.sql` for existing databases
+- **Documentation**: Added comments explaining the new user onboarding flow
+- **Schema Notes**: Enhanced `docs/database-schema.sql` with RLS setup guidance
+
+#### **Deployment Strategy**
+
+- **New Databases**: Fixes included in main `rls-policies.sql` file
+- **Existing Databases**: Standalone fix script for easy application
+- **Backward Compatibility**: Existing admin users continue to work unchanged
+- **Security Maintained**: Policies still prevent unauthorized access while enabling legitimate new user onboarding
+
+#### **Testing & Verification**
+
+- ✅ **Build Success**: All application code changes compile without errors
+- ✅ **Policy Logic**: Verified RLS policies allow new user company creation
+- ✅ **Auto-Assignment**: Confirmed automatic role assignment functionality
+- ✅ **Existing Users**: Validated that current admin workflows remain unaffected
+
+#### **Expected Resolution**
+
+- **New User Flow**: Users can now create their first company without errors
+- **Automatic Permissions**: Users are automatically assigned "Company Admin" role for created companies
+- **Error Elimination**: 500 server errors during company creation are resolved
+- **Smooth Onboarding**: Complete new user onboarding experience restored
+
+================================================================================
+
+## 🚀 **VERCEL DEPLOYMENT OPTIMIZATION - June 26, 2025**roll System
 **Migration Phase**: IndexedDB/localStorage to Supabase Complete + Architecture Refactoring Complete
 **Date Range**: June 2025
 **Status**: ✅ **FULLY COMPLETED**

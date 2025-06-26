@@ -1,6 +1,10 @@
 -- =====================================================
 -- CHEETAH PAYROLL DATABASE SCHEMA
 -- Migration from IndexedDB to Supabase PostgreSQL
+-- 
+-- IMPORTANT: After creating this schema, you MUST apply the RLS policies
+-- from rls-policies.sql to ensure proper data security and access control.
+-- The policies include special handling for first-time company creation.
 -- =====================================================
 
 -- Enable necessary extensions
@@ -409,3 +413,23 @@ SELECT
 FROM public.companies c
 WHERE c.name LIKE '%Isoko Trading%'
 ON CONFLICT DO NOTHING;
+
+-- =====================================================
+-- NEXT STEPS AFTER SCHEMA CREATION
+-- =====================================================
+-- 
+-- 1. APPLY RLS POLICIES: Run the SQL from rls-policies.sql
+--    This is CRITICAL for proper security and access control.
+--    
+-- 2. The RLS policies include special handling for:
+--    - New users creating their first company
+--    - Multi-tenant data isolation
+--    - Role-based access control
+--
+-- 3. Without RLS policies, users may experience 500 errors
+--    when trying to create companies or access data.
+--
+-- Files to apply in order:
+-- 1. database-schema.sql (this file)
+-- 2. rls-policies.sql (security policies)
+-- =====================================================

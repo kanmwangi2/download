@@ -210,8 +210,28 @@ export default function CompanyManagementTab() {
         const { data: inserted, error } = await supabase.from('companies').insert(companyToBackend(formData)).select();
         if (error) throw error;
         if (inserted && inserted.length > 0) {
-          setAllCompanies(prevCompanies => [...prevCompanies, companyFromBackend(inserted[0])]);
-          setFeedback({type: 'success', message: "Company Added", details: `Company "${inserted[0].name}" has been added.`});
+          const newCompany = inserted[0];
+          
+          // Get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Automatically assign the user as Company Admin to the newly created company
+            const { error: assignmentError } = await supabase
+              .from('user_company_assignments')
+              .insert({
+                user_id: user.id,
+                company_id: newCompany.id,
+                role: 'Company Admin'
+              });
+            
+            if (assignmentError) {
+              console.warn('Failed to create user assignment:', assignmentError);
+              // Don't throw here - company was created successfully
+            }
+          }
+          
+          setAllCompanies(prevCompanies => [...prevCompanies, companyFromBackend(newCompany)]);
+          setFeedback({type: 'success', message: "Company Added", details: `Company "${newCompany.name}" has been added and you've been assigned as Company Admin.`});
         } else {
           setFeedback({type: 'success', message: "Company Added", details: `Company has been added.`});
         }

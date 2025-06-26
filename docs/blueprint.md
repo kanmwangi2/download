@@ -20,6 +20,7 @@
 - **Multi-User:** Supports multiple users, companies, and roles with secure authentication and authorization through Supabase Auth.
 - **Deployment:** Optimized for Vercel with webpack configuration for Supabase dependencies, memory optimization, and build-time safety checks.
 - **Build System:** Enhanced with TypeScript strict mode, environment validation, and production-ready error handling.
+- **Build Safety:** Build-safe Supabase client with lazy initialization, runtime-only database connections, and comprehensive error handling.
 
 ## Deployment & Build Configuration:
 
@@ -28,8 +29,12 @@
 - **Environment Safety:** Build-time validation prevents deployment failures while maintaining security
 - **Real-time Optimization:** Production builds include optimized Supabase real-time client configuration
 - **Type Safety:** Full TypeScript strict mode compliance with comprehensive error handling
+- **Build-Safe Client:** Supabase client with lazy initialization, async-only operations, and runtime safety checks
+- **Error Handling:** Comprehensive error messages for missing environment variables and connection issues
 
 ### Environment Variables
+
+**See [environment-setup.md](environment-setup.md) for detailed setup instructions.**
 
 #### Required Variables (Vercel Dashboard)
 ```env

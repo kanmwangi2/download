@@ -9,15 +9,18 @@ This directory contains comprehensive documentation for the Cheetah Payroll Syst
 - **[Change Log](change-log.md)** - Detailed project history, development progress, and deployment optimization
 
 ### Configuration & Setup
+- **[Environment Setup](environment-setup.md)** - Step-by-step environment variable configuration
 - **[Database Schema](database-schema.sql)** - Complete PostgreSQL database structure
 - **[RLS Policies](rls-policies.sql)** - Row Level Security policies for Supabase
 
 ## 🚀 Quick Start
 
-1. **Environment Setup**: Configure required environment variables (see blueprint.md)
+1. **Environment Setup**: Configure required environment variables (see [environment-setup.md](environment-setup.md))
 2. **Database Setup**: Apply [database-schema.sql](database-schema.sql) to your Supabase project
 3. **Security Setup**: Apply [rls-policies.sql](rls-policies.sql) for proper data access control
 4. **Deployment**: Follow deployment guide in blueprint.md for production setup
+
+> **Critical**: You must configure valid Supabase credentials in `.env.local` for local development or in Vercel dashboard for production. Without proper environment variables, all database operations will fail.
 
 ## 📖 Development Guide
 
@@ -35,9 +38,11 @@ The application follows modern cloud-native architecture:
 - Advanced import/export capabilities
 
 ### Recent Updates
+- **Build Safety**: Build-safe Supabase client with lazy initialization and runtime-only database operations
+- **Environment Configuration**: Comprehensive environment setup guide and validation
+- **Error Handling**: Enhanced error messages for missing environment variables and connection issues
 - **Build Optimization**: Enhanced webpack configuration for Supabase dependencies
 - **Memory Management**: Optimized for Vercel deployments with 4GB memory allocation
-- **Environment Safety**: Build-time validation with graceful error handling
 - **Type Safety**: Full TypeScript strict mode compliance
 - **Database Alignment**: Perfect schema-codebase synchronization
 
@@ -48,9 +53,11 @@ The application follows modern cloud-native architecture:
 - `vercel.json` - Vercel deployment configuration
 - `package.json` - Dependencies and build scripts
 
-### Environment Variables (see blueprint.md for details)
+### Environment Variables (see [environment-setup.md](environment-setup.md) for details)
 - `.env.local` - Local development environment variables
 - Vercel dashboard - Production environment variables
+
+> **Important**: The application requires valid Supabase credentials to function. All database operations will fail with clear error messages if environment variables are missing or incorrect.
 
 ## 📞 Support
 
@@ -64,5 +71,5 @@ For technical support or questions:
 
 This documentation is regularly updated to reflect the latest changes and improvements. Check the [change log](change-log.md) for recent updates and the deployment status.
 
-**Last Updated**: June 26, 2025
+**Last Updated**: June 26, 2025 - Added Supabase client build safety and comprehensive environment setup
 **Status**: ✅ Production Ready

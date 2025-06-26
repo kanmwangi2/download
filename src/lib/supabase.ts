@@ -6,6 +6,7 @@
 // Build-time safe mock client
 const createMockClient = () => {
   console.warn('⚠️ Supabase: Using mock client - database operations will not work')
+  console.warn('💡 To fix this: Set up environment variables in .env.local (see docs/environment-setup.md)')
   return {
     auth: {
       getUser: () => Promise.resolve({ data: { user: null }, error: null }),
@@ -18,14 +19,14 @@ const createMockClient = () => {
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
-          select: () => Promise.resolve({ data: [], error: { message: 'Mock client: operation not supported' } }),
+          single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+          select: () => Promise.resolve({ data: [], error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
         }),
-        single: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
+        single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
       }),
-      insert: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
-      update: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
-      delete: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
+      insert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+      update: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+      delete: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
     }),
   }
 }
@@ -38,7 +39,15 @@ const isBrowser = () => typeof window !== 'undefined'
 
 // Check if we have environment variables
 const hasEnvVars = () => {
-  return process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  console.log('🔍 Supabase env check:', { 
+    url: url ? `${url.substring(0, 20)}...` : 'missing', 
+    key: key ? `${key.substring(0, 10)}...` : 'missing',
+    hasUrl: !!url,
+    hasKey: !!key
+  })
+  return url && key
 }
 
 // Create real client only at runtime in browser
@@ -106,6 +115,12 @@ export function getSupabaseClient() {
 
 // Async version that waits for real client
 export async function getSupabaseClientAsync() {
+  console.log('🔄 Supabase: getSupabaseClientAsync called', { 
+    isBrowser: isBrowser(), 
+    hasEnvVars: hasEnvVars(),
+    runtimeClient: !!runtimeClient 
+  })
+  
   if (!isBrowser()) {
     console.log('🔄 Supabase: Returning mock client (not in browser)')
     return createMockClient()

@@ -10,6 +10,7 @@ npm install
 
 # Set up environment variables
 cp .env.example .env.local
+# Edit .env.local with your Supabase credentials
 
 # Run development server
 npm run dev
@@ -17,14 +18,16 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000) to access the application.
 
+> **Important**: You must configure your Supabase credentials in `.env.local` before the application will function. See [Environment Setup Guide](docs/environment-setup.md) for detailed instructions.
+
 ## 📚 Documentation
 
 Complete documentation is available in the `docs/` directory:
 
 - **[Full Documentation](docs/README.md)** - Comprehensive setup and usage guide
+- **[Environment Setup](docs/environment-setup.md)** - Step-by-step environment configuration
 - **[Change Log](docs/change-log.md)** - Detailed project history and updates
 - **[Database Schema](docs/database-schema.sql)** - Complete database structure
-- **[Migration Files](docs/migrations/)** - Database migration scripts
 
 ## 🏗️ Architecture
 
@@ -43,6 +46,8 @@ Complete documentation is available in the `docs/` directory:
 - ✅ Advanced import/export capabilities
 - ✅ Role-based access control
 - ✅ Modern responsive design
+- ✅ Build-safe Supabase integration
+- ✅ Production-ready error handling
 
 ## 🛠️ Development
 
@@ -54,19 +59,26 @@ Complete documentation is available in the `docs/` directory:
 
 ### Environment Setup
 
-1. Create a Supabase project
-2. Run the database schema from `docs/database-schema.sql`
-3. Configure environment variables in `.env.local`
-4. Apply any pending migrations from `docs/migrations/`
+**See [docs/environment-setup.md](docs/environment-setup.md) for detailed setup instructions.**
+
+Quick setup:
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Copy `.env.example` to `.env.local`
+3. Add your Supabase URL and keys to `.env.local`
+4. Run the database schema from `docs/database-schema.sql`
+5. Apply RLS policies from `docs/rls-policies.sql`
+
+> **Critical**: The application requires valid Supabase credentials to function. Without proper environment variables, all database operations will fail with clear error messages.
 
 ### Build Configuration
 
-The application includes optimizations for Vercel deployments:
+The application includes optimizations for Vercel deployments and build safety:
 
-- Webpack configuration for Supabase dependencies
-- Build-time environment validation
-- Memory optimization for large builds
-- Realtime client optimization for production
+- **Build-Safe Supabase Client**: Lazy initialization with runtime-only database connections
+- **Webpack Configuration**: Optimized for Supabase dependencies and WebSocket fallbacks
+- **Environment Validation**: Build-time checks with graceful error handling
+- **Memory Optimization**: 4GB allocation for large dependency trees
+- **TypeScript Safety**: Strict mode compliance with comprehensive error handling
 
 ### Commands
 
@@ -85,12 +97,14 @@ npm run build:vercel # Build with type checking for Vercel
 
 1. Connect your GitHub repository to Vercel
 2. Set the following environment variables in Vercel dashboard:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (for API routes)
+   - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (for API routes)
 3. Deploy automatically via GitHub integration
 
-The build configuration (`vercel.json`) includes memory optimization for successful deployments.
+**Environment Variables**: See [docs/environment-setup.md](docs/environment-setup.md) for detailed configuration instructions.
+
+The build configuration (`vercel.json`) includes memory optimization and timeout settings for successful deployments.
 
 ## 🌟 Features
 

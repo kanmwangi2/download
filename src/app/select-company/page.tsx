@@ -66,6 +66,17 @@ export default function SelectCompanyPage() {
   const [availableCompanies, setAvailableCompanies] = React.useState<Company[]>([]);
   const [isLoadingData, setIsLoadingData] = React.useState(true);
 
+  // Debug logging for select-company page
+  React.useEffect(() => {
+    console.log('🔍 SelectCompany State:', { 
+      hasCurrentUser: !!currentUser, 
+      authLoading, 
+      isLoadingData,
+      userId: currentUser?.id,
+      userEmail: currentUser?.email 
+    });
+  }, [currentUser, authLoading, isLoadingData]);
+
   React.useEffect(() => {
     const loadInitialData = async () => {
       console.log('🔄 SelectCompany: Starting loadInitialData', { authLoading, currentUser: !!currentUser });
@@ -81,7 +92,12 @@ export default function SelectCompanyPage() {
       
       try {
         if (!currentUser) {
-          console.log('🔄 SelectCompany: No user found after auth loading completed, redirecting to home')
+          console.log('❌ SelectCompany: No user found after auth loading completed, redirecting to home');
+          console.log('🔍 SelectCompany: Redirect details:', { 
+            authLoading, 
+            hasCurrentUser: !!currentUser,
+            currentUser: currentUser ? 'exists' : 'null/undefined'
+          });
           router.push("/");
           setIsLoadingData(false);
           return;

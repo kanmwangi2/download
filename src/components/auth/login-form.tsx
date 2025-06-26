@@ -59,19 +59,6 @@ export function LoginForm() {
     }
   }, [user, authLoading, loginSuccessful, router]);
 
-  // Fallback redirect if auth context takes too long
-  useEffect(() => {
-    if (loginSuccessful) {
-      const timeout = setTimeout(() => {
-        console.log("🕐 Auth context timeout, forcing redirect to /select-company");
-        router.replace("/select-company");
-      }, 3000); // 3 second timeout
-
-      return () => clearTimeout(timeout);
-    }
-    return undefined;
-  }, [loginSuccessful, router]);
-
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
@@ -110,7 +97,7 @@ export function LoginForm() {
         
         // Set flag to trigger redirect when auth context updates
         setLoginSuccessful(true);
-        setIsLoading(false); // Stop loading state
+        // Keep loading state until redirect happens
         
         // Don't redirect immediately - let the auth context handle it
         return; // Exit early after successful login

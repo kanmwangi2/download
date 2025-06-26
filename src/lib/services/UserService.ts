@@ -45,6 +45,11 @@ export class UserService extends BaseService {
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
     try {
       console.log('🔄 UserService: Getting current user...');
+      
+      // Check if we have a real Supabase client
+      const isRealClient = this.supabase && typeof this.supabase.auth?.getUser === 'function';
+      console.log('🔄 UserService: Supabase client status:', { isRealClient, hasAuth: !!this.supabase.auth });
+      
       // Get current user from Supabase auth
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
       if (userError || !user) {
@@ -123,6 +128,15 @@ export class UserService extends BaseService {
         }
       }
 
+      console.log('✅ UserService: Successfully created user object:', {
+        userId: user.id,
+        email: user.email || userProfile.email,
+        firstName: userProfile.first_name,
+        lastName: userProfile.last_name,
+        role,
+        assignedCompanyCount: assignedCompanyIds.length
+      });
+
       return {
         id: user.id,
         email: user.email || userProfile.email,
@@ -133,6 +147,7 @@ export class UserService extends BaseService {
         assignedCompanyIds: assignedCompanyIds,
       };
     } catch (error) {
+      console.error('❌ UserService: getCurrentUser threw exception:', error);
       this.handleError(error, 'get current user');
       return null;
     }

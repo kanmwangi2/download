@@ -28,11 +28,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Debug logging for every render
+  useEffect(() => {
+    console.log('🔍 AuthContext State:', { 
+      hasUser: !!user, 
+      userId: user?.id, 
+      userEmail: user?.email,
+      userRole: user?.role,
+      isLoading 
+    });
+  }, [user, isLoading]);
+
   const refreshUser = useCallback(async () => {
     try {
       console.log('🔄 AuthContext: Starting refreshUser');
       setIsLoading(true);
+      
+      // Check environment variables
+      const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      console.log('🔄 AuthContext: Environment check:', { hasUrl, hasKey });
+      
       const supabase = await getSupabaseClientAsync();
+      console.log('🔄 AuthContext: Got Supabase client, checking auth...');
+      
       const userService = new UserService(); // UserService extends BaseService which handles supabase internally
       const currentUser = await userService.getCurrentUser();
       console.log('🔄 AuthContext: Got user from service:', { userId: currentUser?.id, hasUser: !!currentUser });

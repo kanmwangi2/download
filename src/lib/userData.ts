@@ -120,21 +120,43 @@ import { getSupabaseClientAsync } from './supabase';
 /**
  * Ensures a user profile exists for the current authenticated user.
  * Call this after login or on app load.
+ * Now with better error handling and timing to prevent login conflicts.
  */
 export async function ensureUserProfile() {
-  const supabase = await getSupabaseClientAsync();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    // Fallbacks for missing names
-    const emailUsername = user.email?.split('@')[0] || '';
-    const firstName = user.user_metadata?.first_name || emailUsername;
-    const lastName = user.user_metadata?.last_name || '';
-    await supabase.from('user_profiles').upsert({
-      id: user.id,
-      email: user.email,
-      first_name: firstName,
-      last_name: lastName,
-      // Add more fields if needed
-    });
+  try {
+    // Add a small delay to let auth state settle after login
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const supabase = await getSupabaseClientAsync();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('Error getting user in ensureUserProfile:', userError);
+      return;
+    }
+    
+    if (user) {
+      // Fallbacks for missing names
+      const emailUsername = user.email?.split('@')[0] || '';
+      const firstName = user.user_metadata?.first_name || emailUsername;
+      const lastName = user.user_metadata?.last_name || '';
+      
+      const { error: upsertError } = await supabase.from('user_profiles').upsert({
+        id: user.id,
+        email: user.email,
+        first_name: firstName,
+        last_name: lastName,
+        // Add more fields if needed
+      });
+      
+      if (upsertError) {
+        console.error('Error upserting user profile:', upsertError);
+      } else {
+        console.log('✅ User profile ensured successfully');
+      }
+    }
+  } catch (error) {
+    console.error('Error in ensureUserProfile:', error);
+    // Don't throw - this shouldn't block login
   }
 }

@@ -76,7 +76,7 @@ export function LoginForm() {
           details: "Setting up your session..." 
         });
         // Ensure user profile exists
-        // await ensureUserProfile(); // Temporarily disabled to debug stack overflow
+        await ensureUserProfile();
         setIsLoading(false);
         // Use replace to prevent going back to login page
         try {

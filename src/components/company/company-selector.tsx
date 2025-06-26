@@ -30,12 +30,38 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext";
+import { useSimpleCompany } from "@/context/SimpleCompanyContext";
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { Company as AppCompany } from '@/lib/userData';
 
 import { objectToCamelCase } from '@/lib/case-conversion';
 
-// ...existing code...
+// Hook to use either SimpleCompanyContext or CompanyContext
+function useAnyCompanyContext() {
+  try {
+    // Try to use the simple context first (for select-company page)
+    return useSimpleCompany();
+  } catch {
+    try {
+      // Fall back to the full context (for app routes)
+      const context = useCompany();
+      return {
+        selectedCompanyId: context.selectedCompanyId,
+        setSelectedCompanyId: context.setSelectedCompanyId,
+        selectedCompanyName: context.selectedCompanyName,
+        setSelectedCompanyName: context.setSelectedCompanyName
+      };
+    } catch {
+      // If neither context is available, provide a fallback
+      return {
+        selectedCompanyId: null,
+        setSelectedCompanyId: () => {},
+        selectedCompanyName: null,
+        setSelectedCompanyName: () => {}
+      };
+    }
+  }
+}
 
 type CurrentUser = {
   id: string;
@@ -53,7 +79,7 @@ export function CompanySelector() {
     setSelectedCompanyId: setContextCompanyId,
     selectedCompanyName: contextCompanyName,
     setSelectedCompanyName: setContextCompanyName
-  } = useCompany();
+  } = useAnyCompanyContext();
 
   const [open, setOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<CurrentUser | null>(null);

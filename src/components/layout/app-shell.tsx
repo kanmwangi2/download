@@ -87,18 +87,19 @@ function SidebarNavigation() {
 function AppShellContent({ children }: { children: React.ReactNode }) {
   const { selectedCompanyName, selectedCompanyId, isLoadingCompanyContext } = useCompany();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Only redirect if we're definitely in the app routes and missing company context
     if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
+      const currentPath = pathname || window.location.pathname;
       // Only redirect if we're in app routes (not already at select-company or other root routes)
       if (currentPath.startsWith('/app/') && currentPath !== '/select-company') {
         console.log("AppShell: No company selected, redirecting to /select-company");
         router.replace("/select-company");
       }
     }
-  }, [selectedCompanyId, isLoadingCompanyContext, router]);
+  }, [selectedCompanyId, isLoadingCompanyContext, router, pathname]);
 
   const companyNameToDisplay = isLoadingCompanyContext ? "Loading Company..." : (selectedCompanyName || "No Company Selected");
   
@@ -107,7 +108,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
       return <div className="flex h-screen w-screen items-center justify-center"><p>Loading application data...</p></div>;
   }
   
-  if (!selectedCompanyId && !isLoadingCompanyContext && typeof window !== 'undefined' && window.location.pathname !== '/select-company') {
+  if (!selectedCompanyId && !isLoadingCompanyContext && typeof window !== 'undefined' && pathname !== '/select-company') {
     // This case should be handled by the useEffect redirect, but as a fallback:
     return <div className="flex h-screen w-screen items-center justify-center"><p>Redirecting to company selection...</p></div>;
   }

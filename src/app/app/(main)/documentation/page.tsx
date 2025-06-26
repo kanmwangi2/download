@@ -42,27 +42,52 @@ const documentationContent: DocSectionData[] = [
       },
       {
         type: 'subsection',
-        subTitle: "Technology Stack",
+        subTitle: "Technology Stack & Architecture",
         subContent: [
           { type: 'list', items: [
-            "Frontend: Next.js (React framework), TypeScript",
+            "Frontend: Next.js 14+ (React framework), TypeScript with strict mode",
             "UI Components: ShadCN UI (customizable components built with Radix UI and Tailwind CSS)",
-            "Styling: Tailwind CSS",
-            "Backend: Supabase (PostgreSQL, Auth, Storage, Functions)",
+            "Styling: Tailwind CSS with custom design system",
+            "Backend: Supabase (PostgreSQL, Auth, Storage, Real-time)",
+            "Database: PostgreSQL with proper foreign keys and constraints",
+            "Authentication: Supabase Auth with role-based access control",
+            "State Management: React Context with optimized re-rendering",
+            "Service Layer: Object-Oriented service architecture with Service Registry pattern",
+            "Type Safety: Comprehensive TypeScript types with database schema alignment",
+            "Data Mapping: Automated camelCase ↔ snake_case conversion at data boundaries"
           ]}
         ]
-      },      {
+      },
+      {
+        type: 'subsection',
+        subTitle: "Service Architecture",
+        subContent: [
+          "The application uses a modern Object-Oriented service architecture for data management:",
+          { type: 'list', items: [
+            "<strong>Service Registry:</strong> Centralized service management using singleton pattern",
+            "<strong>Base Service:</strong> Common database operations and error handling shared across all services",
+            "<strong>Specialized Services:</strong> Domain-specific services (StaffService, PaymentTypeService, DeductionService, etc.)",
+            "<strong>Type Safety:</strong> All database operations are fully type-safe with proper validation",
+            "<strong>Mapping Layer:</strong> Automatic conversion between database (snake_case) and application (camelCase) formats",
+            "<strong>Error Handling:</strong> Centralized error management with user-friendly feedback"
+          ]}
+        ]
+      },
+      {
         type: 'subsection',
         subTitle: "Data Persistence & Management",
         subContent: [
-          "Cheetah Payroll uses Supabase as its exclusive backend. All application data (staff records, payroll runs, company settings including payment types, deduction types, custom field definitions, tax configurations, user profiles, audit logs, etc.) is securely stored in the cloud and accessible from any device.",
+          "Cheetah Payroll uses Supabase as its exclusive backend with a modern Object-Oriented service architecture. All application data (staff records, payroll runs, company settings including payment types, deduction types, custom field definitions, tax configurations, user profiles, audit logs, etc.) is securely stored in the cloud and accessible from any device.",
           { type: 'list', items: [
             "<strong>Data Location:</strong> All data resides in Supabase PostgreSQL; nothing is stored locally in the browser.",
             "<strong>Data Scoping:</strong> Operational data is scoped per company. Global data includes the overall list of companies, user accounts, and tax settings.",
-            "<strong>Cloud-Native:</strong> Complete migration from IndexedDB to Supabase has been completed. The application is now fully cloud-native.",
-            "<strong>Real-time Sync:</strong> Data synchronizes in real-time across all user sessions through Supabase.",
+            "<strong>Cloud-Native:</strong> Complete migration from IndexedDB to Supabase has been completed. The application is now fully cloud-native with enterprise-grade security.",
+            "<strong>Real-time Sync:</strong> Data synchronizes in real-time across all user sessions through Supabase with automatic conflict resolution.",
+            "<strong>Service Architecture:</strong> Modern OOP-based services (StaffService, PayrollService, etc.) handle all data operations with comprehensive type safety.",
+            "<strong>Audit Trail:</strong> Complete activity logging tracks all user actions and system changes for compliance and troubleshooting.",
+            "<strong>Data Security:</strong> Row Level Security (RLS) ensures complete data isolation between companies with encrypted storage.",
             "<strong>Resetting the Application:</strong> To reset your company or user data, contact your system administrator or use the admin tools in the application settings (if available).",
-            "<strong>Suitability:</strong> This cloud-native setup is suitable for production, multi-user, and collaborative scenarios.",
+            "<strong>Suitability:</strong> This cloud-native setup is suitable for production, multi-user, and collaborative scenarios with automatic backups.",
             "<strong>Initial Data:</strong> The application is seeded with initial default data (for users and the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', including their respective staff, payment types, deduction types, custom fields, departments, company profiles, and payroll history) to allow for immediate exploration and use.",
           ]}
         ]
@@ -277,7 +302,7 @@ const documentationContent: DocSectionData[] = [
       {
         type: 'subsection',
         subTitle: "Audit Log",
-        subContent: ["Accessible via 'Utilities' > 'Audit Log'. View a chronological record of key activities performed within the application, such as payroll status changes, staff additions, or settings updates. Logs can be searched and are paginated."]
+        subContent: ["Accessible via 'Utilities' > 'Audit Log'. View a chronological record of key activities performed within the application, such as payroll status changes, staff additions, or settings updates. Features advanced filtering by action type, severity level, and date range. Logs can be searched by user, action, or description and are paginated for efficient browsing. Export functionality available for compliance reporting."]
       },
       {
         type: 'subsection',
@@ -486,9 +511,9 @@ export default function DocumentationPage() {
       let firstContentEstimatedHeight = 0;
       if (section.content.length > 0) {
           const firstContentItem = section.content[0];
-          if (firstContentItem.type === 'paragraph' && typeof firstContentItem.text === 'string') firstContentEstimatedHeight = baseFontLineHeight;
-          else if (firstContentItem.type === 'list' && firstContentItem.items && firstContentItem.items.length > 0) firstContentEstimatedHeight = baseFontLineHeight;
-          else if (firstContentItem.type === 'subsection' && firstContentItem.subTitle) firstContentEstimatedHeight = subSectionTitleLineHeight;
+          if (firstContentItem?.type === 'paragraph' && typeof firstContentItem.text === 'string') firstContentEstimatedHeight = baseFontLineHeight;
+          else if (firstContentItem?.type === 'list' && firstContentItem.items && firstContentItem.items.length > 0) firstContentEstimatedHeight = baseFontLineHeight;
+          else if (firstContentItem?.type === 'subsection' && firstContentItem.subTitle) firstContentEstimatedHeight = subSectionTitleLineHeight;
       }
       yPos = checkPageBreak(yPos, estSectionTitleHeight + firstContentEstimatedHeight + sectionTitleSpacingAfter);
 

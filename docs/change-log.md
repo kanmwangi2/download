@@ -735,108 +735,41 @@ All change-tracking markdown files have been consolidated into this main change 
 
 ================================================================================
 
-## 🧹 **UTILITY CLEANUP & CIRCULAR DEPENDENCY FIX - June 26, 2025**
+## 🔧 **COMPANY SELECTOR RESTORATION - June 26, 2025**
 
-### ✅ **DUPLICATE FILE CLEANUP**
+### ✅ **COMPANY SELECTION PAGE REBUILT**
 
-Cleaned up duplicate, unused, and legacy utility files to reduce maintenance overhead and prevent confusion.
-
-#### **Files Removed**
-
-**Duplicate Supabase Utilities:**
-- `src/lib/supabase-safe.ts` - Unused duplicate of main Supabase client
-- `src/lib/supabase-client-safe.ts` - Unused alternate Supabase client implementation
-
-**Legacy Data Files:**
-- `src/lib/deductionsData.ts` - Legacy static data, replaced by service architecture
-- `src/lib/deductionTypesData.ts` - Legacy static data, replaced by service architecture
-- `src/lib/paymentTypesData.ts` - Legacy static data, replaced by service architecture  
-- `src/lib/staffData.ts` - Legacy static data, replaced by service architecture
-- `src/lib/payrollData.ts` - Legacy static data, replaced by service architecture
-- `src/lib/database-setup.ts` - Unused database setup, `simple-database-setup.ts` is used
-
-**Unused Development Files:**
-- `src/lib/case-converter.ts` - Duplicate case conversion utility
-- `src/components/debug/supabase-test.tsx` - Debug component no longer needed
-- `src/app/app/(main)/staff/[id]/page_new.tsx` - Unused page variant
-- `src/components/debug/` - Empty directory after cleanup
-
-#### **Circular Dependency Resolution**
-
-**Problem Fixed:** `PayrollCalculationService` was causing infinite recursion by calling `ServiceRegistry.getInstance()` in its constructor, which was creating the service during service registry initialization.
-
-**Solution Applied:**
-- Replaced constructor dependency injection with lazy initialization pattern
-- Added private getter methods for each service dependency
-- Services are now instantiated only when first accessed
-- Eliminated circular dependency chain: `ServiceRegistry → PayrollCalculationService → ServiceRegistry`
-
-#### **Impact**
-
-- **Build Safety:** Eliminated "Maximum call stack size exceeded" errors
-- **Code Clarity:** Removed confusing duplicate utilities
-- **Maintenance:** Reduced number of files to maintain from legacy architecture
-- **Performance:** Services now use lazy loading instead of eager initialization
-
-### ✅ **CIRCULAR DEPENDENCY ARCHITECTURE FIX**
-
-Fixed critical production error where `PayrollCalculationService` was creating infinite recursion through the `ServiceRegistry.getInstance()` pattern.
-
-#### **Root Cause Analysis**
-
-The error occurred because:
-1. `ServiceRegistry.getInstance()` creates new `ServiceRegistry()`
-2. Constructor instantiates all services including `PayrollCalculationService`
-3. `PayrollCalculationService` constructor calls `ServiceRegistry.getInstance()` again
-4. This creates infinite loop: Registry → Service → Registry → Service...
-
-#### **Technical Solution**
-
-Implemented lazy initialization pattern in `PayrollCalculationService`:
-```typescript
-// Before: Eager initialization causing circular dependency
-constructor() {
-  const serviceRegistry = ServiceRegistry.getInstance();
-  this.staffService = serviceRegistry.staffService;
-}
-
-// After: Lazy initialization preventing circular dependency
-private get staffService(): StaffService {
-  if (!this._staffService) {
-    this._staffService = new StaffService();
-  }
-  return this._staffService;
-}
-```
-
-## 🐛 **DOCUMENTATION REFERENCE FIX - June 26, 2025**
-
-### ✅ **BROKEN REFERENCE RESOLUTION**
-
-Fixed application error caused by broken documentation references after consolidation cleanup.
+Restored the full company selection functionality that was accidentally simplified during cleanup, including the searchable dropdown (combobox) and application settings button.
 
 #### **Problem Identified**
 
-- **Application Error**: "An unexpected error has occurred" when accessing the application
-- **Root Cause**: Code references to deleted `docs/environment-setup.md` file in Supabase client
-- **Impact**: Runtime errors and broken error messages pointing to non-existent documentation
+- **Missing Functionality**: Company selection page was simplified to basic buttons, losing the searchable dropdown
+- **Context Issue**: Original component relied on `CompanyProvider` context not available outside main app layout
+- **User Experience**: Lost the intuitive search functionality for company selection
 
-#### **Files Fixed**
+#### **Solution Implemented**
 
-- **Supabase Client**: Updated `src/lib/supabase.ts` to reference `docs/blueprint.md` instead of deleted file
-- **Environment Example**: Updated `.env.example` to point to correct documentation
-- **Error Messages**: All database connection error messages now reference valid documentation
+- **Standalone Implementation**: Created self-contained company selection page without context dependencies
+- **Search Functionality**: Restored the Command/Combobox component with real-time search filtering
+- **Application Settings**: Re-added the "Application Settings" button for admin users
+- **Data Integration**: Proper Supabase integration to fetch and display companies
 
-#### **Reference Updates**
+#### **Features Restored**
 
-- Changed 7 references from `docs/environment-setup.md` to `docs/blueprint.md`
-- Updated user-facing error messages with correct documentation links
-- Ensured all setup instructions point to consolidated documentation
+- ✅ **Searchable Dropdown**: Users can type to filter companies in the selection list
+- ✅ **Company Icons**: Each company shows with briefcase icon for visual clarity
+- ✅ **Application Settings Button**: Admin users can access application settings
+- ✅ **User Welcome**: Personalized greeting with user's first name
+- ✅ **Loading States**: Proper loading indicator while fetching data
+- ✅ **Error Handling**: Graceful handling of authentication and data loading errors
+- ✅ **Logout Functionality**: Clean logout with state clearing
 
-#### **Resolution**
+#### **Technical Details**
 
-- ✅ **Application Error Fixed**: No more runtime errors from broken documentation references
-- ✅ **Proper Error Messages**: Users now see correct documentation links when environment setup is needed
-- ✅ **Documentation Consistency**: All references point to the consolidated blueprint.md file
+- **Component**: Rebuilt `/select-company` page as standalone component
+- **Dependencies**: Uses ShadCN UI Command component for search functionality
+- **State Management**: Local state management with localStorage for company selection
+- **Data Flow**: Direct Supabase integration without requiring CompanyProvider context
+- **Build Compatibility**: No SSR/prerendering issues with proper client-side implementation
 
-## 📚 **DOCUMENTATION CONSOLIDATION - June 26, 2025**
+## 🧹 **UTILITY CLEANUP & CIRCULAR DEPENDENCY FIX - June 26, 2025**

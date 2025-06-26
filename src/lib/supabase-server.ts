@@ -72,6 +72,31 @@ export async function createServerComponentClient() {
 
 // For API routes that need service role access
 export function createServiceRoleClient() {
-  // Always return mock - service role should not be used during static generation
-  return createMockClient() as any
+  // Return mock during build or if environment not ready
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('Service role client: Missing environment variables, returning mock')
+    return createMockClient() as any
+  }
+
+  try {
+    // Dynamic import for service role client
+    const { createClient } = require('@supabase/supabase-js')
+    
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+    
+    console.log('✅ Service role client created successfully')
+    return client
+  } catch (error) {
+    console.warn('Failed to create service role client:', error)
+    return createMockClient() as any
+  }
 } 

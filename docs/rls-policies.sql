@@ -3,6 +3,33 @@
 -- Multi-tenant data isolation for Cheetah Payroll
 -- =====================================================
 
+-- =====================================================
+-- TROUBLESHOOTING SECTION
+-- =====================================================
+-- If you're experiencing 500/400 errors with company/user creation,
+-- you may need to apply one of these fixes:
+--
+-- OPTION 1: EMERGENCY FIX (Very permissive - for testing only)
+-- Uncomment the following lines to disable RLS temporarily:
+-- ALTER TABLE public.companies DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_profiles DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_company_assignments DISABLE ROW LEVEL SECURITY;
+--
+-- OPTION 2: PERMISSIVE POLICIES (for debugging)
+-- Replace the policies below with these very permissive ones:
+-- DROP POLICY IF EXISTS "Users can insert companies" ON companies;
+-- CREATE POLICY "Allow all authenticated for companies" ON companies
+--   FOR ALL USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+-- DROP POLICY IF EXISTS "Users can manage own profile" ON user_profiles;
+-- CREATE POLICY "Allow all authenticated for profiles" ON user_profiles
+--   FOR ALL USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+-- DROP POLICY IF EXISTS "Users can create assignments" ON user_company_assignments;
+-- CREATE POLICY "Allow all authenticated for assignments" ON user_company_assignments
+--   FOR ALL USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+--
+-- Remember to restore proper restrictive policies after testing!
+-- =====================================================
+
 -- Enable RLS on all tables
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
@@ -38,16 +65,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =====================================================
 -- USER PROFILES POLICIES
--- Users can only see/edit their own profile
+-- Users can manage their own profile (allows new user creation)
 -- =====================================================
-CREATE POLICY "Users can view own profile" ON user_profiles
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile" ON user_profiles
-  FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own profile" ON user_profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can manage own profile" ON user_profiles
+  FOR ALL USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- =====================================================
 -- COMPANIES POLICIES
@@ -343,3 +365,46 @@ ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
 ALTER PUBLICATION supabase_realtime ADD TABLE user_avatars;
 ALTER PUBLICATION supabase_realtime ADD TABLE custom_field_definitions;
 ALTER PUBLICATION supabase_realtime ADD TABLE users;
+
+-- =====================================================
+-- GRANT PERMISSIONS TO AUTHENTICATED USERS
+-- Ensures users have the necessary permissions to access tables
+-- =====================================================
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.companies TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_company_assignments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.departments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.staff_members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payment_types TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.deduction_types TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.staff_payment_configs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.staff_deductions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tax_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payroll_runs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payroll_run_details TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.audit_logs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_avatars TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.custom_field_definitions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.users TO authenticated;
+
+-- =====================================================
+-- FINAL TROUBLESHOOTING NOTES
+-- =====================================================
+-- If you're still experiencing issues after applying these policies:
+--
+-- 1. Check that your service role key is properly configured
+-- 2. Verify the Supabase URL and anon key are correct
+-- 3. Ensure the application is using the real Supabase client (not mock)
+-- 4. Check browser console for specific error messages
+-- 5. Monitor the Supabase logs for detailed error information
+--
+-- For immediate testing, you can temporarily disable RLS:
+-- ALTER TABLE public.companies DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_profiles DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_company_assignments DISABLE ROW LEVEL SECURITY;
+--
+-- Remember to re-enable RLS and restore proper policies for production:
+-- ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_company_assignments ENABLE ROW LEVEL SECURITY;
+-- =====================================================

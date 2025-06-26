@@ -88,32 +88,51 @@ export function CompanySelector() {
 
   React.useEffect(() => {
     const loadInitialData = async () => {
+      console.log('🔄 CompanySelector: Starting loadInitialData')
       setIsLoadingData(true);
-      const supabase = await getSupabaseClientAsync();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUser({
-          id: user.id,
-          email: user.email || '',
-          firstName: user.user_metadata?.first_name || 'User',
-          lastName: user.user_metadata?.last_name || '',
-          role: user.user_metadata?.role || 'Primary Admin',
-          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
-        });
-      } else {
-        router.push("/");
+      
+      try {
+        const supabase = await getSupabaseClientAsync();
+        console.log('🔄 CompanySelector: Got Supabase client')
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('🔄 CompanySelector: Got user data', { userId: user?.id })
+        
+        if (user) {
+          setCurrentUser({
+            id: user.id,
+            email: user.email || '',
+            firstName: user.user_metadata?.first_name || 'User',
+            lastName: user.user_metadata?.last_name || '',
+            role: user.user_metadata?.role || 'Primary Admin',
+            assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
+          });
+          
+          console.log('🔄 CompanySelector: Fetching companies')
+          // Fetch companies from Supabase
+          const { data: companies, error } = await supabase.from('companies').select('*');
+          console.log('🔄 CompanySelector: Companies fetched', { companiesCount: companies?.length, error })
+          
+          if (error) {
+            console.error('❌ CompanySelector: Error fetching companies:', error)
+            setAvailableCompanies([]);
+          } else {
+            setAvailableCompanies((companies || []).map(objectToCamelCase));
+          }
+        } else {
+          console.log('🔄 CompanySelector: No user found, redirecting to home')
+          router.push("/");
+          setIsLoadingData(false);
+          return;
+        }
+      } catch (error) {
+        console.error('❌ CompanySelector: Error in loadInitialData:', error)
+      } finally {
         setIsLoadingData(false);
-        return;
+        console.log('✅ CompanySelector: loadInitialData completed')
       }
-      // Fetch companies from Supabase
-      const { data: companies, error } = await supabase.from('companies').select('*');
-      if (error) {
-        setAvailableCompanies([]);
-      } else {
-        setAvailableCompanies((companies || []).map(objectToCamelCase));
-      }
-      setIsLoadingData(false);
     };
+    
     loadInitialData();
   }, [router]);
 

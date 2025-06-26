@@ -33,6 +33,7 @@ const createMockClient = () => {
 
 // Runtime client cache
 let runtimeClient: any = null
+let isCreatingClient = false
 
 // Check if we're in browser
 const isBrowser = () => typeof window !== 'undefined'
@@ -118,7 +119,8 @@ export async function getSupabaseClientAsync() {
   console.log('🔄 Supabase: getSupabaseClientAsync called', { 
     isBrowser: isBrowser(), 
     hasEnvVars: hasEnvVars(),
-    runtimeClient: !!runtimeClient 
+    runtimeClient: !!runtimeClient,
+    isCreatingClient
   })
   
   if (!isBrowser()) {
@@ -131,10 +133,29 @@ export async function getSupabaseClientAsync() {
     return createMockClient()
   }
   
-  if (!runtimeClient) {
-    console.log('🔄 Supabase: Creating runtime client...')
+  if (runtimeClient) {
+    return runtimeClient
+  }
+  
+  if (isCreatingClient) {
+    console.log('🔄 Supabase: Client creation in progress, waiting...')
+    // Wait for the client creation to complete
+    while (isCreatingClient && !runtimeClient) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    return runtimeClient || createMockClient()
+  }
+  
+  console.log('🔄 Supabase: Creating runtime client...')
+  isCreatingClient = true
+  try {
     runtimeClient = await createRealClient()
     console.log('✅ Supabase: Runtime client created successfully')
+  } catch (error) {
+    console.error('❌ Supabase: Failed to create client:', error)
+    runtimeClient = createMockClient()
+  } finally {
+    isCreatingClient = false
   }
   
   return runtimeClient

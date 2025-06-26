@@ -1,11 +1,8 @@
 
-import { CompanySelector } from "@/components/company/company-selector";
-import { SimpleCompanyProvider } from "@/context/SimpleCompanyContext";
+import { MinimalCompanySelector } from "@/components/company/minimal-company-selector";
 
 export default function SelectCompanyPage() {
   return (
-    <SimpleCompanyProvider>
-      <CompanySelector />
-    </SimpleCompanyProvider>
+    <MinimalCompanySelector />
   );
 }

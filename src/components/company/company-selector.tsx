@@ -67,35 +67,37 @@ export function CompanySelector() {
         const supabase = await getSupabaseClientAsync();
         console.log('🔄 CompanySelector: Got Supabase client')
         
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('🔄 CompanySelector: Got user data', { userId: user?.id })
+        // Get the current session to ensure authentication state is fresh
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔄 CompanySelector: Got session data', { hasSession: !!session, sessionError })
         
-        if (user) {
-          setCurrentUser({
-            id: user.id,
-            email: user.email || '',
-            firstName: user.user_metadata?.first_name || 'User',
-            lastName: user.user_metadata?.last_name || '',
-            role: user.user_metadata?.role || 'Primary Admin',
-            assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
-          });
-          
-          console.log('🔄 CompanySelector: Fetching companies')
-          // Fetch companies from Supabase
-          const { data: companies, error } = await supabase.from('companies').select('*');
-          console.log('🔄 CompanySelector: Companies fetched', { companiesCount: companies?.length, error })
-          
-          if (error) {
-            console.error('❌ CompanySelector: Error fetching companies:', error)
-            setAvailableCompanies([]);
-          } else {
-            setAvailableCompanies((companies || []).map(objectToCamelCase));
-          }
-        } else {
-          console.log('🔄 CompanySelector: No user found, redirecting to home')
+        if (sessionError || !session?.user) {
+          console.log('🔄 CompanySelector: No valid session found, redirecting to home')
           router.push("/");
           setIsLoadingData(false);
           return;
+        }
+
+        const user = session.user;
+        setCurrentUser({
+          id: user.id,
+          email: user.email || '',
+          firstName: user.user_metadata?.first_name || 'User',
+          lastName: user.user_metadata?.last_name || '',
+          role: user.user_metadata?.role || 'Primary Admin',
+          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
+        });
+        
+        console.log('🔄 CompanySelector: Fetching companies')
+        // Fetch companies from Supabase
+        const { data: companies, error } = await supabase.from('companies').select('*');
+        console.log('🔄 CompanySelector: Companies fetched', { companiesCount: companies?.length, error })
+        
+        if (error) {
+          console.error('❌ CompanySelector: Error fetching companies:', error)
+          setAvailableCompanies([]);
+        } else {
+          setAvailableCompanies((companies || []).map(objectToCamelCase));
         }
       } catch (error) {
         console.error('❌ CompanySelector: Error in loadInitialData:', error)

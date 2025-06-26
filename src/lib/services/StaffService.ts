@@ -14,6 +14,7 @@ export class StaffService extends BaseService {
    */
   async getStaffByCompany(companyId: string, options?: { activeOnly?: boolean }): Promise<StaffMember[]> {
     try {
+      await this.ensureInitialized();
       let query = this.supabase
         .from(this.tableName)
         .select('*')
@@ -46,6 +47,7 @@ export class StaffService extends BaseService {
    */
   async getById(id: string, companyId: string): Promise<StaffMember | null> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.tableName)
         .select('*')
@@ -75,6 +77,7 @@ export class StaffService extends BaseService {
     try {
       this.validateRequired(data, ['firstName', 'lastName', 'email', 'employmentDate', 'companyId']);
       const backendData = staffToBackend(data);
+      await this.ensureInitialized();
 
       const { data: result, error } = await this.supabase
         .from(this.tableName)
@@ -103,6 +106,7 @@ export class StaffService extends BaseService {
   async update(id: string, data: Partial<Omit<StaffMember, 'id' | 'companyId'>>): Promise<StaffMember> {
     try {
       const backendData = staffToBackend(data as StaffMember); // Cast needed for mapping
+      await this.ensureInitialized();
 
       const { data: result, error } = await this.supabase
         .from(this.tableName)
@@ -128,6 +132,7 @@ export class StaffService extends BaseService {
    */
   async delete(id: string): Promise<void> {
     try {
+      await this.ensureInitialized();
       const { error } = await this.supabase
         .from(this.tableName)
         .delete()
@@ -146,6 +151,7 @@ export class StaffService extends BaseService {
    */
   async bulkDelete(ids: string[]): Promise<{ count: number }> {
     try {
+      await this.ensureInitialized();
       const { count, error } = await this.supabase
         .from(this.tableName)
         .delete()

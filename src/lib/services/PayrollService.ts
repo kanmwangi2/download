@@ -15,6 +15,7 @@ export class PayrollService extends BaseService {
    */
   async getPayrollRunDetail(id: string, companyId: string): Promise<PayrollRunDetail | null> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.payrollRunDetailsTable)
         .select('*')
@@ -40,6 +41,7 @@ export class PayrollService extends BaseService {
    */
   async getPayrollRunSummary(id: string, companyId: string): Promise<PayrollRunSummary | null> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.payrollRunsTable)
         .select('*')
@@ -65,6 +67,7 @@ export class PayrollService extends BaseService {
    */
   async getPayrollRunSummaries(companyId: string): Promise<PayrollRunSummary[]> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.payrollRunsTable)
         .select('*')
@@ -88,6 +91,7 @@ export class PayrollService extends BaseService {
    */
   async updatePayrollRunDetail(detail: PayrollRunDetail): Promise<void> {
     try {
+      await this.ensureInitialized();
       const detailSnake = objectToSnakeCase(detail);
       const { error } = await this.supabase
         .from(this.payrollRunDetailsTable)
@@ -106,6 +110,7 @@ export class PayrollService extends BaseService {
    */
   async updatePayrollRunSummary(summary: PayrollRunSummary): Promise<void> {
     try {
+      await this.ensureInitialized();
       const summarySnake = objectToSnakeCase(summary);
       const { error } = await this.supabase
         .from(this.payrollRunsTable)

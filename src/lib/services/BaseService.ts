@@ -7,19 +7,59 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export abstract class BaseService {
   private _supabase: SupabaseClient | null = null;
+  private _initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    // Lazy initialization - client will be created on first access
+    // Start initialization but don't wait for it
+    this._initializationPromise = this.initializeSupabase();
   }
 
   /**
-   * Get Supabase client with lazy initialization
+   * Initialize Supabase client asynchronously
    */
-  protected async getSupabase(): Promise<SupabaseClient> {
-    if (!this._supabase) {
+  private async initializeSupabase(): Promise<void> {
+    try {
       this._supabase = await getSupabaseClientAsync();
+      console.log(`${this.constructor.name}: Supabase client initialized successfully`);
+    } catch (error) {
+      console.error(`${this.constructor.name}: Failed to initialize Supabase client:`, error);
+      // Create a basic mock client to prevent "undefined" errors
+      this._supabase = {
+        from: () => ({
+          select: () => Promise.resolve({ data: [], error: { message: 'Database connection unavailable' } }),
+          insert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
+          update: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
+          delete: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
+          upsert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
+        })
+      } as any;
     }
-    return this._supabase as SupabaseClient;
+  }
+
+  /**
+   * Ensure Supabase client is initialized before use
+   */
+  protected async ensureInitialized(): Promise<void> {
+    if (this._initializationPromise) {
+      await this._initializationPromise;
+      this._initializationPromise = null;
+    }
+    
+    if (!this._supabase) {
+      await this.initializeSupabase();
+    }
+  }
+
+  /**
+   * Get the initialized Supabase client
+  /**
+   * Get the initialized Supabase client
+   */
+  protected get supabase(): SupabaseClient {
+    if (!this._supabase) {
+      throw new Error(`${this.constructor.name}: Supabase client not initialized. Call ensureInitialized() first.`);
+    }
+    return this._supabase;
   }
 
   /**

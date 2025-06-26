@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StaffMember } from '@/lib/types/staff';
-import { PaymentType, StaffPayment, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID } from '@/lib/types/payments';
+import { PaymentType, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID } from '@/lib/types/payments';
 import Papa from 'papaparse';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import * as XLSX from 'xlsx';
@@ -35,188 +35,310 @@ import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-al
 // Import services
 import { ServiceRegistry } from '@/lib/services/ServiceRegistry';
 
-// Type for staff payment details mapping
-type StaffPaymentDetails = Record<string, number>;
-const defaultPaymentDetails: StaffPaymentDetails = {};
-
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
 const defaultNewPaymentTypeData: Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'> = {
   name: "",
-  type: "allowance",
+  type: "Gross",
   isTaxable: false,
-  isDefault: false,
-};
-
-const sanitizeFilename = (name: string | null | undefined): string => {
-    if (!name) return 'UnknownCompany';
-    return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-};
-
-const formatCurrency = (amount?: number): string => {
-  if (!amount || isNaN(amount)) return "0";
-  return Math.round(amount).toLocaleString();
-};
-
-const formatNumberForTable = (amount: number): string => {
-  return Math.round(amount).toLocaleString();
+  isPensionable: false,
 };
 
 export default function PaymentsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
-  const staffPaymentImportFileInputRef = useRef<HTMLInputElement>(null);
-  const paymentTypesImportFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Component State
+  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState("payment-types");
 
   // Initialize services
-  const services = useMemo(() => ServiceRegistry.getInstance(), []);
+  const [services, setServices] = useState<ServiceRegistry | null>(null);
 
+  // Payment Types data state
   const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
+  const [paymentTypeSearchTerm, setPaymentTypeSearchTerm] = useState("");
+  const [paymentTypeCurrentPage, setPaymentTypeCurrentPage] = useState(1);
+  const [paymentTypeRowsPerPage, setPaymentTypeRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
+
+  // Dialog states
   const [isPaymentTypeDialogOpen, setIsPaymentTypeDialogOpen] = useState(false);
   const [editingPaymentType, setEditingPaymentType] = useState<PaymentType | null>(null);
-  const [paymentTypeFormData, setPaymentTypeFormData] = useState(defaultNewPaymentTypeData);
-  const [isDeletePaymentTypeDialogOpen, setIsDeletePaymentTypeDialogOpen] = useState(false);
-  const [paymentTypeToDelete, setPaymentTypeToDelete] = useState<PaymentType | null>(null);
-  const [paymentTypeSearchTerm, setPaymentTypeSearchTerm] = useState("");
-  const [ptCurrentPage, setPtCurrentPage] = useState(1);
-  const [ptRowsPerPage, setPtRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
-  const [selectedPaymentTypeItems, setSelectedPaymentTypeItems] = useState<Set<string>>(new Set());
-  const [isBulkDeletePaymentTypesDialogOpen, setIsBulkDeletePaymentTypesDialogOpen] = useState(false);
-
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [paymentDataStore, setPaymentDataStore] = useState<Record<string, StaffPaymentDetails>>({});
-  const [isStaffPaymentFormDialogOpen, setIsStaffPaymentFormDialogOpen] = useState(false);
-  const [editingStaffForPayments, setEditingStaffForPayments] = useState<StaffMember | null>(null);
-  const [currentStaffPaymentFormData, setCurrentStaffPaymentFormData] = useState<StaffPaymentDetails>(JSON.parse(JSON.stringify(defaultPaymentDetails)));
-
-  const [isAddStaffPaymentDialogOpen, setIsAddStaffPaymentDialogOpen] = useState(false);
-  const [selectedStaffIdForNewConfig, setSelectedStaffIdForNewConfig] = useState<string>("");
-
-  const [isDeleteStaffPaymentRecordDialogOpen, setIsDeleteStaffPaymentRecordDialogOpen] = useState(false);
-  const [staffIdForPaymentRecordDeletion, setStaffIdForPaymentRecordDeletion] = useState<string | null>(null);
-
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [staffPaymentSearchTerm, setStaffPaymentSearchTerm] = useState("");
-  const [spCurrentPage, setSpCurrentPage] = useState(1);
-  const [spRowsPerPage, setSpRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
-  const [selectedStaffPaymentItems, setSelectedStaffPaymentItems] = useState<Set<string>>(new Set());
-  const [isBulkDeleteStaffPaymentsDialogOpen, setIsBulkDeleteStaffPaymentsDialogOpen] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
-
-  // Dialog-specific feedback states
-  const [paymentTypeDialogFeedback, setPaymentTypeDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [deletePaymentTypeDialogFeedback, setDeletePaymentTypeDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [bulkDeletePaymentTypesDialogFeedback, setBulkDeletePaymentTypesDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [staffPaymentFormDialogFeedback, setStaffPaymentFormDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [addStaffPaymentDialogFeedback, setAddStaffPaymentDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [deleteStaffPaymentDialogFeedback, setDeleteStaffPaymentDialogFeedback] = useState<FeedbackMessage | null>(null);
-  const [bulkDeleteStaffPaymentsDialogFeedback, setBulkDeleteStaffPaymentsDialogFeedback] = useState<FeedbackMessage | null>(null);
+  const [paymentTypeFormData, setPaymentTypeFormData] = useState<Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'>>(defaultNewPaymentTypeData);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (isLoadingCompanyContext || !selectedCompanyId || typeof window === 'undefined') {
-        if (!isLoadingCompanyContext && !selectedCompanyId) {
-          setPaymentTypes([]); setStaffList([]); setPaymentDataStore({}); setIsLoaded(true);
-        }
+    setServices(ServiceRegistry.getInstance());
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!selectedCompanyId || isLoadingCompanyContext || !services) {
+        if (!isLoadingCompanyContext && !selectedCompanyId) setIsLoaded(true);
         return;
       }
-      setIsLoaded(false);
-      setFeedback(null);
-      
+
       try {
-        // Use services to fetch data
-        const [paymentTypesData, staffData, paymentConfigs] = await Promise.all([
-          services.paymentTypeService.getByCompanyId(selectedCompanyId),
-          services.staffService.getByCompanyId(selectedCompanyId),
-          services.staffPaymentConfigService.getByCompanyId(selectedCompanyId)
-        ]);
+        // Fetch payment types
+        const fetchedPaymentTypes = await services.paymentTypeService.getByCompanyId(selectedCompanyId);
+        setPaymentTypes(fetchedPaymentTypes);
 
-        setPaymentTypes(paymentTypesData);
-        setStaffList(staffData);
-        
-        // Map payment configs to the existing data structure
-        const paymentStore: Record<string, StaffPaymentDetails> = {};
-        paymentConfigs.forEach((config: any) => {
-          if (!paymentStore[config.staffId]) {
-            paymentStore[config.staffId] = {};
-          }
-          paymentStore[config.staffId]![config.paymentTypeId] = config.amount || 0;
-        });
-        
-        setPaymentDataStore(paymentStore);
-
+        setIsLoaded(true);
       } catch (error) {
-        console.error("Error loading data for Payments page:", error);
-        setPaymentTypes([]); setStaffList([]); setPaymentDataStore({});
+        console.error("Error fetching payment data:", error);
         setFeedback({
-          type: 'error', 
-          message: "Loading Error", 
-          details: `Could not load payment data. ${error instanceof Error ? error.message : 'Unknown error'}`
+          type: "error",
+          message: "Failed to load payment data. Please try again."
         });
+        setIsLoaded(true);
       }
-      setIsLoaded(true);
     };
-    loadData();
+
+    fetchData();
   }, [selectedCompanyId, isLoadingCompanyContext, services]);
 
-  // Component rendering placeholder
+  // Computed values for payment types
+  const filteredPaymentTypes = useMemo(() => {
+    return paymentTypes.filter(paymentType =>
+      paymentType.name.toLowerCase().includes(paymentTypeSearchTerm.toLowerCase())
+    );
+  }, [paymentTypes, paymentTypeSearchTerm]);
+
+  const paymentTypeTotalPages = Math.ceil(filteredPaymentTypes.length / (paymentTypeRowsPerPage || 10));
+  const paginatedPaymentTypes = useMemo(() => {
+    const rowsPerPage = paymentTypeRowsPerPage || 10;
+    const startIndex = (paymentTypeCurrentPage - 1) * rowsPerPage;
+    return filteredPaymentTypes.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredPaymentTypes, paymentTypeCurrentPage, paymentTypeRowsPerPage]);
+
+  // Loading states
   if (isLoadingCompanyContext) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading...</span>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading company context...</span>
+        </div>
       </div>
     );
   }
 
-  if (!selectedCompanyId) {
+  if (!selectedCompanyId && !isLoadingCompanyContext) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No Company Selected</CardTitle>
-          <CardDescription>Please select a company to manage payments.</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="container mx-auto p-6">
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <CreditCard className="h-16 w-16 text-muted-foreground mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">No Company Selected</h2>
+          <p className="text-muted-foreground mb-6">
+            Please select a company to manage payments.
+          </p>
+          <Button asChild>
+            <Link href="/select-company">Select Company</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading payment data...</span>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Payment Management</h1>
-      </div>
-
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-2">Payment Management</h1>
+      <p className="text-muted-foreground mb-6">
+        Manage payment types and staff payment configurations for your company.
+      </p>
+      
       <FeedbackAlert feedback={feedback} />
 
-      <Button 
-        variant="outline" 
-        onClick={() => setFeedback(null)}
-        className={feedback ? "mb-4" : "hidden"}
-      >
-        Clear Messages
-      </Button>
-
-      <Tabs defaultValue="payment-types" className="w-full">
-        <TabsList>
-          <TabsTrigger value="payment-types">Payment Types</TabsTrigger>
-          <TabsTrigger value="staff-payments">Staff Payments</TabsTrigger>
+      <Tabs defaultValue="payment-types" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="payment-types">
+            <CreditCard className="mr-2 h-4 w-4" /> Payment Types
+          </TabsTrigger>
+          <TabsTrigger value="staff-payments">
+            <Banknote className="mr-2 h-4 w-4" /> Staff Payments
+          </TabsTrigger>
         </TabsList>
-
+        
         <TabsContent value="payment-types">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Payment Types
-              </CardTitle>
+              <CardTitle>Manage Payment Types</CardTitle>
               <CardDescription>
-                Manage payment types for your organization
+                Define and configure payment types for your organization. 
+                Currently managing {paymentTypes.length} payment types.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Info className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Payment Types management interface will be implemented here</p>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={() => setIsPaymentTypeDialogOpen(true)} className="flex-1">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Payment Type
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="flex-1">
+                      Export Data
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => console.log('Export CSV')}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => console.log('Export Excel')}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => console.log('Export PDF')}>
+                      <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
+
+              {/* Search and filters */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search payment types..."
+                    value={paymentTypeSearchTerm}
+                    onChange={(e) => setPaymentTypeSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Types Table */}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Taxable</TableHead>
+                      <TableHead>Default</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedPaymentTypes.map((paymentType) => (
+                      <TableRow key={paymentType.id}>
+                        <TableCell className="font-medium">{paymentType.name}</TableCell>
+                        <TableCell className="capitalize">{paymentType.type}</TableCell>
+                        <TableCell>{paymentType.isTaxable ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>{paymentType.isFixedName ? 'Yes' : 'No'}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => console.log('Edit', paymentType.id)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => console.log('Delete', paymentType.id)}
+                                disabled={!paymentType.isDeletable}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {(paymentTypeCurrentPage - 1) * (paymentTypeRowsPerPage || 10) + 1} to{' '}
+                    {Math.min(paymentTypeCurrentPage * (paymentTypeRowsPerPage || 10), filteredPaymentTypes.length)} of{' '}
+                    {filteredPaymentTypes.length} entries
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+                  <Select
+                    value={(paymentTypeRowsPerPage || 10).toString()}
+                    onValueChange={(value) => {
+                      setPaymentTypeRowsPerPage(Number(value));
+                      setPaymentTypeCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option.toString()}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaymentTypeCurrentPage(1)}
+                      disabled={paymentTypeCurrentPage === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaymentTypeCurrentPage(paymentTypeCurrentPage - 1)}
+                      disabled={paymentTypeCurrentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
+                      Page {paymentTypeCurrentPage} of {paymentTypeTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaymentTypeCurrentPage(paymentTypeCurrentPage + 1)}
+                      disabled={paymentTypeCurrentPage === paymentTypeTotalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaymentTypeCurrentPage(paymentTypeTotalPages)}
+                      disabled={paymentTypeCurrentPage === paymentTypeTotalPages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {paymentTypes.length === 0 && (
+                <div className="text-center py-8">
+                  <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No payment types found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -224,8 +346,8 @@ export default function PaymentsPage() {
         <TabsContent value="staff-payments">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
+              <CardTitle>
+                <Banknote className="inline mr-2 h-5 w-5" />
                 Staff Payments
               </CardTitle>
               <CardDescription>

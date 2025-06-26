@@ -75,8 +75,9 @@ export function LoginForm() {
           message: "Login Successful", 
           details: "Setting up your session..." 
         });
-        // Ensure user profile exists
-        await ensureUserProfile();
+        // Ensure user profile exists - DISABLED to prevent stack overflow
+        // TODO: Move this to a background process after login
+        // await ensureUserProfile();
         setIsLoading(false);
         // Use replace to prevent going back to login page
         try {

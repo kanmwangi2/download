@@ -90,15 +90,28 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Only redirect if we're definitely in the app routes and missing company context
-    if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined') {
-      const currentPath = pathname || window.location.pathname;
-      // Only redirect if we're in app routes (not already at select-company or other root routes)
-      if (currentPath.startsWith('/app/') && currentPath !== '/select-company') {
-        console.log("AppShell: No company selected, redirecting to /select-company");
-        router.replace("/select-company");
+    // Add a small delay to prevent race conditions during initial load
+    const timeoutId = setTimeout(() => {
+      // Only redirect if we're definitely in the app routes and missing company context
+      if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined') {
+        const currentPath = pathname || window.location.pathname;
+        console.log("AppShell: Checking redirect logic", { 
+          currentPath, 
+          isLoadingCompanyContext, 
+          selectedCompanyId: !!selectedCompanyId,
+          startsWithApp: currentPath.startsWith('/app/'),
+          isSelectCompany: currentPath === '/select-company'
+        });
+        
+        // Only redirect if we're in app routes (not already at select-company or other root routes)
+        if (currentPath.startsWith('/app/') && currentPath !== '/select-company') {
+          console.log("AppShell: No company selected, redirecting to /select-company");
+          router.replace("/select-company");
+        }
       }
-    }
+    }, 100); // 100ms delay to let context load
+
+    return () => clearTimeout(timeoutId);
   }, [selectedCompanyId, isLoadingCompanyContext, router, pathname]);
 
   const companyNameToDisplay = isLoadingCompanyContext ? "Loading Company..." : (selectedCompanyName || "No Company Selected");

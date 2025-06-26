@@ -6,7 +6,7 @@
 // Build-time safe mock client
 const createMockClient = () => {
   console.warn('⚠️ Supabase: Using mock client - database operations will not work')
-  console.warn('💡 To fix this: Set up environment variables in .env.local (see docs/environment-setup.md)')
+  console.warn('💡 To fix this: Set up environment variables in .env.local (see docs/blueprint.md)')
   return {
     auth: {
       getUser: () => Promise.resolve({ data: { user: null }, error: null }),
@@ -19,14 +19,14 @@ const createMockClient = () => {
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
-          select: () => Promise.resolve({ data: [], error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+          single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
+          select: () => Promise.resolve({ data: [], error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
         }),
-        single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+        single: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
       }),
-      insert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
-      update: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
-      delete: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/environment-setup.md)' } }),
+      insert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
+      update: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
+      delete: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable: Please set up Supabase environment variables (see docs/blueprint.md)' } }),
     }),
   }
 }

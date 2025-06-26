@@ -22,6 +22,20 @@ export interface PayrollRunDeduction {
 }
 
 /**
+ * Represents a general deduction (used in payroll calculations)
+ */
+export interface Deduction {
+  id: string;
+  companyId: string;
+  staffId: string;
+  deductionTypeId: string;
+  balance: number;
+  monthlyDeduction: number;
+  startDate: string;
+  isActive: boolean;
+}
+
+/**
  * Deduction statuses
  */
 export type DeductionStatus = 'active' | 'paused' | 'completed';

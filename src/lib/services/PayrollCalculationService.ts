@@ -4,33 +4,69 @@ import { DeductionService } from './DeductionService';
 import { PaymentTypeService } from './PaymentTypeService';
 import { StaffPaymentConfigService } from './StaffPaymentConfigService';
 import { CompanyService } from './CompanyService';
-import { ServiceRegistry } from './ServiceRegistry';
 
 // Import centralized types
-import { CompanyProfileData } from '../types/company';
 import { EmployeePayrollRecord, PayrollRunDetail, AppliedDeductionDetail } from '../types/payroll';
-import { StaffMember, StaffPaymentDetails } from '../types/staff';
+import { StaffMember } from '../types/staff';
 import { TaxSettingsData } from '../types/tax';
-import { Deduction } from '../types/deductions';
-import { PaymentType, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID } from '../types/payments';
+import { PaymentType, StaffPaymentDetails, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID } from '../types/payments';
 import { DeductionType } from '../types/deductionTypes';
+import { Deduction } from '../types/deductions';
+import { CompanyProfileData } from '../types/company';
 
 export class PayrollCalculationService {
-    private staffService: StaffService;
-    private taxService: TaxService;
-    private deductionService: DeductionService;
-    private paymentTypeService: PaymentTypeService;
-    private staffPaymentConfigService: StaffPaymentConfigService;
-    private companyService: CompanyService;
+    private _staffService?: StaffService;
+    private _taxService?: TaxService;
+    private _deductionService?: DeductionService;
+    private _paymentTypeService?: PaymentTypeService;
+    private _staffPaymentConfigService?: StaffPaymentConfigService;
+    private _companyService?: CompanyService;
 
     constructor() {
-        const serviceRegistry = ServiceRegistry.getInstance();
-        this.staffService = serviceRegistry.staffService;
-        this.taxService = serviceRegistry.taxService;
-        this.deductionService = serviceRegistry.deductionService;
-        this.paymentTypeService = serviceRegistry.paymentTypeService;
-        this.staffPaymentConfigService = serviceRegistry.staffPaymentConfigService;
-        this.companyService = serviceRegistry.companyService;
+        // Services will be lazily initialized when first accessed
+    }
+
+    // Lazy initialization getters to avoid circular dependencies
+    private get staffService(): StaffService {
+        if (!this._staffService) {
+            this._staffService = new StaffService();
+        }
+        return this._staffService;
+    }
+
+    private get taxService(): TaxService {
+        if (!this._taxService) {
+            this._taxService = new TaxService();
+        }
+        return this._taxService;
+    }
+
+    private get deductionService(): DeductionService {
+        if (!this._deductionService) {
+            this._deductionService = new DeductionService();
+        }
+        return this._deductionService;
+    }
+
+    private get paymentTypeService(): PaymentTypeService {
+        if (!this._paymentTypeService) {
+            this._paymentTypeService = new PaymentTypeService();
+        }
+        return this._paymentTypeService;
+    }
+
+    private get staffPaymentConfigService(): StaffPaymentConfigService {
+        if (!this._staffPaymentConfigService) {
+            this._staffPaymentConfigService = new StaffPaymentConfigService();
+        }
+        return this._staffPaymentConfigService;
+    }
+
+    private get companyService(): CompanyService {
+        if (!this._companyService) {
+            this._companyService = new CompanyService();
+        }
+        return this._companyService;
     }
 
     public calculatePAYE(grossSalary: number, taxSettings: TaxSettingsData, isPayeActive: boolean): number {

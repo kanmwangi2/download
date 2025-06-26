@@ -21,5 +21,10 @@ export interface StaffPaymentConfig {
   allowances: Record<string, number>;
 }
 
+/**
+ * Staff payment details configuration (used in payroll calculations)
+ */
+export type StaffPaymentDetails = Record<string, number>;
+
 export const DEFAULT_BASIC_PAY_ID = 'd8a4c3a3-1d9a-4f8a-8e9a-4b0c7c1d8e9a';
 export const DEFAULT_TRANSPORT_ALLOWANCE_ID = 'd8a4c3a3-1d9a-4f8a-8e9a-4b0c7c1d8e9b';

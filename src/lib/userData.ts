@@ -115,14 +115,14 @@ export const defaultNewUserFormData: Omit<User, 'id' | 'password'> & { password?
 // Import centralized case conversion utilities
 export { userToBackend, userFromBackend } from './case-conversion';
 
-import { getSupabaseClient } from './supabase';
+import { getSupabaseClientAsync } from './supabase';
 
 /**
  * Ensures a user profile exists for the current authenticated user.
  * Call this after login or on app load.
  */
 export async function ensureUserProfile() {
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
     // Fallbacks for missing names

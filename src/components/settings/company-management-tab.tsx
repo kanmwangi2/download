@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/table";
 import { PlusCircle, Edit, Trash2, Building, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Papa from 'papaparse';
@@ -110,7 +110,7 @@ export default function CompanyManagementTab() {
     const loadCompanies = async () => {
       setIsLoaded(false);
       setFeedback(null);
-      try {        const supabase = getSupabaseClient();
+      try {        const supabase = await getSupabaseClientAsync();
         const { data: companies, error } = await supabase.from('companies').select('*');
         if (error) throw error;
         setAllCompanies((companies || []).map(companyFromBackend));
@@ -178,7 +178,7 @@ export default function CompanyManagementTab() {
     setFeedback(null);
     if (idsToDelete.length === 0) return;
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { error } = await supabase.from('companies').delete().in('id', idsToDelete);
       if (error) throw error;
       setAllCompanies(prev => prev.filter(comp => !idsToDelete.includes(comp.id)));      setSelectedCompanyItems(prev => { const newSelected = new Set(prev); idsToDelete.forEach(id => newSelected.delete(id)); return newSelected; });
@@ -199,7 +199,7 @@ export default function CompanyManagementTab() {
       return;
     }
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (editingCompany) {
         const updatedCompany = companyToBackend({ ...editingCompany, ...formData });
         const { error } = await supabase.from('companies').update(updatedCompany).eq('id', editingCompany.id);
@@ -360,7 +360,7 @@ export default function CompanyManagementTab() {
           if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}.`}); return; }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Record<string, unknown>[] = [];
           // Fetch existing companies from Supabase
-          const supabase = getSupabaseClient();
+          const supabase = await getSupabaseClientAsync();
           const { data: existingCompanies, error: fetchError } = await supabase.from('companies').select('*');
           if (fetchError) {
             setFeedback({type: 'error', message: "Import Failed", details: "Could not fetch existing companies from Supabase."});

@@ -4,28 +4,31 @@
  */
 
 // Build-time safe mock client
-const createMockClient = () => ({
-  auth: {
-    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    signInWithPassword: () => Promise.resolve({ data: null, error: null }),
-    signUp: () => Promise.resolve({ data: null, error: null }),
-    signOut: () => Promise.resolve({ error: null }),
-  },
-  from: () => ({
-    select: () => ({
-      eq: () => ({
-        single: () => Promise.resolve({ data: null, error: null }),
-        select: () => Promise.resolve({ data: [], error: null }),
+const createMockClient = () => {
+  console.warn('⚠️ Supabase: Using mock client - database operations will not work')
+  return {
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithPassword: () => Promise.resolve({ data: null, error: null }),
+      signUp: () => Promise.resolve({ data: null, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
+          select: () => Promise.resolve({ data: [], error: { message: 'Mock client: operation not supported' } }),
+        }),
+        single: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
       }),
-      single: () => Promise.resolve({ data: null, error: null }),
+      insert: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
+      update: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
+      delete: () => Promise.resolve({ data: null, error: { message: 'Mock client: operation not supported' } }),
     }),
-    insert: () => Promise.resolve({ data: null, error: null }),
-    update: () => Promise.resolve({ data: null, error: null }),
-    delete: () => Promise.resolve({ data: null, error: null }),
-  }),
-})
+  }
+}
 
 // Runtime client cache
 let runtimeClient: any = null
@@ -41,14 +44,17 @@ const hasEnvVars = () => {
 // Create real client only at runtime in browser
 async function createRealClient() {
   if (!isBrowser() || !hasEnvVars()) {
+    console.log('🔄 Supabase: Environment not ready, returning mock client')
     return createMockClient()
   }
 
   try {
+    console.log('🔄 Supabase: Importing Supabase modules...')
     // Dynamic import - only executed in browser at runtime
     const supabaseModule = await import('@supabase/ssr')
     
-    return supabaseModule.createBrowserClient(
+    console.log('🔄 Supabase: Creating browser client...')
+    const client = supabaseModule.createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -66,8 +72,11 @@ async function createRealClient() {
         }
       }
     )
+    
+    console.log('✅ Supabase: Real client created successfully')
+    return client
   } catch (error) {
-    console.warn('Failed to create Supabase client:', error)
+    console.warn('❌ Supabase: Failed to create real client:', error)
     return createMockClient()
   }
 }
@@ -98,11 +107,19 @@ export function getSupabaseClient() {
 // Async version that waits for real client
 export async function getSupabaseClientAsync() {
   if (!isBrowser()) {
+    console.log('🔄 Supabase: Returning mock client (not in browser)')
+    return createMockClient()
+  }
+  
+  if (!hasEnvVars()) {
+    console.warn('⚠️ Supabase: Missing environment variables, returning mock client')
     return createMockClient()
   }
   
   if (!runtimeClient) {
+    console.log('🔄 Supabase: Creating runtime client...')
     runtimeClient = await createRealClient()
+    console.log('✅ Supabase: Runtime client created successfully')
   }
   
   return runtimeClient

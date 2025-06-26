@@ -10,7 +10,7 @@ import React, {
   memo,
   useCallback 
 } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 
 interface CompanyContextType {
   selectedCompanyId: string | null;
@@ -35,7 +35,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Assume user_metadata contains selectedCompanyId and selectedCompanyName
@@ -62,7 +62,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.auth.updateUser({
@@ -83,7 +83,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.auth.updateUser({

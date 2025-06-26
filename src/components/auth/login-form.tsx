@@ -43,20 +43,34 @@ export function LoginForm() {
     setIsClient(true);
   }, []);
 
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (user && !authLoading && !loginSuccessful) {
+      console.log("🚀 User already authenticated, redirecting to /select-company");
+      router.replace("/select-company");
+    }
+  }, [user, authLoading, loginSuccessful, router]);
+
   // Redirect when user is authenticated after login
   useEffect(() => {
-    console.log("🔄 LoginForm: Auth state check:", { 
-      loginSuccessful, 
-      hasUser: !!user, 
-      authLoading, 
-      userId: user?.id 
-    });
-    
     if (loginSuccessful && user && !authLoading) {
       console.log("🚀 User authenticated after login, redirecting to /select-company");
       router.replace("/select-company");
     }
   }, [user, authLoading, loginSuccessful, router]);
+
+  // Fallback redirect if auth context takes too long
+  useEffect(() => {
+    if (loginSuccessful) {
+      const timeout = setTimeout(() => {
+        console.log("🕐 Auth context timeout, forcing redirect to /select-company");
+        router.replace("/select-company");
+      }, 3000); // 3 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [loginSuccessful, router]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,12 +105,12 @@ export function LoginForm() {
         setFeedback({ 
           type: 'success', 
           message: "Login Successful", 
-          details: "Setting up your session..." 
+          details: "Redirecting..." 
         });
         
         // Set flag to trigger redirect when auth context updates
         setLoginSuccessful(true);
-        setIsLoading(false); // Stop the loading state
+        setIsLoading(false); // Stop loading state
         
         // Don't redirect immediately - let the auth context handle it
         return; // Exit early after successful login
@@ -200,23 +214,10 @@ export function LoginForm() {
             <Button
               type="submit"
               className="w-full text-lg py-3"
-              disabled={isLoading}
+              disabled={isLoading || loginSuccessful}
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {loginSuccessful ? "Redirecting..." : isLoading ? "Logging in..." : "Login"}
             </Button>
-            
-            {/* Show manual continue button if login was successful but no auto-redirect */}
-            {loginSuccessful && feedback?.type === 'success' && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full text-lg py-3"
-                onClick={() => router.replace("/select-company")}
-              >
-                Continue to App
-              </Button>
-            )}
-            
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/signup" className="text-primary hover:underline">

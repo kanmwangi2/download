@@ -1,4 +1,6 @@
 
+"use client";
+
 export default function SelectCompanyPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

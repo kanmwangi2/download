@@ -27,8 +27,8 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
 
     const checkAuthentication = async () => {
       try {
-        // Small delay to ensure session is properly established
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Longer delay to ensure session is properly established
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const supabase = await getSupabaseClientAsync();
         
@@ -45,15 +45,15 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
         if (sessionError) {
           console.error('ApplicationSettings: Session error:', sessionError);
           if (isMounted) {
-            router.replace('/');
+            router.replace('/signin');
           }
           return;
         }
 
         if (!session?.user) {
-          console.log('ApplicationSettings: No session found, redirecting to home');
+          console.log('ApplicationSettings: No session found, redirecting to signin');
           if (isMounted) {
-            router.replace('/');
+            router.replace('/signin');
           }
           return;
         }
@@ -89,7 +89,7 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
       } catch (error) {
         console.error('ApplicationSettings: Authentication error:', error);
         if (isMounted) {
-          router.replace('/');
+          router.replace('/signin');
         }
       } finally {
         if (isMounted) {
@@ -104,14 +104,21 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
     const setupAuthListener = async () => {
       try {
         const supabase = await getSupabaseClientAsync();
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
           console.log('ApplicationSettings: Auth state changed:', event, !!session);
           
           if (event === 'SIGNED_OUT' || !session) {
             if (isMounted) {
               setIsAuthenticated(false);
-              router.replace('/');
+              router.replace('/signin');
             }
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            // Re-check authentication when signed in or token refreshed
+            setTimeout(() => {
+              if (isMounted) {
+                checkAuthentication();
+              }
+            }, 100);
           }
         });
 

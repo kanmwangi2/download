@@ -23,17 +23,18 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { UserRole } from '@/lib/userData';
 import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 export interface Department {
   id: string;
   companyId: string;
-  name: string;  description?: string;
+  name: string;
+  description?: string;
 }
 
-export const initialDepartments: Omit<Department, 'companyId'>[] = [
+const initialDepartments: Omit<Department, 'companyId'>[] = [
   { id: "dept_eng_co001", name: "Engineering", description: "Software development and R&D" },
   { id: "dept_mkt_co001", name: "Marketing", description: "Product promotion and sales strategy" },
   { id: "dept_hr_co001", name: "Human Resources", description: "Employee management and relations" },
@@ -41,7 +42,6 @@ export const initialDepartments: Omit<Department, 'companyId'>[] = [
   { id: "dept_ops_co001", name: "Operations", description: "Day-to-day business activities" },
   { id: "dept_sales_co002", name: "Sales & Marketing (Isoko)", description: "Isoko sales and promotion" },
   { id: "dept_log_co002", name: "Logistics (Isoko)", description: "Isoko warehousing and distribution" },
-
 ];
 
 const defaultDepartmentFormData = { name: "", description: "" };
@@ -87,21 +87,62 @@ const sanitizeFilename = (name: string | null | undefined): string => {
     return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
 };
 
-// --- Supabase migration: Remove all legacy utility calls and constants ---
-// Replace all data access with Supabase queries. Example below:
+// --- Supabase migration: Use safe Supabase client ---
+// Replace all data access with safe Supabase queries.
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+// Helper: get safe Supabase client
+async function getSupabase() {
+  return await getSupabaseClientAsync();
+}
 
 // Helper: get current user from Supabase
 async function supabaseUserFromContextOrSession(): Promise<any> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) return null;
-  // You may want to map user_metadata to your app's User type
-  return { ...data.user.user_metadata, id: data.user.id };
+  try {
+    const supabase = await getSupabaseClientAsync();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) return null;
+    // Map user_metadata to your app's User type
+    return { 
+      ...data.user.user_metadata, 
+      id: data.user.id,
+      email: data.user.email 
+    };
+  } catch (error) {
+    console.error('Error getting user from session:', error);
+    return null;
+  }
+}
+
+// Create departments list async function
+async function getDepartments(companyId: string) {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('departments')
+    .select('*')
+    .eq('companyId', companyId);
+  if (error) throw error;
+  return (data || []).map((dept: any) => ({
+    id: dept.id,
+    companyId: dept.companyId,
+    name: dept.name,
+    description: dept.description
+  }));
+}
+
+// Create company users list async function  
+async function getCompanyUsers(companyId: string) {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('companyId', companyId);
+  if (error) throw error;
+  return data || [];
 }
 
 // Helper: fetch company profile from Supabase
 async function fetchCompanyProfile(companyId: string): Promise<CompanyProfileData | null> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('company_profiles')
     .select('*')
@@ -113,13 +154,14 @@ async function fetchCompanyProfile(companyId: string): Promise<CompanyProfileDat
 
 // Helper: fetch departments from Supabase
 async function fetchDepartments(companyId: string): Promise<Department[]> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('departments')
     .select('*')
     .eq('company_id', companyId);
   if (error) return [];
   // Map from snake_case to camelCase
-  return (data || []).map(dept => ({
+  return (data || []).map((dept: any) => ({
     id: dept.id,
     companyId: dept.company_id,
     name: dept.name,
@@ -169,6 +211,7 @@ function userToBackend(user: User): any {
 
 // Helper: fetch company users from Supabase
 async function fetchCompanyUsers(companyId: string): Promise<User[]> {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('users')
     .select('*')
@@ -179,6 +222,7 @@ async function fetchCompanyUsers(companyId: string): Promise<User[]> {
 
 // Helper: update company profile in Supabase
 async function updateCompanyProfile(companyId: string, profile: CompanyProfileData) {
+  const supabase = await getSupabase();
   await supabase
     .from('company_profiles')
     .update(profile)
@@ -187,6 +231,7 @@ async function updateCompanyProfile(companyId: string, profile: CompanyProfileDa
 
 // Helper: update department in Supabase
 async function updateDepartment(companyId: string, department: Department) {
+  const supabase = await getSupabase();
   // Convert camelCase to snake_case for database
   const deptDbFormat = {
     id: department.id,
@@ -259,21 +304,25 @@ export default function CompanySettingsPage() {
 
       if (!selectedCompanyId) {
         setFeedback({type: 'info', message: "No Company Selected", details: "Redirecting to company selection."});
-        router.replace("/select-company");
-        setAccessGranted(false);
-        return;
-      }
-
-      // Supabase-only: get current user from context/session
-      const user = await supabaseUserFromContextOrSession();
-      if (!user) {
-        setFeedback({type: 'error', message: "Authentication Required"});
-        router.replace("/");
+        setTimeout(() => {
+          router.replace("/select-company");
+        }, 1000);
         setAccessGranted(false);
         return;
       }
 
       try {
+        // Supabase-only: get current user from context/session
+        const user = await supabaseUserFromContextOrSession();
+        if (!user) {
+          setFeedback({type: 'error', message: "Authentication Required", details: "Please sign in to continue."});
+          setTimeout(() => {
+            router.replace("/signin");
+          }, 2000);
+          setAccessGranted(false);
+          return;
+        }
+
         setPageCurrentUserRole(user.role);
         let hasAccess = false;
         if (user.role === "Primary Admin" || user.role === "App Admin") {
@@ -492,7 +541,9 @@ export default function CompanySettingsPage() {
 
   const deleteCompanyUsersByIds = async (idsToDelete: string[]) => {
     setFeedback(null);
-    if (!selectedCompanyId || idsToDelete.length === 0) return;    try {
+    if (!selectedCompanyId || idsToDelete.length === 0) return;    
+    try {
+      const supabase = await getSupabase();
       // NOTE: This logic needs revision - users don't have companyId column
       // Should remove company from assigned_company_ids array instead
       for (const userId of idsToDelete) {
@@ -537,6 +588,7 @@ export default function CompanySettingsPage() {
 
     const newEmail = companyUserFormData.email.trim().toLowerCase();
     if (newEmail !== originalEmailForEdit.toLowerCase()) {
+        const supabase = await getSupabase();
         const { data: existingUserWithNewEmail } = await supabase
           .from('users')
           .select('*')
@@ -549,6 +601,7 @@ export default function CompanySettingsPage() {
     }
 
     try {
+      const supabase = await getSupabase();
       if (editingCompanyUser) {
         const updatedUser: User = { ...editingCompanyUser, ...companyUserFormData, email: newEmail, assignedCompanyIds: [selectedCompanyId] };
         if (companyUserFormData.password && companyUserFormData.password.trim() !== "") { updatedUser.password = companyUserFormData.password.trim(); }
@@ -727,6 +780,7 @@ export default function CompanySettingsPage() {
             else { itemsToBulkPut.push({ id: id || `dept_${Date.now()}_${index}`, companyId: selectedCompanyId, name, description }); newCount++; }
           }
           if (itemsToBulkPut.length > 0) {
+            const supabase = await getSupabase();
             const { error } = await supabase.from('departments').upsert(itemsToBulkPut);
             if (error) upsertError = error;
             const updatedList = await fetchDepartments(selectedCompanyId); setAllDepartments(updatedList);
@@ -779,6 +833,7 @@ export default function CompanySettingsPage() {
             return; 
           }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: User[] = [];
+          const supabase = await getSupabase();
           const allGlobalUsers = await supabase
             .from('users')
             .select('*');

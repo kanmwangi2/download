@@ -186,12 +186,6 @@ export const signOut = async () => {
   return await client.auth.signOut()
 }
 
-export const getCurrentUser = async () => {
-  const client = await getSupabaseClientAsync()
-  const { data: { user } } = await client.auth.getUser()
-  return user
-}
-
 // Type definitions
 export type Database = {
   public: {

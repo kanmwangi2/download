@@ -8,9 +8,10 @@ import Link from 'next/link';
 import { CheetahIcon } from '@/components/icons/cheetah-icon';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSupabaseClientAsync } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { UserService } from '@/lib/services/UserService';
 
 interface ApplicationSettingsLayoutProps {
   children: React.ReactNode;
@@ -18,131 +19,33 @@ interface ApplicationSettingsLayoutProps {
 
 export default function ApplicationSettingsLayout({ children }: ApplicationSettingsLayoutProps) {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    let isMounted = true;
+    if (isLoading) return;
 
-    const checkAuthentication = async () => {
-      try {
-        // Longer delay to ensure session is properly established
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const supabase = await getSupabaseClientAsync();
-        
-        // Get the current session first
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        console.log('ApplicationSettings: Session check:', { 
-          hasSession: !!session, 
-          hasUser: !!session?.user,
-          userRole: session?.user?.user_metadata?.role,
-          sessionError: sessionError?.message 
-        });
-        
-        if (sessionError) {
-          console.error('ApplicationSettings: Session error:', sessionError);
-          if (isMounted) {
-            router.replace('/signin');
-          }
-          return;
-        }
+    if (!user) {
+      console.log('ApplicationSettings: No user found, redirecting to signin');
+      router.replace('/signin');
+      return;
+    }
 
-        if (!session?.user) {
-          console.log('ApplicationSettings: No session found, redirecting to signin');
-          if (isMounted) {
-            router.replace('/signin');
-          }
-          return;
-        }
+    // Check if user has admin privileges
+    const hasAdminAccess = UserService.hasUniversalAccess(user);
+    
+    if (!hasAdminAccess) {
+      console.log('ApplicationSettings: User not admin, redirecting to select-company');
+      router.replace('/select-company');
+      return;
+    }
 
-        const user = session.user;
-        const role = user.user_metadata?.role || '';
-        
-        console.log('ApplicationSettings: User authenticated:', {
-          userId: user.id,
-          email: user.email,
-          role: role,
-          isAdmin: role === 'Primary Admin' || role === 'App Admin'
-        });
-        
-        if (isMounted) {
-          setUserRole(role);
-        }
-        
-        // Check if user has admin privileges
-        const isAdmin = role === 'Primary Admin' || role === 'App Admin';
-        
-        if (!isAdmin) {
-          console.log('ApplicationSettings: User not admin, redirecting to select-company');
-          if (isMounted) {
-            router.replace('/select-company');
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.error('ApplicationSettings: Authentication error:', error);
-        if (isMounted) {
-          router.replace('/signin');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    checkAuthentication();
-
-    // Set up auth state change listener
-    const setupAuthListener = async () => {
-      try {
-        const supabase = await getSupabaseClientAsync();
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-          console.log('ApplicationSettings: Auth state changed:', event, !!session);
-          
-          if (event === 'SIGNED_OUT' || !session) {
-            if (isMounted) {
-              setIsAuthenticated(false);
-              router.replace('/signin');
-            }
-          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            // Re-check authentication when signed in or token refreshed
-            setTimeout(() => {
-              if (isMounted) {
-                checkAuthentication();
-              }
-            }, 100);
-          }
-        });
-
-        return () => {
-          subscription.unsubscribe();
-        };
-      } catch (error) {
-        console.error('ApplicationSettings: Failed to set up auth listener:', error);
-        return () => {};
-      }
-    };
-
-    let unsubscribe: (() => void) | undefined;
-    setupAuthListener().then(unsub => {
-      unsubscribe = unsub;
+    console.log('ApplicationSettings: User authenticated with admin access:', {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      hasAdminAccess
     });
-
-    return () => {
-      isMounted = false;
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [router]);
+  }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -162,7 +65,7 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user || !UserService.hasUniversalAccess(user)) {
     return null; // Router will redirect
   }
 
@@ -182,7 +85,7 @@ export default function ApplicationSettingsLayout({ children }: ApplicationSetti
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
-                {userRole}
+                {user.role}
               </span>
               <Button variant="outline" asChild>
                 <Link href="/select-company">

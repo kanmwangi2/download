@@ -2,7 +2,8 @@
  * PayrollPermissions
  * Utility class for handling payroll-related permission checks
  */
-import type { UserRole, AuthenticatedUser, PayrollStatus, PayrollRunSummary } from '../oop';
+import type { UserRole, AuthenticatedUser } from '../services/UserService';
+import type { PayrollStatus, PayrollRunSummary } from '../oop';
 
 export class PayrollPermissions {
   /**
@@ -73,11 +74,13 @@ export class PayrollPermissions {
       return false;
     }
 
+    // Primary Admin and App Admin have universal access
     if (user.role === 'Primary Admin' || user.role === 'App Admin') {
       return true; // Admins can access all companies
     }
     
-    return user.assignedCompanyIds.includes(companyId);
+    // Check if user has the universal access marker or the specific company ID
+    return user.assignedCompanyIds.includes('*') || user.assignedCompanyIds.includes(companyId);
   }
 
   /**

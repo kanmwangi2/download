@@ -17,7 +17,9 @@ import { LogOut, Settings, Repeat, UserCircle } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { UserRole } from '@/lib/userData';
-import { useCompany } from "@/context/CompanyContext"; // Added useCompany
+import { useCompany } from "@/context/CompanyContext";
+import { useAuth } from "@/context/AuthContext";
+import { UserService } from "@/lib/services/UserService";
 
 
 const defaultAvatarSrc = "https://placehold.co/100x100.png"; 
@@ -32,40 +34,17 @@ interface CurrentUser {
 }
 
 export function UserNav() {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [avatarSrc, setAvatarSrc] = useState<string>(defaultAvatarSrc);
   const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
+  const { user: currentUser, logout } = useAuth();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      const supabase = await getSupabaseClientAsync();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUser({
-          id: user.id,
-          email: user.email || '',
-          firstName: user.user_metadata?.first_name || 'User',
-          lastName: user.user_metadata?.last_name || '',
-          role: user.user_metadata?.role || 'Primary Admin',
-          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
-        });
-        // Optionally fetch avatar from a Supabase storage bucket or user profile table
-        setAvatarSrc(defaultAvatarSrc); // Replace with Supabase avatar if available
-      } else {
-        setCurrentUser(null);
-        setAvatarSrc(defaultAvatarSrc);
-      }
-    };
-    loadUserData();
-  }, []);
+    // Just set a default avatar for now - could be enhanced to load user's avatar
+    setAvatarSrc(defaultAvatarSrc);
+  }, [currentUser]);
 
-
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      setCurrentUser(null); 
-      setAvatarSrc(defaultAvatarSrc);
-      window.location.href = "/"; 
-    }
+  const handleLogout = async () => {
+    await logout();
   };
   
   const userDisplay = currentUser || { firstName: "Guest", lastName: "", email: "", role: "Guest" as UserRole, assignedCompanyIds: [] };
@@ -75,14 +54,7 @@ export function UserNav() {
     if (isLoadingCompanyContext || !currentUser || !selectedCompanyId) {
       return false; 
     }
-    const { role, assignedCompanyIds } = currentUser;
-    if (role === "Primary Admin" || role === "App Admin") {
-      return true;
-    }
-    if (role === "Company Admin" && assignedCompanyIds.includes(selectedCompanyId)) {
-      return true;
-    }
-    return false;
+    return UserService.canAccessCompany(currentUser, selectedCompanyId);
   }, [currentUser, selectedCompanyId, isLoadingCompanyContext]);
 
 

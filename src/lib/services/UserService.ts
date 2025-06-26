@@ -51,7 +51,14 @@ export class UserService extends BaseService {
         return null;
       }
 
-      // Fetch user profile
+      // Get role from user metadata (this is where it's stored during authentication)
+      const role = user.user_metadata?.role as UserRole;
+      if (!role) {
+        console.warn('User has no role assigned in metadata');
+        return null;
+      }
+
+      // Fetch user profile for additional details
       const { data: userProfile, error: profileError } = await this.supabase
         .from(this.userProfileTableName)
         .select('*')
@@ -63,14 +70,59 @@ export class UserService extends BaseService {
         return null;
       }
 
+      // For Primary Admin and App Admin, they have access to all companies
+      let assignedCompanyIds: string[] = [];
+      if (role === 'Primary Admin' || role === 'App Admin') {
+        // Admins can access all companies - get all company IDs
+        try {
+          const { data: companies } = await this.supabase
+            .from('companies')
+            .select('id');
+          assignedCompanyIds = (companies || []).map(c => c.id);
+          
+          // If no companies table or it's empty, still allow admin access
+          // Primary Admin should always have access regardless
+          if (assignedCompanyIds.length === 0 && role === 'Primary Admin') {
+            console.warn('Primary Admin detected but no companies found in database');
+            // For Primary Admin, return a special marker to indicate universal access
+            assignedCompanyIds = ['*']; // Universal access marker
+          }
+        } catch (error) {
+          console.warn('Error fetching companies for admin user:', error);
+          // For Primary Admin, ensure they still get access even if companies table fails
+          if (role === 'Primary Admin') {
+            assignedCompanyIds = ['*']; // Universal access marker
+          }
+        }
+      } else {
+        // For other roles, get assigned companies from user_metadata first, then fallback to assignments table
+        const metadataCompanyIds = user.user_metadata?.assignedCompanyIds || user.user_metadata?.assigned_company_ids;
+        
+        if (metadataCompanyIds && Array.isArray(metadataCompanyIds)) {
+          assignedCompanyIds = metadataCompanyIds;
+        } else {
+          // Fallback: get assigned companies from user_company_assignments table
+          try {
+            const { data: assignments } = await this.supabase
+              .from('user_company_assignments')
+              .select('company_id')
+              .eq('user_id', user.id);
+            assignedCompanyIds = (assignments || []).map(a => a.company_id);
+          } catch (error) {
+            console.warn('Error fetching user company assignments:', error);
+            assignedCompanyIds = [];
+          }
+        }
+      }
+
       return {
-        id: userProfile.id,
-        email: userProfile.email,
+        id: user.id,
+        email: user.email || userProfile.email,
         firstName: userProfile.first_name,
         lastName: userProfile.last_name,
-        phone: userProfile.phone || '', // Added phone
-        role: userProfile.role,
-        assignedCompanyIds: userProfile.assigned_company_ids || [],
+        phone: userProfile.phone || '', 
+        role: role,
+        assignedCompanyIds: assignedCompanyIds,
       };
     } catch (error) {
       this.handleError(error, 'get current user');
@@ -238,6 +290,34 @@ export class UserService extends BaseService {
       return true; // Admins can access all companies
     }
     
-    return user.assignedCompanyIds.includes(companyId);
+    // Check if user has the universal access marker or the specific company ID
+    return user.assignedCompanyIds.includes('*') || user.assignedCompanyIds.includes(companyId);
+  }
+
+  /**
+   * Check if user has universal admin access
+   */
+  static hasUniversalAccess(user: AuthenticatedUser): boolean {
+    return user.role === 'Primary Admin' || user.role === 'App Admin' || user.assignedCompanyIds.includes('*');
+  }
+
+  /**
+   * Get user's accessible company IDs
+   * For admins, this should return all company IDs in the system
+   */
+  async getUserAccessibleCompanies(user: AuthenticatedUser): Promise<string[]> {
+    if (UserService.hasUniversalAccess(user)) {
+      try {
+        const { data: companies } = await this.supabase
+          .from('companies')
+          .select('id');
+        return (companies || []).map(c => c.id);
+      } catch (error) {
+        console.warn('Error fetching all companies for admin:', error);
+        return user.assignedCompanyIds.filter(id => id !== '*');
+      }
+    }
+    
+    return user.assignedCompanyIds;
   }
 }

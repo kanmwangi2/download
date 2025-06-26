@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import NextImage from 'next/image';
 import { Cropper, CircleStencil, type CropperRef } from 'react-advanced-cropper';
 import 'react-advanced-cropper/dist/style.css';
@@ -12,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getServices, type UserProfile } from '@/lib/oop';
+import { getServices } from '@/lib/oop';
+import { type UserProfile } from '@/lib/services/UserService';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
@@ -27,6 +29,7 @@ const initialProfileDetails: UserProfile = {
 };
 
 export default function UserProfilePage() {
+  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
   const [userDetails, setUserDetails] = useState<UserProfile>(initialProfileDetails);
   const [passwordDetails, setPasswordDetails] = useState({
     currentPassword: "",
@@ -43,7 +46,6 @@ export default function UserProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [passwordFeedback, setPasswordFeedback] = useState<FeedbackMessage | null>(null);
   const [avatarFeedback, setAvatarFeedback] = useState<FeedbackMessage | null>(null);
@@ -53,28 +55,27 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      if (isLoadingAuth) return;
+      
       try {
-        // Use UserService to get current user and profile data
-        const user = await services.userService.getCurrentUser();
-        if (!user) {
+        if (!currentUser) {
           setIsLoaded(true);
           setFeedback({ type: 'error', message: 'User not authenticated', details: 'Please log in again.' });
           return;
         }
-        setCurrentUserId(user.id);
 
         // Set user details from the authenticated user object
         setUserDetails({
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          phone: user.phone || ''
+          firstName: currentUser.firstName || '',
+          lastName: currentUser.lastName || '',
+          email: currentUser.email || '',
+          phone: currentUser.phone || ''
         });
 
         // Fetch avatar using UserService
         let avatar = null;
         try {
-          avatar = await services.userService.getAvatar(user.id);
+          avatar = await services.userService.getAvatar(currentUser.id);
         } catch (avatarErr) {
           setAvatarFeedback({ type: 'error', message: 'Avatar Load Failed', details: String(avatarErr) });
         }
@@ -87,7 +88,7 @@ export default function UserProfilePage() {
       }
     };
     loadProfile();
-  }, [services]);
+  }, [services, currentUser, isLoadingAuth]);
 
   const handleUserInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFeedback(null);
@@ -104,14 +105,14 @@ export default function UserProfilePage() {
   const handleProfileSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
-    if (!currentUserId) {
+    if (!currentUser) {
         setFeedback({ type: 'error', message: "User session not found. Please log in again." });
         return;
     }
 
     try {
       // Use UserService to update profile
-      await services.userService.updateProfile(currentUserId, userDetails);
+      await services.userService.updateProfile(currentUser.id, userDetails);
       setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
     } catch (error: any) {
       setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error?.message || String(error)) });
@@ -122,7 +123,7 @@ export default function UserProfilePage() {
     event.preventDefault();
     setPasswordFeedback(null);
 
-    if (!currentUserId) {
+    if (!currentUser) {
       setPasswordFeedback({ type: 'error', message: "Error", details: "User session not found. Please log in again." });
       return;
     }
@@ -175,11 +176,11 @@ export default function UserProfilePage() {
     setAvatarFeedback(null);
     if (cropperRef.current) {
       const canvas = cropperRef.current.getCanvas();
-      if (canvas && currentUserId) {
+      if (canvas && currentUser) {
         const croppedImgDataUrl = canvas.toDataURL('image/jpeg');
         setCroppedImage(croppedImgDataUrl);
         // Use UserService to update avatar
-        await services.userService.updateAvatar(currentUserId, croppedImgDataUrl);
+        await services.userService.updateAvatar(currentUser.id, croppedImgDataUrl);
         setAvatarFeedback({ type: 'success', message: "Profile Picture Saved", details: "Your new profile picture has been saved." });
         setImageSrc(null);
       } else {
@@ -192,10 +193,10 @@ export default function UserProfilePage() {
     setAvatarFeedback(null);
     setImageSrc(null);
     setCroppedImage(defaultPlaceholderImage);
-    if (currentUserId) {
+    if (currentUser) {
       try {
         // Use UserService to update avatar to default
-        await services.userService.updateAvatar(currentUserId, defaultPlaceholderImage);
+        await services.userService.updateAvatar(currentUser.id, defaultPlaceholderImage);
       } catch (error) {
         console.error("Error removing profile picture via service", error);
       }

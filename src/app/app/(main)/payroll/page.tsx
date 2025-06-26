@@ -46,6 +46,7 @@ import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from '@/context/CompanyContext';
+import { useAuth } from '@/context/AuthContext';
 import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 // Import OOP services and utilities
@@ -55,9 +56,9 @@ import {
   PayrollValidation,
   PayrollPermissions,
   type PayrollRunSummary,
-  type PayrollStatus,
-  type AuthenticatedUser
+  type PayrollStatus
 } from '@/lib/oop';
+import { type AuthenticatedUser } from '@/lib/services/UserService';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
@@ -72,10 +73,10 @@ const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementTy
 export default function PayrollPage() {
   const router = useRouter();
   const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
+  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
   
   // State management
   const [allPayrollRunsData, setAllPayrollRunsData] = useState<PayrollRunSummary[]>([]);
-  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,8 +98,8 @@ export default function PayrollPage() {
   // Load data effect
   useEffect(() => {
     const loadData = async () => {
-      if (isLoadingCompanyContext || !selectedCompanyId) {
-        if (!isLoadingCompanyContext && !selectedCompanyId) {
+      if (isLoadingCompanyContext || isLoadingAuth || !selectedCompanyId) {
+        if (!isLoadingCompanyContext && !isLoadingAuth && !selectedCompanyId) {
           setAllPayrollRunsData([]);
           setIsLoaded(true);
         }
@@ -109,28 +110,23 @@ export default function PayrollPage() {
       setFeedback(null);
 
       try {
-        const services = getServices();
-        
-        // Load current user
-        const user = await services.userService.getCurrentUser();
-        setCurrentUser(user);
-
-        if (!user) {
+        if (!currentUser) {
           setFeedback({ type: 'error', message: "Authentication Required", details: "Please log in to access payroll data." });
           setIsLoaded(true);
           return;
         }
 
         // Check if user can access this company's payroll data
-        if (!PayrollPermissions.canAccessCompanyPayroll(user, selectedCompanyId)) {
+        if (!PayrollPermissions.canAccessCompanyPayroll(currentUser, selectedCompanyId)) {
           setFeedback({ type: 'error', message: "Access Denied", details: "You don't have permission to access payroll data for this company." });
           setAllPayrollRunsData([]);
           setIsLoaded(true);
           return;
         }
 
+        const services = getServices();
         // Load payroll runs for the company
-        const payrollRuns = await services.payrollService.getByCompanyId(selectedCompanyId);
+        const payrollRuns = await services.payrollService.getPayrollRunSummaries(selectedCompanyId);
         setAllPayrollRunsData(payrollRuns);
 
       } catch (error) {
@@ -143,7 +139,7 @@ export default function PayrollPage() {
     };
 
     loadData();
-  }, [selectedCompanyId, isLoadingCompanyContext]);
+  }, [selectedCompanyId, isLoadingCompanyContext, isLoadingAuth, currentUser]);
 
   // Computed values
   const filteredRunsSource = useMemo(() => {
@@ -160,7 +156,7 @@ export default function PayrollPage() {
 
   const existingNonApprovedRunForCompany = useMemo(() => {
     if (!selectedCompanyId) return null;
-    return allPayrollRunsData.find(run => run.company_id === selectedCompanyId && run.status !== "Approved");
+    return allPayrollRunsData.find(run => run.companyId === selectedCompanyId && run.status !== "Approved");
   }, [allPayrollRunsData, selectedCompanyId]);
 
   // Event handlers
@@ -224,7 +220,11 @@ export default function PayrollPage() {
     }
 
     // Check for duplicates
-    const exists = await getServices().payrollService.existsForPeriod(selectedCompanyId, month, year);
+    const exists = allPayrollRunsData.some(run => 
+      run.companyId === selectedCompanyId && 
+      run.month === month && 
+      run.year === year
+    );
     if (exists) {
       setCreateRunDialogFeedback({ 
         type: 'error', 
@@ -237,12 +237,21 @@ export default function PayrollPage() {
     try {
       const services = getServices();
       
-      const newRun = await services.payrollService.createWithGeneratedId({
-        company_id: selectedCompanyId,
+      // Create a new payroll run summary
+      const newRun: PayrollRunSummary = {
+        id: `payroll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        companyId: selectedCompanyId,
         month,
         year,
+        employees: 0,
+        grossSalary: 0,
+        deductions: 0,
+        netPay: 0,
         status: 'Draft'
-      });
+      };
+
+      // Save the payroll run
+      await services.payrollService.updatePayrollRunSummary(newRun);
 
       // Update UI state
       setAllPayrollRunsData(prev => [newRun, ...prev]);
@@ -268,7 +277,7 @@ export default function PayrollPage() {
   const deletePayrollRunsByIds = async (runIds: string[], isFromSingleDialog = false, isFromBulkDialog = false) => {
     if (runIds.length === 0 || !selectedCompanyId || !currentUser) return;
 
-    const runsToDelte = allPayrollRunsData.filter(r => runIds.includes(r.id) && r.company_id === selectedCompanyId);
+    const runsToDelte = allPayrollRunsData.filter(r => runIds.includes(r.id) && r.companyId === selectedCompanyId);
     const validation = PayrollValidation.canBulkDeletePayrollRuns(runsToDelte);
 
     if (!validation.canDelete && validation.deletableCount === 0) {
@@ -291,9 +300,10 @@ export default function PayrollPage() {
     if (actualIdsToDelete.length === 0) return;
 
     try {
-      const services = getServices();
-      await services.payrollService.deleteByIds(actualIdsToDelete);
-
+      // TODO: Implement actual deletion in PayrollService
+      // For now, just remove from local state
+      console.warn('Delete payroll runs not fully implemented yet - removing from UI only');
+      
       // Update UI state
       setAllPayrollRunsData(prev => prev.filter(run => !actualIdsToDelete.includes(run.id)));
       setSelectedItems(prev => {
@@ -540,7 +550,7 @@ export default function PayrollPage() {
                     const deletePermission = currentUser ? PayrollPermissions.canDeletePayrollRun(currentUser, run.status) : { allowed: false, title: 'Login required' };
                     
                     return (
-                      <TableRow key={`${run.id}-${run.company_id}`} data-state={selectedItems.has(run.id) ? "selected" : ""}>
+                      <TableRow key={`${run.id}-${run.companyId}`} data-state={selectedItems.has(run.id) ? "selected" : ""}>
                         <TableCell>
                           <Checkbox
                             checked={selectedItems.has(run.id)}
@@ -551,16 +561,16 @@ export default function PayrollPage() {
                         <TableCell className="font-medium">{run.id}</TableCell>
                         <TableCell>
                           {run.month} {run.year}
-                          {run.status === "Rejected" && run.rejection_reason && (
-                            <p className="text-xs text-destructive mt-1" title={run.rejection_reason}>
-                              Reason: {run.rejection_reason.substring(0,30)}{run.rejection_reason.length > 30 ? "..." : ""}
+                          {run.status === "Rejected" && run.rejectionReason && (
+                            <p className="text-xs text-destructive mt-1" title={run.rejectionReason}>
+                              Reason: {run.rejectionReason.substring(0,30)}{run.rejectionReason.length > 30 ? "..." : ""}
                             </p>
                           )}
                         </TableCell>
                         <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.employees)}</TableCell>
-                        <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.gross_salary)}</TableCell>
+                        <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.grossSalary)}</TableCell>
                         <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.deductions)}</TableCell>
-                        <TableCell className="text-right font-semibold">{PayrollUtils.formatNumberForTable(run.net_pay)}</TableCell>
+                        <TableCell className="text-right font-semibold">{PayrollUtils.formatNumberForTable(run.netPay)}</TableCell>
                         <TableCell>
                           <Badge className={`${statusConfig[run.status].color} ${statusConfig[run.status].textColor}`}>
                             <StatusIcon className="mr-1 h-3 w-3" />

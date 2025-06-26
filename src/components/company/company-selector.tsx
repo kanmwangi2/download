@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext";
+import { useAuth } from "@/context/AuthContext";
+import { UserService } from "@/lib/services/UserService";
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { Company as AppCompany } from '@/lib/userData';
 
@@ -52,9 +54,9 @@ export function CompanySelector() {
     selectedCompanyName: contextCompanyName,
     setSelectedCompanyName: setContextCompanyName
   } = useCompany();
+  const { user: currentUser, logout } = useAuth();
 
   const [open, setOpen] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState<CurrentUser | null>(null);
   const [availableCompanies, setAvailableCompanies] = React.useState<AppCompany[]>([]);
   const [isLoadingData, setIsLoadingData] = React.useState(true);
 
@@ -67,26 +69,13 @@ export function CompanySelector() {
         const supabase = await getSupabaseClientAsync();
         console.log('🔄 CompanySelector: Got Supabase client')
         
-        // Get the current session to ensure authentication state is fresh
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log('🔄 CompanySelector: Got session data', { hasSession: !!session, sessionError })
-        
-        if (sessionError || !session?.user) {
-          console.log('🔄 CompanySelector: No valid session found, redirecting to home')
+        // Check if user is authenticated
+        if (!currentUser) {
+          console.log('🔄 CompanySelector: No user found, redirecting to home')
           router.push("/");
           setIsLoadingData(false);
           return;
         }
-
-        const user = session.user;
-        setCurrentUser({
-          id: user.id,
-          email: user.email || '',
-          firstName: user.user_metadata?.first_name || 'User',
-          lastName: user.user_metadata?.last_name || '',
-          role: user.user_metadata?.role || 'Primary Admin',
-          assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
-        });
         
         console.log('🔄 CompanySelector: Fetching companies')
         // Fetch companies from Supabase
@@ -108,7 +97,7 @@ export function CompanySelector() {
     };
     
     loadInitialData();
-  }, [router]);
+  }, [router, currentUser]);
 
   const handleGoToCompany = () => {
     if (contextCompanyId) {
@@ -117,14 +106,10 @@ export function CompanySelector() {
   };
 
   const handleLogout = async () => {
-    const supabase = await getSupabaseClientAsync();
-    await supabase.auth.signOut();
-    setContextCompanyId(null);
-    setContextCompanyName(null);
-    router.push("/");
+    await logout();
   };
 
-  const canAccessApplicationSettings = currentUser && (currentUser.role === 'Primary Admin' || currentUser.role === 'App Admin');
+  const canAccessApplicationSettings = currentUser && UserService.hasUniversalAccess(currentUser);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

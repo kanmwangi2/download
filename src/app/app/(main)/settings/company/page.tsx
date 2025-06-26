@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCompany } from '@/context/CompanyContext';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
 import { getSupabaseClientAsync } from '@/lib/supabase';
-import type { UserRole } from '@/lib/userData';
+import type { UserRole } from '@/lib/services/UserService';
 import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 export interface Department {
@@ -93,24 +94,6 @@ const sanitizeFilename = (name: string | null | undefined): string => {
 // Helper: get safe Supabase client
 async function getSupabase() {
   return await getSupabaseClientAsync();
-}
-
-// Helper: get current user from Supabase
-async function supabaseUserFromContextOrSession(): Promise<any> {
-  try {
-    const supabase = await getSupabaseClientAsync();
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data?.user) return null;
-    // Map user_metadata to your app's User type
-    return { 
-      ...data.user.user_metadata, 
-      id: data.user.id,
-      email: data.user.email 
-    };
-  } catch (error) {
-    console.error('Error getting user from session:', error);
-    return null;
-  }
 }
 
 // Create departments list async function
@@ -259,6 +242,7 @@ const defaultNewUserFormData: Omit<User, 'id'> & { password?: string } = {
 
 export default function CompanySettingsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
+  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
   const router = useRouter();
 
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
@@ -300,7 +284,7 @@ export default function CompanySettingsPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
-      if (isLoadingCompanyContext) return;
+      if (isLoadingCompanyContext || isLoadingAuth) return;
 
       if (!selectedCompanyId) {
         setFeedback({type: 'info', message: "No Company Selected", details: "Redirecting to company selection."});
@@ -312,9 +296,7 @@ export default function CompanySettingsPage() {
       }
 
       try {
-        // Supabase-only: get current user from context/session
-        const user = await supabaseUserFromContextOrSession();
-        if (!user) {
+        if (!currentUser) {
           setFeedback({type: 'error', message: "Authentication Required", details: "Please sign in to continue."});
           setTimeout(() => {
             router.replace("/signin");
@@ -323,11 +305,11 @@ export default function CompanySettingsPage() {
           return;
         }
 
-        setPageCurrentUserRole(user.role);
+        setPageCurrentUserRole(currentUser.role);
         let hasAccess = false;
-        if (user.role === "Primary Admin" || user.role === "App Admin") {
+        if (currentUser.role === "Primary Admin" || currentUser.role === "App Admin") {
           hasAccess = true;
-        } else if (user.role === "Company Admin" && user.assignedCompanyIds?.includes(selectedCompanyId)) {
+        } else if (currentUser.role === "Company Admin" && currentUser.assignedCompanyIds?.includes(selectedCompanyId)) {
           hasAccess = true;
         }
 
@@ -350,7 +332,7 @@ export default function CompanySettingsPage() {
       }
     };
     checkAccess();
-  }, [isLoadingCompanyContext, selectedCompanyId, router]);
+  }, [isLoadingCompanyContext, isLoadingAuth, selectedCompanyId, currentUser, router]);
 
 
   useEffect(() => {

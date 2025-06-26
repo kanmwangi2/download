@@ -31,6 +31,8 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import { objectToCamelCase } from '@/lib/case-conversion';
+import { useAuth } from '@/context/AuthContext';
+import { UserService } from '@/lib/services/UserService';
 
 type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Manager' | 'User';
 
@@ -57,10 +59,10 @@ type Company = {
 
 export default function SelectCompanyPage() {
   const router = useRouter();
+  const { user: currentUser, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<string | null>(null);
   const [selectedCompanyName, setSelectedCompanyName] = React.useState<string | null>(null);
-  const [currentUser, setCurrentUser] = React.useState<CurrentUser | null>(null);
   const [availableCompanies, setAvailableCompanies] = React.useState<Company[]>([]);
   const [isLoadingData, setIsLoadingData] = React.useState(true);
 
@@ -70,38 +72,26 @@ export default function SelectCompanyPage() {
       setIsLoadingData(true);
       
       try {
-        const supabase = await getSupabaseClientAsync();
-        console.log('🔄 SelectCompany: Got Supabase client')
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('🔄 SelectCompany: Got user data', { userId: user?.id })
-        
-        if (user) {
-          setCurrentUser({
-            id: user.id,
-            email: user.email || '',
-            firstName: user.user_metadata?.first_name || 'User',
-            lastName: user.user_metadata?.last_name || '',
-            role: user.user_metadata?.role || 'Primary Admin',
-            assignedCompanyIds: user.user_metadata?.assignedCompanyIds || []
-          });
-          
-          console.log('🔄 SelectCompany: Fetching companies')
-          // Fetch companies from Supabase
-          const { data: companies, error } = await supabase.from('companies').select('*');
-          console.log('🔄 SelectCompany: Companies fetched', { companiesCount: companies?.length, error })
-          
-          if (error) {
-            console.error('❌ SelectCompany: Error fetching companies:', error)
-            setAvailableCompanies([]);
-          } else {
-            setAvailableCompanies((companies || []).map(objectToCamelCase));
-          }
-        } else {
+        if (!currentUser) {
           console.log('🔄 SelectCompany: No user found, redirecting to home')
           router.push("/");
           setIsLoadingData(false);
           return;
+        }
+
+        const supabase = await getSupabaseClientAsync();
+        console.log('🔄 SelectCompany: Got Supabase client')
+          
+        console.log('🔄 SelectCompany: Fetching companies')
+        // Fetch companies from Supabase
+        const { data: companies, error } = await supabase.from('companies').select('*');
+        console.log('🔄 SelectCompany: Companies fetched', { companiesCount: companies?.length, error })
+          
+        if (error) {
+          console.error('❌ SelectCompany: Error fetching companies:', error)
+          setAvailableCompanies([]);
+        } else {
+          setAvailableCompanies((companies || []).map(objectToCamelCase));
         }
       } catch (error) {
         console.error('❌ SelectCompany: Error in loadInitialData:', error)
@@ -112,7 +102,7 @@ export default function SelectCompanyPage() {
     };
     
     loadInitialData();
-  }, [router]);
+  }, [router, currentUser]);
 
   const handleGoToCompany = () => {
     if (selectedCompanyId) {
@@ -124,14 +114,10 @@ export default function SelectCompanyPage() {
   };
 
   const handleLogout = async () => {
-    const supabase = await getSupabaseClientAsync();
-    await supabase.auth.signOut();
-    localStorage.removeItem('selectedCompanyId');
-    localStorage.removeItem('selectedCompanyName');
-    router.push("/");
+    await logout();
   };
 
-  const canAccessApplicationSettings = currentUser && (currentUser.role === 'Primary Admin' || currentUser.role === 'App Admin');
+  const canAccessApplicationSettings = currentUser && UserService.hasUniversalAccess(currentUser);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

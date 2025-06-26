@@ -23,7 +23,7 @@ import {
 } from "@/config/nav";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
 import { UserNav } from "./user-nav";
-import { CompanyProvider, useCompany } from "@/context/CompanyContext"; // Import CompanyProvider and useCompany
+import { CompanyProvider, useCompany } from "@/context/CompanyContext";
 
 function SidebarNavigation() {
   const pathname = usePathname();

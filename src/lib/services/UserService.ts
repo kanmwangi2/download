@@ -63,10 +63,48 @@ export class UserService extends BaseService {
       console.log('🔄 UserService: Got authenticated user:', { userId: user.id, email: user.email });
 
       // Get role from user metadata (this is where it's stored during authentication)
-      const role = user.user_metadata?.role as UserRole;
+      let role = user.user_metadata?.role as UserRole;
       if (!role) {
-        console.warn('❌ UserService: User has no role assigned in metadata');
-        return null;
+        console.warn('❌ UserService: User has no role assigned in metadata, assigning default role');
+        
+        // For now, assign a default role. In production, you might want to:
+        // 1. Check if this is the first user (make them Primary Admin)
+        // 2. Have a proper role assignment flow
+        // 3. Default to a restricted role like 'Employee'
+        
+        // Let's check if this is the first user by checking if there are any profiles
+        try {
+          const { data: existingProfiles, error: profilesError } = await this.supabase
+            .from(this.userProfileTableName)
+            .select('id')
+            .limit(1);
+          
+          let defaultRole: UserRole;
+          if (!existingProfiles || existingProfiles.length === 0) {
+            // First user - make them Primary Admin
+            defaultRole = 'Primary Admin';
+            console.log('🔄 UserService: First user detected, assigning Primary Admin role');
+          } else {
+            // Not first user - assign Company Admin as default
+            defaultRole = 'Company Admin';
+            console.log('🔄 UserService: Assigning default Company Admin role');
+          }
+          
+          // Update user metadata with the role
+          await this.supabase.auth.updateUser({
+            data: { 
+              ...user.user_metadata,
+              role: defaultRole 
+            }
+          });
+          
+          // Use the assigned role
+          role = defaultRole;
+          console.log('✅ UserService: Assigned role:', role);
+        } catch (error) {
+          console.error('❌ UserService: Error assigning default role:', error);
+          return null;
+        }
       }
 
       console.log('🔄 UserService: User role:', role);

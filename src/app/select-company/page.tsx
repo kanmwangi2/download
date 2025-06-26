@@ -59,7 +59,7 @@ type Company = {
 
 export default function SelectCompanyPage() {
   const router = useRouter();
-  const { user: currentUser, logout } = useAuth();
+  const { user: currentUser, isLoading: authLoading, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<string | null>(null);
   const [selectedCompanyName, setSelectedCompanyName] = React.useState<string | null>(null);
@@ -68,12 +68,20 @@ export default function SelectCompanyPage() {
 
   React.useEffect(() => {
     const loadInitialData = async () => {
-      console.log('🔄 SelectCompany: Starting loadInitialData')
+      console.log('🔄 SelectCompany: Starting loadInitialData', { authLoading, currentUser: !!currentUser });
+      
+      // Wait for auth to finish loading
+      if (authLoading) {
+        console.log('🔄 SelectCompany: Auth still loading, waiting...');
+        setIsLoadingData(true);
+        return;
+      }
+      
       setIsLoadingData(true);
       
       try {
         if (!currentUser) {
-          console.log('🔄 SelectCompany: No user found, redirecting to home')
+          console.log('🔄 SelectCompany: No user found after auth loading completed, redirecting to home')
           router.push("/");
           setIsLoadingData(false);
           return;
@@ -102,7 +110,7 @@ export default function SelectCompanyPage() {
     };
     
     loadInitialData();
-  }, [router, currentUser]);
+  }, [router, currentUser, authLoading]);
 
   const handleGoToCompany = () => {
     if (selectedCompanyId) {
@@ -132,10 +140,12 @@ export default function SelectCompanyPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {isLoadingData || !currentUser ? (
+          {isLoadingData || authLoading || !currentUser ? (
             <div className="flex flex-col items-center justify-center py-10">
               <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-              <p className="text-muted-foreground">Loading user and company data...</p>
+              <p className="text-muted-foreground">
+                {authLoading ? "Authenticating..." : "Loading user and company data..."}
+              </p>
             </div>
           ) : (
             <>

@@ -20,6 +20,7 @@ import { ensureUserProfile } from '@/lib/userData';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 type FeedbackMessage = {
   type: 'success' | 'error';
@@ -29,16 +30,26 @@ type FeedbackMessage = {
 
 export function LoginForm() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
+  const [loginSuccessful, setLoginSuccessful] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Redirect when user is authenticated after login
+  useEffect(() => {
+    if (loginSuccessful && user && !authLoading) {
+      console.log("🚀 User authenticated after login, redirecting to /select-company");
+      router.replace("/select-company");
+    }
+  }, [user, authLoading, loginSuccessful, router]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -69,23 +80,17 @@ export function LoginForm() {
           details: error.message || "Invalid email or password." 
         });
       } else if (data.user) {
-        console.log("✅ Login successful, setting up user session");
+        console.log("✅ Login successful, waiting for auth context to update");
         setFeedback({ 
           type: 'success', 
           message: "Login Successful", 
           details: "Setting up your session..." 
         });
-        // Ensure user profile exists - DISABLED to prevent stack overflow
-        // TODO: Move this to a background process after login
-        // await ensureUserProfile();
-        setIsLoading(false);
-        // Use replace to prevent going back to login page
-        try {
-          console.log("🚀 Redirecting to /select-company");
-          router.replace("/select-company");        } catch {
-          console.log("❌ Router redirect failed, using window.location");
-          window.location.href = "/select-company";
-        }
+        
+        // Set flag to trigger redirect when auth context updates
+        setLoginSuccessful(true);
+        
+        // Don't redirect immediately - let the auth context handle it
         return; // Exit early after successful login
       }
     } catch (error) {

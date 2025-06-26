@@ -44,19 +44,24 @@ export class UserService extends BaseService {
    */
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
     try {
+      console.log('🔄 UserService: Getting current user...');
       // Get current user from Supabase auth
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
       if (userError || !user) {
-        console.warn('User not authenticated:', userError?.message);
+        console.warn('❌ UserService: User not authenticated:', userError?.message);
         return null;
       }
+
+      console.log('🔄 UserService: Got authenticated user:', { userId: user.id, email: user.email });
 
       // Get role from user metadata (this is where it's stored during authentication)
       const role = user.user_metadata?.role as UserRole;
       if (!role) {
-        console.warn('User has no role assigned in metadata');
+        console.warn('❌ UserService: User has no role assigned in metadata');
         return null;
       }
+
+      console.log('🔄 UserService: User role:', role);
 
       // Fetch user profile for additional details
       const { data: userProfile, error: profileError } = await this.supabase
@@ -66,9 +71,12 @@ export class UserService extends BaseService {
         .single();
 
       if (profileError || !userProfile) {
+        console.warn('❌ UserService: Error fetching user profile:', profileError?.message);
         this.handleError(profileError, 'fetch user profile');
         return null;
       }
+
+      console.log('🔄 UserService: Got user profile:', { firstName: userProfile.first_name, lastName: userProfile.last_name });
 
       // For Primary Admin and App Admin, they have access to all companies
       let assignedCompanyIds: string[] = [];

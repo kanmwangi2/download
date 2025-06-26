@@ -30,16 +30,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = useCallback(async () => {
     try {
+      console.log('🔄 AuthContext: Starting refreshUser');
       setIsLoading(true);
       const supabase = await getSupabaseClientAsync();
       const userService = new UserService(); // UserService extends BaseService which handles supabase internally
       const currentUser = await userService.getCurrentUser();
+      console.log('🔄 AuthContext: Got user from service:', { userId: currentUser?.id, hasUser: !!currentUser });
       setUser(currentUser);
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      console.error('❌ AuthContext: Error refreshing user:', error);
       setUser(null);
     } finally {
       setIsLoading(false);
+      console.log('✅ AuthContext: refreshUser completed');
     }
   }, []);
 
@@ -72,9 +75,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const supabase = await getSupabaseClientAsync();
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: any, session: any) => {
+            console.log('🔄 AuthContext: Auth state change:', event, { hasSession: !!session, hasUser: !!session?.user });
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              console.log('🔄 AuthContext: User signed in/token refreshed, refreshing user data');
               await refreshUser();
             } else if (event === 'SIGNED_OUT') {
+              console.log('🔄 AuthContext: User signed out, clearing user state');
               setUser(null);
               setIsLoading(false);
             }

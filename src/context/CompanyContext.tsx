@@ -52,7 +52,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchCompanyFromProfile();
-  }, [fetchCompanyFromProfile]);
+  }, []); // Remove fetchCompanyFromProfile dependency to prevent infinite loop
 
   const setSelectedCompanyId = useCallback(async (companyId: string | null) => {
     setSelectedCompanyIdState(companyId);

@@ -50,7 +50,7 @@ function SidebarNavigation() {
                     <SidebarMenuButton
                       asChild
                       isActive={pathname === item.href || (item.href !== "/app/dashboard" && pathname.startsWith(item.href))}
-                      tooltip={open ? undefined : item.title}
+                      {...(open ? {} : { tooltip: item.title })}
                     >
                       <Link href={item.href}>
                         <item.icon />
@@ -68,7 +68,7 @@ function SidebarNavigation() {
                  <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href || (item.href !== "/app/dashboard" && pathname.startsWith(item.href))}
-                    tooltip={open ? undefined : item.title}
+                    {...(open ? {} : { tooltip: item.title })}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -89,9 +89,14 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined' && window.location.pathname !== '/select-company') {
-      console.log("AppShell: No company selected, redirecting to /select-company");
-      router.replace("/select-company");
+    // Only redirect if we're definitely in the app routes and missing company context
+    if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      // Only redirect if we're in app routes (not already at select-company or other root routes)
+      if (currentPath.startsWith('/app/') && currentPath !== '/select-company') {
+        console.log("AppShell: No company selected, redirecting to /select-company");
+        router.replace("/select-company");
+      }
     }
   }, [selectedCompanyId, isLoadingCompanyContext, router]);
 

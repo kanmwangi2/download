@@ -35,6 +35,7 @@ export const CompanyProvider = memo(({ children }: { children: ReactNode }) => {
     }
 
     try {
+      setIsLoadingCompanyContext(true);
       const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {

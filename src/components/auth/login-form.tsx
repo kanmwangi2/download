@@ -153,6 +153,7 @@ export function LoginForm() {
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="your.email@example.com"
                 required
                 className="text-base"
@@ -176,6 +177,7 @@ export function LoginForm() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   required
                   className="text-base pr-10 py-3"
                   value={password}

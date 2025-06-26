@@ -46,6 +46,9 @@ export class UserService extends BaseService {
     try {
       console.log('🔄 UserService: Getting current user...');
       
+      // Ensure Supabase client is initialized first
+      await this.ensureInitialized();
+      
       // Check if we have a real Supabase client
       const isRealClient = this.supabase && typeof this.supabase.auth?.getUser === 'function';
       console.log('🔄 UserService: Supabase client status:', { isRealClient, hasAuth: !!this.supabase.auth });
@@ -158,6 +161,7 @@ export class UserService extends BaseService {
    */
   async getById(userId: string): Promise<User | null> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.userProfileTableName)
         .select('*')
@@ -185,6 +189,8 @@ export class UserService extends BaseService {
    */
   async updateProfile(userId: string, profileData: UserProfile): Promise<UserProfile> {
     try {
+      await this.ensureInitialized();
+      
       // Update the user_profiles table
       const { data: profile, error: profileError } = await this.supabase
         .from(this.userProfileTableName)
@@ -230,6 +236,7 @@ export class UserService extends BaseService {
    */
   async updatePassword(newPassword: string): Promise<void> {
     try {
+      await this.ensureInitialized();
       const { error } = await this.supabase.auth.updateUser({ password: newPassword });
       if (error) {
         this.handleError(error, 'update password');
@@ -244,6 +251,7 @@ export class UserService extends BaseService {
    */
   async getAvatar(userId: string): Promise<string | null> {
     try {
+      await this.ensureInitialized();
       const { data, error } = await this.supabase
         .from(this.userAvatarTableName)
         .select('avatar_url')
@@ -264,6 +272,7 @@ export class UserService extends BaseService {
    */
   async updateAvatar(userId: string, avatarUrl: string): Promise<void> {
     try {
+      await this.ensureInitialized();
       const { error } = await this.supabase
         .from(this.userAvatarTableName)
         .upsert({ user_id: userId, avatar_url: avatarUrl });
@@ -331,6 +340,7 @@ export class UserService extends BaseService {
   async getUserAccessibleCompanies(user: AuthenticatedUser): Promise<string[]> {
     if (UserService.hasUniversalAccess(user)) {
       try {
+        await this.ensureInitialized();
         const { data: companies } = await this.supabase
           .from('companies')
           .select('id');

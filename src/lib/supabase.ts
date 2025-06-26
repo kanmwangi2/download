@@ -1,10 +1,39 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+// Validate environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  if (typeof window !== 'undefined') {
+    throw new Error('Missing Supabase environment variables')
+  }
+}
+
 // Client-side Supabase client
 export function createClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      realtime: {
+        // Optimize realtime settings for production
+        params: {
+          eventsPerSecond: 10,
+        },
+        // Disable during build or if window is undefined
+        heartbeatIntervalMs: typeof window !== 'undefined' ? 30000 : 0,
+      },
+      global: {
+        headers: {
+          'X-Client-Info': 'cheetah-payroll'
+        }
+      }
+    }
   )
 }
 
@@ -33,10 +62,7 @@ export const signUp = async (email: string, password: string, metadata?: { first
   return await client.auth.signUp({ 
     email, 
     password,
-    options: {
-      data: metadata,
-      emailRedirectTo: undefined
-    }
+    ...(metadata && { options: { data: metadata } })
   })
 }
 

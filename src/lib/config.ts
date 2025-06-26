@@ -3,6 +3,8 @@
  * Ensures all required environment variables are present and properly typed
  */
 
+const isBuildTime = process.env.NODE_ENV === 'production' && !process.env.VERCEL_URL;
+
 // Define the shape of environment variables
 interface EnvironmentConfig {
   // Supabase configuration
@@ -33,12 +35,12 @@ const validateEnvironment = (): EnvironmentConfig => {
   const nodeEnv = env.NODE_ENV || 'development';
   const nextPublicAppUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-  // Check for missing required variables
+  // Check for missing required variables - but be lenient during build
   const missingVars: string[] = [];
   if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
   if (!supabaseAnonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
-  if (missingVars.length > 0) {
+  if (missingVars.length > 0 && !isBuildTime) {
     throw new Error(
       `Missing required environment variables: ${missingVars.join(', ')}\n` +
       'Please check your .env.local file and ensure all required variables are set.'

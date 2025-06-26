@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check environment variables
+    // Validate environment variables first
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ 
-        error: true,
-        message: 'Supabase environment variables not configured' 
-      }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
     }
 
     const { userId, firstName, lastName, email } = await request.json()
@@ -59,14 +59,11 @@ export async function POST(request: NextRequest) {
       profile: profileData 
     })
 
-  } catch (error: any) {
-    console.error('❌ API error:', error)
+  } catch (error) {
+    console.error('Error in create-profile:', error)
     return NextResponse.json(
-      { 
-        error: true, 
-        message: error.message || 'Internal server error' 
-      },
+      { error: 'Failed to create profile' },
       { status: 500 }
     )
   }
-} 
+}

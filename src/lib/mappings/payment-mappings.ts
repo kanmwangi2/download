@@ -1,4 +1,4 @@
-import { PaymentType, StaffPayment } from "@/lib/types";
+import { PaymentType, StaffPaymentConfig } from "@/lib/types";
 
 export function paymentTypeToBackend(paymentType: PaymentType | Omit<PaymentType, 'id'>): Record<string, unknown> {
   return {
@@ -6,9 +6,11 @@ export function paymentTypeToBackend(paymentType: PaymentType | Omit<PaymentType
     company_id: paymentType.companyId,
     name: paymentType.name,
     type: paymentType.type,
+    order_number: paymentType.orderNumber,
+    is_fixed_name: paymentType.isFixedName,
+    is_deletable: paymentType.isDeletable,
     is_taxable: paymentType.isTaxable,
-    is_default: paymentType.isDefault,
-    description: paymentType.description,
+    is_pensionable: paymentType.isPensionable,
   };
 }
 
@@ -18,30 +20,55 @@ export function paymentTypeFromBackend(paymentType: Record<string, any>): Paymen
     companyId: paymentType.company_id,
     name: paymentType.name,
     type: paymentType.type,
+    orderNumber: paymentType.order_number,
+    isFixedName: paymentType.is_fixed_name,
+    isDeletable: paymentType.is_deletable,
     isTaxable: paymentType.is_taxable,
-    isDefault: paymentType.is_default,
-    description: paymentType.description,
+    isPensionable: paymentType.is_pensionable,
   };
 }
 
-export function staffPaymentToBackend(staffPayment: StaffPayment | Omit<StaffPayment, 'id'>): Record<string, unknown> {
+export function staffPaymentConfigToBackend(config: StaffPaymentConfig | Omit<StaffPaymentConfig, 'id'>): Record<string, unknown> {
     return {
-        ...(('id' in staffPayment) && { id: staffPayment.id }),
-        staff_id: staffPayment.staffId,
-        payment_type_id: staffPayment.paymentTypeId,
-        amount: staffPayment.amount,
-        effective_date: staffPayment.effectiveDate,
-        end_date: staffPayment.endDate,
+        ...(('id' in config) && { id: config.id }),
+        company_id: config.companyId,
+        staff_id: config.staffId,
+        basic_pay: config.basicPay,
+        payment_type: config.paymentType,
+        allowances: config.allowances,
     };
 }
 
-export function staffPaymentFromBackend(staffPayment: Record<string, any>): StaffPayment {
+export function staffPaymentConfigFromBackend(config: Record<string, any>): StaffPaymentConfig {
     return {
-        id: staffPayment.id,
-        staffId: staffPayment.staff_id,
-        paymentTypeId: staffPayment.payment_type_id,
-        amount: staffPayment.amount,
-        effectiveDate: staffPayment.effective_date,
-        endDate: staffPayment.end_date,
+        id: config.id,
+        companyId: config.company_id,
+        staffId: config.staff_id,
+        basicPay: config.basic_pay,
+        paymentType: config.payment_type,
+        allowances: config.allowances,
+    };
+}
+
+// Legacy compatibility functions for existing services
+export function staffPaymentFromBackend(payment: Record<string, any>): any {
+    return {
+        id: payment.id,
+        staffId: payment.staff_id,
+        paymentTypeId: payment.payment_type_id,
+        amount: payment.amount,
+        effectiveDate: payment.effective_date,
+        endDate: payment.end_date,
+    };
+}
+
+export function staffPaymentToBackend(payment: any): Record<string, unknown> {
+    return {
+        id: payment.id,
+        staff_id: payment.staffId,
+        payment_type_id: payment.paymentTypeId,
+        amount: payment.amount,
+        effective_date: payment.effectiveDate,
+        end_date: payment.endDate,
     };
 }

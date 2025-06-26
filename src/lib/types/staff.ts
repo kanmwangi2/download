@@ -1,35 +1,34 @@
-export type StaffStatus = "active" | "inactive" | "on_leave";
+export type StaffStatus = "Active" | "Inactive";
 
 export interface StaffMember {
   id: string;
   companyId: string;
-  userId?: string | null;
+  staffNumber?: string;
   firstName: string;
   lastName: string;
-  staffNumber?: string;
-  email: string;
+  email?: string;
   phone?: string;
-  rssbNumber?: string;
-  employeeCategory?: string;
+  staffRssbNumber?: string;
+  employeeCategory?: 'P' | 'C' | 'E' | 'S';
   gender?: 'Male' | 'Female' | 'Other';
   birthDate?: string;
   department?: string;
-  position?: string;
+  designation?: string;
   employmentDate?: string;
-  terminationDate?: string | null;
   nationality?: string;
-  nationalIdNumber?: string;
-  passportNumber?: string;
+  idPassportNumber?: string;
   province?: string;
   district?: string;
   sector?: string;
   cell?: string;
   village?: string;
   bankName?: string;
+  bankCode?: string;
   bankAccountNumber?: string;
-  emergencyContactName?: string;
-  emergencyContactRelationship?: string;
-  emergencyContactPhone?: string;
+  bankBranch?: string;
+  keyContactName?: string;
+  keyContactRelationship?: string;
+  keyContactPhone?: string;
   status: StaffStatus;
   customFields?: Record<string, any>;
 }

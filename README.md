@@ -59,14 +59,38 @@ Complete documentation is available in the `docs/` directory:
 3. Configure environment variables in `.env.local`
 4. Apply any pending migrations from `docs/migrations/`
 
+### Build Configuration
+
+The application includes optimizations for Vercel deployments:
+
+- Webpack configuration for Supabase dependencies
+- Build-time environment validation
+- Memory optimization for large builds
+- Realtime client optimization for production
+
 ### Commands
 
 ```bash
-npm run dev          # Start development server
+npm run dev          # Start development server (port 9002)
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
+npm run typecheck    # TypeScript type checking
+npm run build:vercel # Build with type checking for Vercel
 ```
+
+### Deployment
+
+#### Vercel
+
+1. Connect your GitHub repository to Vercel
+2. Set the following environment variables in Vercel dashboard:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (for API routes)
+3. Deploy automatically via GitHub integration
+
+The build configuration (`vercel.json`) includes memory optimization for successful deployments.
 
 ## 🌟 Features
 

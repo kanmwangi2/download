@@ -5,4 +5,5 @@ export interface DeductionType {
   orderNumber: number;
   isFixedName: boolean;
   isDeletable: boolean;
+  description?: string;
 }

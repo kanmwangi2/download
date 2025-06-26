@@ -11,29 +11,32 @@ export type UserRole = typeof USER_ROLE_VALUES[number];
 export const USER_STATUS_VALUES = ['Active', 'Inactive'] as const;
 export type UserStatus = typeof USER_STATUS_VALUES[number];
 
-// Corresponds to the `users` table in the database (snake_case)
-export interface User {
-  id: string;
-  email: string;
-  first_name?: string;
-  last_name?: string;
+// User profile (matches user_profiles table)
+export interface UserProfile {
+  id: string; // UUID referencing auth.users(id)
+  firstName?: string;
+  lastName?: string;
+  email?: string;
   phone?: string;
-  role: UserRole;
-  assigned_company_ids: string[];
-  status: UserStatus;
-  created_at: string;
-  updated_at: string;
 }
 
-// Represents the user object used in the UI (camelCase)
+// User company assignment (matches user_company_assignments table)
+export interface UserCompanyAssignment {
+  id: string;
+  userId: string;
+  companyId: string;
+  role: UserRole;
+}
+
+// Combined user data for UI (camelCase)
 export interface UserUI {
-  id?: string;
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
-  role: UserRole;
-  assignedCompanyIds: string[];
-  status: UserStatus;
-  password?: string; // Only for creating new users
+  phone?: string;
+  companies: Array<{
+    companyId: string;
+    role: UserRole;
+  }>;
 }

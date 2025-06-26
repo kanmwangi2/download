@@ -32,6 +32,7 @@ CREATE TABLE public.user_profiles (
   first_name TEXT,
   last_name TEXT,
   email TEXT,
+  phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

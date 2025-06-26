@@ -45,6 +45,13 @@ export function LoginForm() {
 
   // Redirect when user is authenticated after login
   useEffect(() => {
+    console.log("🔄 LoginForm: Auth state check:", { 
+      loginSuccessful, 
+      hasUser: !!user, 
+      authLoading, 
+      userId: user?.id 
+    });
+    
     if (loginSuccessful && user && !authLoading) {
       console.log("🚀 User authenticated after login, redirecting to /select-company");
       router.replace("/select-company");
@@ -89,6 +96,7 @@ export function LoginForm() {
         
         // Set flag to trigger redirect when auth context updates
         setLoginSuccessful(true);
+        setIsLoading(false); // Stop the loading state
         
         // Don't redirect immediately - let the auth context handle it
         return; // Exit early after successful login
@@ -196,6 +204,19 @@ export function LoginForm() {
             >
               {isLoading ? "Logging in..." : "Login"}
             </Button>
+            
+            {/* Show manual continue button if login was successful but no auto-redirect */}
+            {loginSuccessful && feedback?.type === 'success' && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-lg py-3"
+                onClick={() => router.replace("/select-company")}
+              >
+                Continue to App
+              </Button>
+            )}
+            
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/signup" className="text-primary hover:underline">

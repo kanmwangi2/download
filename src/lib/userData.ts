@@ -115,7 +115,7 @@ export const defaultNewUserFormData: Omit<User, 'id' | 'password'> & { password?
 // Import centralized case conversion utilities
 export { userToBackend, userFromBackend } from './case-conversion';
 
-import { getSupabaseClientAsync } from './supabase';
+import { getSupabaseClientAsync } from './supabase-simple';
 
 /**
  * Ensures a user profile exists for the current authenticated user.

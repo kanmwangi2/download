@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
-import { signIn } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase-simple';
 import { ensureUserProfile } from '@/lib/userData';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -57,7 +57,11 @@ export function LoginForm() {
 
     try {
       console.log("🔄 Attempting login...");
-      const { data, error } = await signIn(email.trim().toLowerCase(), password);
+      const supabase = await getSupabaseClientAsync();
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim().toLowerCase(), 
+        password 
+      });
 
       console.log("📊 Login result:", { user: data?.user?.id, error: error?.message });
 

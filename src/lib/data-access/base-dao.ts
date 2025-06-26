@@ -3,7 +3,7 @@
  * Implements common CRUD operations that all entities can inherit
  */
 
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface BaseEntity {
@@ -28,14 +28,23 @@ export interface CRUDOperations<T extends BaseEntity> {
 }
 
 export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T> {
-  protected supabase: SupabaseClient;
+  private _supabase: SupabaseClient | null = null;
   protected tableName: string;
   protected companyScoped: boolean;
 
   constructor(tableName: string, companyScoped: boolean = true) {
-    this.supabase = getSupabaseClient();
     this.tableName = tableName;
     this.companyScoped = companyScoped;
+  }
+
+  /**
+   * Get Supabase client with lazy initialization
+   */
+  protected async getSupabase(): Promise<SupabaseClient> {
+    if (!this._supabase) {
+      this._supabase = await getSupabaseClientAsync();
+    }
+    return this._supabase as SupabaseClient;
   }
 
   /**
@@ -51,8 +60,9 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   /**
    * Build base query with company scoping if needed
    */
-  protected buildBaseQuery(companyId?: string) {
-    let query = this.supabase.from(this.tableName).select('*');
+  protected async buildBaseQuery(companyId?: string) {
+    const supabase = await this.getSupabase();
+    let query = supabase.from(this.tableName).select('*');
     
     if (this.companyScoped && companyId) {
       query = query.eq('company_id', companyId);
@@ -62,17 +72,19 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async findAll(companyId?: string): Promise<T[]> {
-    const { data, error } = await this.buildBaseQuery(companyId);
+    const query = await this.buildBaseQuery(companyId);
+    const { data, error } = await query;
     
     if (error) {
       throw new Error(`Failed to fetch ${this.tableName}: ${error.message}`);
     }
     
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 
   async findById(id: string, companyId?: string): Promise<T | null> {
-    let query = this.supabase.from(this.tableName).select('*').eq('id', id);
+    const supabase = await this.getSupabase();
+    let query = supabase.from(this.tableName).select('*').eq('id', id);
     
     if (this.companyScoped && companyId) {
       query = query.eq('company_id', companyId);
@@ -91,8 +103,9 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async create(entity: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<T> {
+    const supabase = await this.getSupabase();
     const dbEntity = this.toDatabase(entity as Partial<T>);
-    const { data, error } = await this.supabase
+    const { data, error } = await supabase
       .from(this.tableName)
       .insert(dbEntity)
       .select()
@@ -106,8 +119,9 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async update(id: string, entity: Partial<T>): Promise<T> {
+    const supabase = await this.getSupabase();
     const dbEntity = this.toDatabase(entity);
-    const { data, error } = await this.supabase
+    const { data, error } = await supabase
       .from(this.tableName)
       .update(dbEntity)
       .eq('id', id)
@@ -122,7 +136,8 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { error } = await supabase
       .from(this.tableName)
       .delete()
       .eq('id', id);
@@ -133,8 +148,9 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async bulkCreate(entities: Omit<T, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<T[]> {
+    const supabase = await this.getSupabase();
     const dbEntities = entities.map(entity => this.toDatabase(entity as Partial<T>));
-    const { data, error } = await this.supabase
+    const { data, error } = await supabase
       .from(this.tableName)
       .insert(dbEntities)
       .select();
@@ -147,8 +163,9 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async bulkUpdate(entities: Partial<T>[]): Promise<T[]> {
+    const supabase = await this.getSupabase();
     const dbEntities = entities.map(entity => this.toDatabase(entity));
-    const { data, error } = await this.supabase
+    const { data, error } = await supabase
       .from(this.tableName)
       .upsert(dbEntities)
       .select();
@@ -161,7 +178,8 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   }
 
   async bulkDelete(ids: string[]): Promise<void> {
-    const { error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { error } = await supabase
       .from(this.tableName)
       .delete()
       .in('id', ids);
@@ -175,7 +193,12 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
    * Find entities with custom filters
    */
   async findWithFilters(filters: Record<string, any>, companyId?: string): Promise<T[]> {
-    let query = this.buildBaseQuery(companyId);
+    const supabase = await this.getSupabase();
+    let query = supabase.from(this.tableName).select('*');
+    
+    if (this.companyScoped && companyId) {
+      query = query.eq('company_id', companyId);
+    }
     
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -189,14 +212,15 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
       throw new Error(`Failed to fetch ${this.tableName} with filters: ${error.message}`);
     }
     
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 
   /**
    * Count entities
    */
   async count(companyId?: string): Promise<number> {
-    let query = this.supabase.from(this.tableName).select('*', { count: 'exact', head: true });
+    const supabase = await this.getSupabase();
+    let query = supabase.from(this.tableName).select('*', { count: 'exact', head: true });
     
     if (this.companyScoped && companyId) {
       query = query.eq('company_id', companyId);

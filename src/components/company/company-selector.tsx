@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext";
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { Company as AppCompany } from '@/lib/userData';
 
 import { objectToCamelCase } from '@/lib/case-conversion';
@@ -63,7 +63,7 @@ export function CompanySelector() {
   React.useEffect(() => {
     const loadInitialData = async () => {
       setIsLoadingData(true);
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUser({
@@ -98,7 +98,7 @@ export function CompanySelector() {
   };
 
   const handleLogout = async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     await supabase.auth.signOut();
     setContextCompanyId(null);
     setContextCompanyName(null);

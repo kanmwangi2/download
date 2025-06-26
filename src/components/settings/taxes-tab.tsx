@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Save, Loader2, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { PAYE_BANDS as DEFAULT_PAYE_BANDS, PENSION_EMPLOYER_RATE as DEFAULT_PENSION_EMPLOYER_RATE, PENSION_EMPLOYEE_RATE as DEFAULT_PENSION_EMPLOYEE_RATE, MATERNITY_EMPLOYER_RATE as DEFAULT_MATERNITY_EMPLOYER_RATE, MATERNITY_EMPLOYEE_RATE as DEFAULT_MATERNITY_EMPLOYEE_RATE, CBHI_RATE as DEFAULT_CBHI_RATE, RAMA_EMPLOYER_RATE as DEFAULT_RAMA_EMPLOYER_RATE, RAMA_EMPLOYEE_RATE as DEFAULT_RAMA_EMPLOYEE_RATE } from "@/lib/taxConfig";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/CompanyContext';
 
@@ -82,7 +82,7 @@ export default function TaxesTab() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         const { data, error } = await supabase
           .from('tax_settings')
           .select('*')
@@ -148,7 +148,7 @@ export default function TaxesTab() {
     };
 
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data, error } = await supabase.from('tax_settings').upsert(objectToSnakeCase(settingsToSave), { onConflict: 'company_id' }).select().single();
 
       if (error) throw error;

@@ -2,14 +2,24 @@
  * Base Service Class
  * Provides common functionality for all service classes including error handling and Supabase client access
  */
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export abstract class BaseService {
-  protected supabase: SupabaseClient;
+  private _supabase: SupabaseClient | null = null;
 
   constructor() {
-    this.supabase = getSupabaseClient();
+    // Lazy initialization - client will be created on first access
+  }
+
+  /**
+   * Get Supabase client with lazy initialization
+   */
+  protected async getSupabase(): Promise<SupabaseClient> {
+    if (!this._supabase) {
+      this._supabase = await getSupabaseClientAsync();
+    }
+    return this._supabase as SupabaseClient;
   }
 
   /**

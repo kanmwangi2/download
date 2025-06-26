@@ -48,7 +48,7 @@ import {
 import { PlusCircle, Edit, Trash2, Eye, EyeOff, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Download, FileText, FileSpreadsheet, FileType, AlertTriangle, Info, CheckCircle2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import { type Company } from '@/lib/types/company';
 import { type User, type UserUI, type UserRole, USER_ROLE_VALUES } from '@/lib/types/user';
 import { userFromBackend, userToBackend } from '@/lib/mappings/user-mappings';
@@ -101,7 +101,7 @@ export default function UserManagementTab() {
       setIsLoaded(false);
       setFeedback(null);
       try {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         const { data: users, error: userError } = await supabase.from('users').select('*');
         if (userError) throw userError;
         setAllUsers(users || []);
@@ -180,7 +180,7 @@ export default function UserManagementTab() {
     setFeedback(null);
     if (idsToDelete.length === 0) return;
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { error } = await supabase.from('users').delete().in('id', idsToDelete);
       if (error) throw error;
       setAllUsers(prev => prev.filter((user) => user.id && !idsToDelete.includes(user.id)));
@@ -219,7 +219,7 @@ export default function UserManagementTab() {
     }
     const newEmail = formData.email.trim().toLowerCase();
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const finalAssignedCompanyIds =
         formData.role === "Primary Admin" || formData.role === "App Admin"
           ? availableCompaniesForAssignment.map(c => c.id)
@@ -373,9 +373,11 @@ export default function UserManagementTab() {
         header: true, skipEmptyLines: true,
         complete: async (results) => {
           const { data: rawData, errors: papaParseErrors } = results;          if (papaParseErrors.length > 0 && rawData.length === 0) { setFeedback({type: 'error', message: "Import Failed", details: `Critical CSV parsing error: ${papaParseErrors[0]?.message || 'Unknown error'}.`}); return; }
-          const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkUpsert: (Omit<User, 'created_at' | 'updated_at' | 'id'> & { id?: string, password?: string})[] = [];
+          const validationSkippedLog: string[] = []; 
+          let newCount = 0, updatedCount = 0; 
+          const itemsToBulkUpsert: User[] = [];
           const validCompanyIds = availableCompaniesForAssignment.map(c => c.id);
-          const supabase = getSupabaseClient();
+          const supabase = await getSupabaseClientAsync();
           const { data: existingUsersRaw = [], error: fetchUsersError } = await supabase.from('users').select('*');
           const existingUsers: User[] = existingUsersRaw || [];
           if (fetchUsersError) {
@@ -402,7 +404,8 @@ export default function UserManagementTab() {
               if (!password) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Password required for new user.`); continue; }
               if (existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Email already exists.`); continue; }
               if (role === "Primary Admin" && primaryAdminExists) { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Primary Admin already exists.`); continue; }
-              itemsToBulkUpsert.push(userToBackend({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray, status: 'Active' })); newCount++; // Do not assign id manually
+              itemsToBulkUpsert.push(userToBackend({ firstName, lastName, email, phone, role, password, assignedCompanyIds: assignedCompanyIdsArray, status: 'Active' })); 
+              newCount++;
             }
           }
           if (itemsToBulkUpsert.length > 0) {

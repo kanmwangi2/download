@@ -1,5 +1,34 @@
-import { type UserProfile, type UserCompanyAssignment, type UserUI } from '@/lib/types/user';
+import { type User, type UserProfile, type UserCompanyAssignment, type UserUI } from '@/lib/types/user';
 
+// Main user mappings (snake_case ↔ camelCase)
+export function userToBackend(user: UserUI | Omit<UserUI, 'id'>): User {
+    return {
+        ...(('id' in user) && { id: user.id! }),
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        assigned_company_ids: user.assignedCompanyIds,
+        ...(user.password && { password: user.password }),
+        status: user.status || 'Active',
+    } as User;
+}
+
+export function userFromBackend(user: Record<string, any>): UserUI {
+    return {
+        id: user.id,
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        email: user.email || '',
+        phone: user.phone,
+        role: user.role,
+        assignedCompanyIds: user.assigned_company_ids || [],
+        status: user.status || 'Active',
+    };
+}
+
+// User profile mappings
 export function userProfileToBackend(profile: UserProfile | Omit<UserProfile, 'id'>): Record<string, unknown> {
     return {
         ...(('id' in profile) && { id: profile.id }),
@@ -20,6 +49,7 @@ export function userProfileFromBackend(profile: Record<string, any>): UserProfil
     };
 }
 
+// User company assignment mappings
 export function userCompanyAssignmentToBackend(assignment: UserCompanyAssignment | Omit<UserCompanyAssignment, 'id'>): Record<string, unknown> {
     return {
         ...(('id' in assignment) && { id: assignment.id }),
@@ -35,27 +65,5 @@ export function userCompanyAssignmentFromBackend(assignment: Record<string, any>
         userId: assignment.user_id,
         companyId: assignment.company_id,
         role: assignment.role,
-    };
-}
-
-// Legacy compatibility functions for existing components
-export function userFromBackend(user: Record<string, any>): UserUI {
-    return {
-        id: user.id,
-        firstName: user.first_name || '',
-        lastName: user.last_name || '',
-        email: user.email || '',
-        phone: user.phone,
-        companies: user.companies || [],
-    };
-}
-
-export function userToBackend(user: UserUI): Record<string, unknown> {
-    return {
-        id: user.id,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        phone: user.phone,
     };
 }

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, Repeat, UserCircle } from "lucide-react"; 
 import { ThemeToggle } from "./theme-toggle";
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClientAsync } from '@/lib/supabase';
 import type { UserRole } from '@/lib/userData';
 import { useCompany } from "@/context/CompanyContext"; // Added useCompany
 
@@ -38,7 +38,7 @@ export function UserNav() {
 
   useEffect(() => {
     const loadUserData = async () => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUser({

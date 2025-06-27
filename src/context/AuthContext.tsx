@@ -9,11 +9,24 @@ import React, {
   useMemo,
   useCallback 
 } from 'react';
-import { AuthenticatedUser, UserService } from '@/lib/services/UserService';
+import { User } from '@supabase/supabase-js';
 import { getSupabaseClientAsync } from '@/lib/supabase';
+
+export type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Payroll Preparer' | 'Payroll Approver' | 'Employee';
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  role: UserRole;
+  assignedCompanyIds: string[];
+}
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
+  supabaseUser: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
@@ -26,42 +39,122 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Debug logging for every render
-  useEffect(() => {
-    console.log('🔍 AuthContext State:', { 
-      hasUser: !!user, 
-      userId: user?.id, 
-      userEmail: user?.email,
-      userRole: user?.role,
-      isLoading 
-    });
-  }, [user, isLoading]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const refreshUser = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      console.log('🔄 AuthContext: Starting refreshUser');
+      console.log('� AuthContext: Refreshing user');
       setIsLoading(true);
       
-      // Check environment variables
-      const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      console.log('🔄 AuthContext: Environment check:', { hasUrl, hasKey });
-      
       const supabase = await getSupabaseClientAsync();
-      console.log('🔄 AuthContext: Got Supabase client, checking auth...');
+      const { data: { user: authUser }, error } = await supabase.auth.getUser();
       
-      const userService = new UserService(); // UserService extends BaseService which handles supabase internally
-      const currentUser = await userService.getCurrentUser();
-      console.log('🔄 AuthContext: Got user from service:', { userId: currentUser?.id, hasUser: !!currentUser });
-      setUser(currentUser);
+      if (error || !authUser) {
+        console.log('🚫 AuthContext: No authenticated user');
+        setUser(null);
+        setSupabaseUser(null);
+        return;
+      }
+
+      console.log('✅ AuthContext: Got authenticated user:', authUser.id);
+      setSupabaseUser(authUser);
+
+      // Get user profile from database
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.warn('❌ AuthContext: No user profile found');
+        setUser(null);
+        return;
+      }
+
+      // Get role from user metadata
+      let role = authUser.user_metadata?.role as UserRole;
+      if (!role) {
+        // Check if this is the first user in the system
+        try {
+          const { data: existingProfiles, error: profilesError } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .limit(1);
+          
+          if (profilesError) {
+            console.warn('Could not check existing profiles:', profilesError);
+            role = 'Company Admin'; // Safe default
+          } else if (!existingProfiles || existingProfiles.length === 0) {
+            // First user - make them Primary Admin
+            role = 'Primary Admin';
+            console.log('🔄 AuthContext: First user detected, assigning Primary Admin role');
+          } else {
+            // Not first user - assign default role
+            role = 'Company Admin';
+            console.log('🔄 AuthContext: Assigning default Company Admin role');
+          }
+          
+          // Update user metadata with the role
+          await supabase.auth.updateUser({
+            data: { 
+              ...authUser.user_metadata,
+              role 
+            }
+          });
+        } catch (error) {
+          console.error('❌ AuthContext: Error assigning role:', error);
+          role = 'Company Admin'; // Safe fallback
+        }
+      }
+
+      // Get assigned companies
+      let assignedCompanyIds: string[] = [];
+      if (role === 'Primary Admin' || role === 'App Admin') {
+        // Admins have access to all companies
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('id');
+        assignedCompanyIds = companies ? companies.map((c: any) => c.id) : ['*'];
+      } else {
+        // Get from assignments table
+        const { data: assignments } = await supabase
+          .from('user_company_assignments')
+          .select('company_id')
+          .eq('user_id', authUser.id);
+        assignedCompanyIds = assignments ? assignments.map((a: any) => a.company_id) : [];
+      }
+
+      const authenticatedUser: AuthenticatedUser = {
+        id: authUser.id,
+        email: authUser.email || profile.email,
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        phone: profile.phone || '',
+        role,
+        assignedCompanyIds,
+      };
+
+      console.log('✅ AuthContext: Created user object:', {
+        userId: authenticatedUser.id,
+        role: authenticatedUser.role,
+        companyCount: authenticatedUser.assignedCompanyIds.length
+      });
+
+      setUser(authenticatedUser);
     } catch (error) {
       console.error('❌ AuthContext: Error refreshing user:', error);
       setUser(null);
+      setSupabaseUser(null);
     } finally {
       setIsLoading(false);
-      console.log('✅ AuthContext: refreshUser completed');
     }
   }, []);
 
@@ -70,70 +163,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const supabase = await getSupabaseClientAsync();
       await supabase.auth.signOut();
       setUser(null);
+      setSupabaseUser(null);
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('❌ AuthContext: Error during logout:', error);
     }
   }, []);
 
   const canAccessCompany = useCallback((companyId: string): boolean => {
     if (!user || !companyId) return false;
-    return UserService.canAccessCompany(user, companyId);
+    if (user.role === 'Primary Admin' || user.role === 'App Admin') return true;
+    return user.assignedCompanyIds.includes(companyId) || user.assignedCompanyIds.includes('*');
   }, [user]);
 
   const hasUniversalAccess = useCallback((): boolean => {
     if (!user) return false;
-    return UserService.hasUniversalAccess(user);
+    return user.role === 'Primary Admin' || user.role === 'App Admin';
   }, [user]);
 
+  // Initialize auth state
   useEffect(() => {
-    refreshUser();
+    if (isInitialized) return;
 
-    // Listen for auth state changes
-    const setupAuthListener = async () => {
+    const initializeAuth = async (): Promise<(() => void) | undefined> => {
       try {
+        console.log('🔄 AuthContext: Initializing auth');
+        await refreshUser();
+        
         const supabase = await getSupabaseClientAsync();
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: any, session: any) => {
-            console.log('🔄 AuthContext: Auth state change:', event, { hasSession: !!session, hasUser: !!session?.user });
+            console.log('🔄 AuthContext: Auth state change:', event);
+            
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              console.log('🔄 AuthContext: User signed in/token refreshed, refreshing user data');
               await refreshUser();
             } else if (event === 'SIGNED_OUT') {
-              console.log('🔄 AuthContext: User signed out, clearing user state');
               setUser(null);
+              setSupabaseUser(null);
               setIsLoading(false);
             }
           }
         );
 
-        return subscription;
+        setIsInitialized(true);
+        return () => subscription.unsubscribe();
       } catch (error) {
-        console.error('Error setting up auth listener:', error);
-        return null;
+        console.error('❌ AuthContext: Error initializing auth:', error);
+        setIsLoading(false);
+        return undefined;
       }
     };
 
-    let cleanup: any = null;
-    setupAuthListener().then((subscription) => {
-      cleanup = subscription;
+    let cleanup: (() => void) | undefined;
+    initializeAuth().then((cleanupFn) => {
+      cleanup = cleanupFn;
     });
 
     return () => {
-      if (cleanup?.unsubscribe) {
-        cleanup.unsubscribe();
-      }
+      if (cleanup) cleanup();
     };
-  }, [refreshUser]);
+  }, [isInitialized, refreshUser]);
 
   const contextValue = useMemo(() => ({
     user,
+    supabaseUser,
     isLoading,
     isAuthenticated: !!user,
     refreshUser,
     canAccessCompany,
     hasUniversalAccess,
     logout,
-  }), [user, isLoading, refreshUser, canAccessCompany, hasUniversalAccess, logout]);
+  }), [user, supabaseUser, isLoading, refreshUser, canAccessCompany, hasUniversalAccess, logout]);
 
   return (
     <AuthContext.Provider value={contextValue}>

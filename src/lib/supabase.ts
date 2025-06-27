@@ -172,7 +172,7 @@ export const signIn = async (email: string, password: string) => {
   return await client.auth.signInWithPassword({ email, password })
 }
 
-export const signUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string }) => {
+export const signUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string; role?: string }) => {
   const client = await getSupabaseClientAsync()
   return await client.auth.signUp({ 
     email, 

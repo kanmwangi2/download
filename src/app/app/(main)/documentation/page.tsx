@@ -37,7 +37,7 @@ const documentationContent: DocSectionData[] = [
         type: 'subsection',
         subTitle: "Multi-Company Support",
         subContent: [
-          "Cheetah Payroll supports managing multiple distinct company profiles within a single application instance. All operational data (staff records, payroll runs, payment types, payment configurations, deductions, company-specific settings like departments, custom field definitions, and company profile) is isolated to the currently selected company. Global data includes the list of available companies, user accounts, and system-wide tax configurations. The demo comes pre-seeded with two companies: 'Umoja Tech Solutions (Demo)' (ID: co_001) and 'Isoko Trading Co. (Demo)' (ID: co_002).",
+          "Cheetah Payroll supports managing multiple distinct company profiles within a single application instance. All operational data (staff records, payroll runs, payment types, payment configurations, deductions, company-specific settings like departments, custom field definitions, and company profile) is isolated to the currently selected company. Global data includes the list of available companies, user accounts, and system-wide tax configurations. Users create their own companies during the initial setup process.",
         ],
       },
       {
@@ -88,7 +88,7 @@ const documentationContent: DocSectionData[] = [
             "<strong>Data Security:</strong> Row Level Security (RLS) ensures complete data isolation between companies with encrypted storage.",
             "<strong>Resetting the Application:</strong> To reset your company or user data, contact your system administrator or use the admin tools in the application settings (if available).",
             "<strong>Suitability:</strong> This cloud-native setup is suitable for production, multi-user, and collaborative scenarios with automatic backups.",
-            "<strong>Initial Data:</strong> The application is seeded with initial default data (for users and the two demo companies 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)', including their respective staff, payment types, deduction types, custom fields, departments, company profiles, and payroll history) to allow for immediate exploration and use.",
+            "<strong>Initial Data:</strong> The application starts with a clean state. Users create their companies and populate data as needed for their specific business requirements.",
           ]}
         ]
       },
@@ -134,7 +134,7 @@ const documentationContent: DocSectionData[] = [
           "Access the application by navigating to the root URL. You will be presented with a login form.",
           { type: 'list', items: [
             "Enter your registered email and password.",
-            "Initial default users (including a Primary Admin for 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)') are seeded into Supabase on first load or after a data reset. Refer to `src/lib/userData.ts` for default credentials if testing locally.",
+            "For first-time users, start by signing up to create an account. The first user to sign up will automatically become the Primary Admin.",
           ]}
         ]
       },
@@ -144,7 +144,7 @@ const documentationContent: DocSectionData[] = [
         subContent: [
           "After successful login, you'll be directed to the \"Select Your Company\" screen.",
           { type: 'list', items: [
-            "Choose the company profile you wish to manage from the dropdown list. The list displays all companies registered in the application (initially, 'Umoja Tech Solutions (Demo)' and 'Isoko Trading Co. (Demo)'). Your user role will determine what actions you can perform within the selected company.",
+            "Choose the company profile you wish to manage from the dropdown list. The list displays all companies that you have access to. Your user role will determine what actions you can perform within the selected company.",
             "Click \"Go to Company\" to load the main application dashboard for the selected company. All subsequent operations (Staff, Payroll, etc.) will be within the context of this chosen company.",
           ]}
         ]

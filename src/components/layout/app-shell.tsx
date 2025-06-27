@@ -1,8 +1,7 @@
-
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation"; // Added useRouter
+import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect } from "react";
 import {
   SidebarProvider,
@@ -13,7 +12,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  SidebarTrigger,  useSidebar,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -24,6 +24,43 @@ import {
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
 import { UserNav } from "./user-nav";
 import { CompanyProvider, useCompany } from "@/context/CompanyContext";
+import { useAuth } from "@/context/AuthContext";
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      console.log("🚫 AppShell: User not authenticated, redirecting to /signin");
+      router.replace("/signin");
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <div className="text-center">
+          <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <div className="text-center">
+          <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+          <p>Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function SidebarNavigation() {
   const pathname = usePathname();
@@ -65,16 +102,16 @@ function SidebarNavigation() {
             const item = element as NavItem;
             return (
               <SidebarMenuItem key={item.href}>
-                 <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href || (item.href !== "/app/dashboard" && pathname.startsWith(item.href))}
-                    {...(open ? {} : { tooltip: item.title })}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href || (item.href !== "/app/dashboard" && pathname.startsWith(item.href))}
+                  {...(open ? {} : { tooltip: item.title })}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             );
           }
@@ -84,47 +121,44 @@ function SidebarNavigation() {
   );
 }
 
-function AppShellContent({ children }: { children: React.ReactNode }) {
-  const { selectedCompanyName, selectedCompanyId, isLoadingCompanyContext } = useCompany();
+function CompanyGuard({ children }: { children: React.ReactNode }) {
+  const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
-    // Add a small delay to prevent race conditions during initial load
-    const timeoutId = setTimeout(() => {
-      // Only redirect if we're definitely in the app routes and missing company context
-      if (!isLoadingCompanyContext && !selectedCompanyId && typeof window !== 'undefined') {
-        const currentPath = pathname || window.location.pathname;
-        console.log("AppShell: Checking redirect logic", { 
-          currentPath, 
-          isLoadingCompanyContext, 
-          selectedCompanyId: !!selectedCompanyId,
-          startsWithApp: currentPath.startsWith('/app/'),
-          isSelectCompany: currentPath === '/select-company'
-        });
-        
-        // Only redirect if we're in app routes (not already at select-company or other root routes)
-        if (currentPath.startsWith('/app/') && currentPath !== '/select-company') {
-          console.log("AppShell: No company selected, redirecting to /select-company");
-          router.replace("/select-company");
-        }
-      }
-    }, 100); // 100ms delay to let context load
+    if (!isLoadingCompanyContext && !selectedCompanyId) {
+      console.log("🚫 AppShell: No company selected, redirecting to /select-company");
+      router.replace("/select-company");
+    }
+  }, [selectedCompanyId, isLoadingCompanyContext, router]);
 
-    return () => clearTimeout(timeoutId);
-  }, [selectedCompanyId, isLoadingCompanyContext, router, pathname]);
+  if (isLoadingCompanyContext) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <div className="text-center">
+          <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+          <p>Loading company data...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const companyNameToDisplay = isLoadingCompanyContext ? "Loading Company..." : (selectedCompanyName || "No Company Selected");
-  
-  if (isLoadingCompanyContext && !selectedCompanyId) {
-      // Optionally show a loading state or minimal layout if context is loading and no companyId yet
-      return <div className="flex h-screen w-screen items-center justify-center"><p>Loading application data...</p></div>;
+  if (!selectedCompanyId) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <div className="text-center">
+          <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+          <p>Redirecting to company selection...</p>
+        </div>
+      </div>
+    );
   }
-  
-  if (!selectedCompanyId && !isLoadingCompanyContext && typeof window !== 'undefined' && pathname !== '/select-company') {
-    // This case should be handled by the useEffect redirect, but as a fallback:
-    return <div className="flex h-screen w-screen items-center justify-center"><p>Redirecting to company selection...</p></div>;
-  }
+
+  return <>{children}</>;
+}
+
+function AppShellContent({ children }: { children: React.ReactNode }) {
+  const { selectedCompanyName } = useCompany();
 
   return (
     <SidebarProvider defaultOpen>
@@ -151,12 +185,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           </SidebarContent>
         </Sidebar>
 
-        <SidebarInset className="flex flex-col flex-1 overflow-auto"> {/* Added overflow-auto */}
-          <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"> {/* Removed sticky */}
+        <SidebarInset className="flex flex-col flex-1 overflow-auto">
+          <header className="w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
               <div className="flex items-center">
                 <h1 className="text-lg font-semibold text-foreground hidden md:block">
-                  {companyNameToDisplay}
+                  {selectedCompanyName || "No Company Selected"}
                 </h1>
               </div>
               <div className="flex items-center space-x-4 ml-auto">
@@ -164,7 +198,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-4 md:p-8"> {/* Removed overflow-y-auto */}
+          <main className="flex-1 p-4 md:p-8">
             {children}
           </main>
         </SidebarInset>
@@ -175,9 +209,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <CompanyProvider>
-      <AppShellContent>{children}</AppShellContent>
-    </CompanyProvider>
+    <AuthGuard>
+      <CompanyProvider>
+        <CompanyGuard>
+          <AppShellContent>{children}</AppShellContent>
+        </CompanyGuard>
+      </CompanyProvider>
+    </AuthGuard>
   );
 }
-    

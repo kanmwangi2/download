@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
 import { signIn } from '@/lib/supabase';
-import { ensureUserProfile } from '@/lib/userData';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
@@ -37,27 +36,18 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
-  const [loginSuccessful, setLoginSuccessful] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Redirect if user is already authenticated
+  // Simple redirect logic - if user is authenticated, redirect immediately
   useEffect(() => {
-    if (user && !authLoading && !loginSuccessful) {
-      console.log("🚀 User already authenticated, redirecting to /select-company");
+    if (!authLoading && user) {
+      console.log("🚀 User authenticated, redirecting to /select-company");
       router.replace("/select-company");
     }
-  }, [user, authLoading, loginSuccessful, router]);
-
-  // Redirect when user is authenticated after login
-  useEffect(() => {
-    if (loginSuccessful && user && !authLoading) {
-      console.log("🚀 User authenticated after login, redirecting to /select-company");
-      router.replace("/select-company");
-    }
-  }, [user, authLoading, loginSuccessful, router]);
+  }, [user, authLoading, router]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -78,8 +68,6 @@ export function LoginForm() {
       console.log("🔄 Attempting login...");
       const { data, error } = await signIn(email.trim().toLowerCase(), password);
 
-      console.log("📊 Login result:", { user: data?.user?.id, error: error?.message });
-
       if (error) {
         console.error("❌ Login failed:", error);
         setFeedback({ 
@@ -87,20 +75,15 @@ export function LoginForm() {
           message: "Login Failed", 
           details: error.message || "Invalid email or password." 
         });
+        setIsLoading(false);
       } else if (data.user) {
-        console.log("✅ Login successful, waiting for auth context to update");
+        console.log("✅ Login successful");
         setFeedback({ 
           type: 'success', 
           message: "Login Successful", 
           details: "Redirecting..." 
         });
-        
-        // Set flag to trigger redirect when auth context updates
-        setLoginSuccessful(true);
-        // Keep loading state until redirect happens
-        
-        // Don't redirect immediately - let the auth context handle it
-        return; // Exit early after successful login
+        // The AuthContext will handle the redirect via useEffect above
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -109,9 +92,8 @@ export function LoginForm() {
         message: "Login Error", 
         details: "An unexpected error occurred during login." 
       });
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const togglePasswordVisibility = () => {
@@ -132,6 +114,22 @@ export function LoginForm() {
       </Alert>
     );
   };
+
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+              <p>Checking authentication...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -203,9 +201,9 @@ export function LoginForm() {
             <Button
               type="submit"
               className="w-full text-lg py-3"
-              disabled={isLoading || loginSuccessful}
+              disabled={isLoading}
             >
-              {loginSuccessful ? "Redirecting..." : isLoading ? "Logging in..." : "Login"}
+              {feedback?.type === 'success' ? "Redirecting..." : isLoading ? "Logging in..." : "Login"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}

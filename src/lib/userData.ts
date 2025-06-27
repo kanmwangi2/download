@@ -1,8 +1,7 @@
-// This file centralizes initial user and company data for seeding and type definitions.
+// User and company type definitions for Cheetah Payroll
 
 export type UserRole = "Primary Admin" | "App Admin" | "Company Admin" | "Payroll Approver" | "Payroll Preparer";
 
-// Company type used by User data, matches the structure in company-management-tab.tsx for seeding
 export interface Company {
   id: string;
   name: string;
@@ -20,95 +19,15 @@ export interface User {
   email: string;
   role: UserRole;
   assigned_company_ids: string[];
-  password?: string; // Stored plain text for simulation
   phone?: string;
 }
 
-// This will be dynamically populated by initialCompaniesDataForSeed from company-management-tab.tsx
-// during database seeding.
-export const all_company_ids_for_user_seed: string[] = ["co_001", "co_002"];
-
-
-export const initialUsers: User[] = [
-  {
-    id: "usr_pa001",
-    first_name: "Jean Pierre",
-    last_name: "Mugabe",
-    email: "jp.mugabe.admin@example.rw",
-    role: "Primary Admin",
-    assigned_company_ids: all_company_ids_for_user_seed,
-    password: "password123",
-    phone: "0788123456",
-  },
-  {
-    id: "usr_aa001",
-    first_name: "Marie Claire",
-    last_name: "Uwineza",
-    email: "mc.uwineza.admin@example.rw",
-    role: "App Admin",
-    assigned_company_ids: all_company_ids_for_user_seed,
-    password: "password123",
-    phone: "0788000111",
-  },
-  {
-    id: "usr_ca001", // Kevin Gatete
-    first_name: "Kevin",
-    last_name: "Gatete",
-    email: "kevin.gatete@example.rw",
-    role: "Company Admin",
-    assigned_company_ids: ["co_001", "co_002"],
-    password: "password123",
-    phone: "0788111222",
-  },
-   {
-    id: "usr_pp001", // Diane Keza - Payroll Preparer for Umoja (co_001)
-    first_name: "Diane",
-    last_name: "Keza",
-    email: "diane.keza@example.rw",
-    role: "Payroll Preparer",
-    assigned_company_ids: ["co_001"],
-    password: "password123",
-    phone: "0788333444",
-  },
-  {
-    id: "usr_pa002", // Eric Shema - Payroll Approver for Umoja (co_001)
-    first_name: "Eric",
-    last_name: "Shema",
-    email: "eric.shema@example.rw",
-    role: "Payroll Approver",
-    assigned_company_ids: ["co_001"],
-    password: "password123",
-    phone: "0788555666",
-  },
-  { // New Payroll Preparer for Isoko (co_002)
-    id: "usr_pp002",
-    first_name: "Aisha",
-    last_name: "Nizam",
-    email: "aisha.nizam@example.rw",
-    role: "Payroll Preparer",
-    assigned_company_ids: ["co_002"],
-    password: "password123",
-    phone: "0788777888",
-  },
-  { // New Payroll Approver for Isoko (co_002)
-    id: "usr_pa003",
-    first_name: "Samuel",
-    last_name: "Kaneza",
-    email: "samuel.kaneza@example.rw",
-    role: "Payroll Approver",
-    assigned_company_ids: ["co_002"],
-    password: "password123",
-    phone: "0788999000",
-  }
-];
-
-export const defaultNewUserFormData: Omit<User, 'id' | 'password'> & { password?: string } = {
+export const defaultNewUserFormData: Omit<User, 'id'> = {
   first_name: "",
   last_name: "",
   email: "",
   role: "Payroll Preparer",
   assigned_company_ids: [],
-  password: "",
   phone: "",
 };
 
@@ -120,43 +39,47 @@ import { getSupabaseClientAsync } from './supabase';
 /**
  * Ensures a user profile exists for the current authenticated user.
  * Call this after login or on app load.
- * Now with better error handling and timing to prevent login conflicts.
  */
 export async function ensureUserProfile() {
   try {
-    // Add a small delay to let auth state settle after login
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     const supabase = await getSupabaseClientAsync();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (userError) {
+    if (userError || !user) {
       console.error('Error getting user in ensureUserProfile:', userError);
       return;
     }
     
-    if (user) {
-      // Fallbacks for missing names
+    // Check if profile already exists
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (!existingProfile) {
+      // Create profile for new user
       const emailUsername = user.email?.split('@')[0] || '';
       const firstName = user.user_metadata?.first_name || emailUsername;
       const lastName = user.user_metadata?.last_name || '';
       
-      const { error: upsertError } = await supabase.from('user_profiles').upsert({
-        id: user.id,
-        email: user.email,
-        first_name: firstName,
-        last_name: lastName,
-        // Add more fields if needed
-      });
+      const { error: insertError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: user.email,
+          first_name: firstName,
+          last_name: lastName,
+          phone: user.user_metadata?.phone || '',
+        });
       
-      if (upsertError) {
-        console.error('Error upserting user profile:', upsertError);
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
       } else {
-        console.log('✅ User profile ensured successfully');
+        console.log('✅ User profile created successfully');
       }
     }
   } catch (error) {
     console.error('Error in ensureUserProfile:', error);
-    // Don't throw - this shouldn't block login
   }
 }

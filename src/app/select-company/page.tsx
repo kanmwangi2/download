@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -25,25 +24,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
-import { LogOut, Briefcase, Settings, Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { LogOut, Briefcase, Settings, Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { getSupabaseClientAsync } from '@/lib/supabase';
-import { objectToCamelCase } from '@/lib/case-conversion';
 import { useAuth } from '@/context/AuthContext';
-import { UserService } from '@/lib/services/UserService';
-
-type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Manager' | 'User';
-
-type CurrentUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: UserRole | string;
-  assignedCompanyIds: string[];
-};
 
 type Company = {
   id: string;
@@ -59,157 +45,218 @@ type Company = {
 
 export default function SelectCompanyPage() {
   const router = useRouter();
-  const { user: currentUser, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout, canAccessCompany } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<string | null>(null);
   const [selectedCompanyName, setSelectedCompanyName] = React.useState<string | null>(null);
   const [availableCompanies, setAvailableCompanies] = React.useState<Company[]>([]);
-  const [isLoadingData, setIsLoadingData] = React.useState(true);
+  const [isLoadingCompanies, setIsLoadingCompanies] = React.useState(true);
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
-  // Debug logging for select-company page
+  // Redirect to signin if not authenticated
   React.useEffect(() => {
-    console.log('🔍 SelectCompany State:', { 
-      hasCurrentUser: !!currentUser, 
-      authLoading, 
-      isLoadingData,
-      userId: currentUser?.id,
-      userEmail: currentUser?.email 
-    });
-  }, [currentUser, authLoading, isLoadingData]);
+    if (!authLoading && !user) {
+      console.log('🚫 SelectCompany: No authenticated user, redirecting to signin');
+      router.replace('/signin');
+    }
+  }, [user, authLoading, router]);
 
+  // Load available companies
   React.useEffect(() => {
-    const loadInitialData = async () => {
-      console.log('🔄 SelectCompany: Starting loadInitialData', { authLoading, currentUser: !!currentUser });
-      
-      // Wait for auth to finish loading
-      if (authLoading) {
-        console.log('🔄 SelectCompany: Auth still loading, waiting...');
-        setIsLoadingData(true);
+    const loadCompanies = async () => {
+      if (!user || authLoading) {
+        setIsLoadingCompanies(false);
         return;
       }
-      
-      setIsLoadingData(true);
-      
+
       try {
-        if (!currentUser) {
-          console.log('❌ SelectCompany: No user found after auth loading completed, redirecting to home');
-          console.log('🔍 SelectCompany: Redirect details:', { 
-            authLoading, 
-            hasCurrentUser: !!currentUser,
-            currentUser: currentUser ? 'exists' : 'null/undefined'
-          });
-          router.push("/");
-          setIsLoadingData(false);
-          return;
+        setIsLoadingCompanies(true);
+        const supabase = await getSupabaseClientAsync();
+
+        // Get companies the user can access
+        let companies: Company[] = [];
+        
+        if (user.role === 'Primary Admin' || user.role === 'App Admin') {
+          // Admins can see all companies
+          const { data, error } = await supabase
+            .from('companies')
+            .select('*')
+            .order('name');
+          
+          if (error) throw error;
+          companies = data || [];
+        } else {
+          // Regular users can only see assigned companies
+          const { data, error } = await supabase
+            .from('companies')
+            .select('*')
+            .in('id', user.assignedCompanyIds)
+            .order('name');
+          
+          if (error) throw error;
+          companies = data || [];
         }
 
-        const supabase = await getSupabaseClientAsync();
-        console.log('🔄 SelectCompany: Got Supabase client')
-          
-        console.log('🔄 SelectCompany: Fetching companies')
-        // Fetch companies from Supabase
-        const { data: companies, error } = await supabase.from('companies').select('*');
-        console.log('🔄 SelectCompany: Companies fetched', { companiesCount: companies?.length, error })
-          
-        if (error) {
-          console.error('❌ SelectCompany: Error fetching companies:', error)
-          setAvailableCompanies([]);
-        } else {
-          setAvailableCompanies((companies || []).map(objectToCamelCase));
-        }
+        setAvailableCompanies(companies);
       } catch (error) {
-        console.error('❌ SelectCompany: Error in loadInitialData:', error)
+        console.error('❌ SelectCompany: Error loading companies:', error);
+        setAvailableCompanies([]);
       } finally {
-        setIsLoadingData(false);
-        console.log('✅ SelectCompany: loadInitialData completed')
+        setIsLoadingCompanies(false);
       }
     };
-    
-    loadInitialData();
-  }, [router, currentUser, authLoading]);
 
-  const handleGoToCompany = () => {
-    if (selectedCompanyId) {
-      // Store selected company in localStorage for the app to pick up
-      localStorage.setItem('selectedCompanyId', selectedCompanyId);
-      localStorage.setItem('selectedCompanyName', selectedCompanyName || '');
-      router.push("/app/dashboard");
+    loadCompanies();
+  }, [user, authLoading]);
+
+  const handleCompanySelect = async (company: Company) => {
+    if (!canAccessCompany(company.id)) {
+      console.warn('❌ SelectCompany: User cannot access company:', company.id);
+      return;
+    }
+
+    try {
+      setSelectedCompanyId(company.id);
+      setSelectedCompanyName(company.name);
+
+      // Update user metadata with selected company
+      const supabase = await getSupabaseClientAsync();
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          selectedCompanyId: company.id,
+          selectedCompanyName: company.name,
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ SelectCompany: Company selected, redirecting to dashboard');
+      router.replace('/app/dashboard');
+    } catch (error) {
+      console.error('❌ SelectCompany: Error selecting company:', error);
+      setSelectedCompanyId(null);
+      setSelectedCompanyName(null);
     }
   };
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      router.replace('/signin');
+    } catch (error) {
+      console.error('❌ SelectCompany: Error during logout:', error);
+      setIsLoggingOut(false);
+    }
   };
 
-  const canAccessApplicationSettings = currentUser && UserService.hasUniversalAccess(currentUser);
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+              <p>Checking authentication...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Don't render if user is not authenticated (redirect is handled by useEffect)
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <CheetahIcon className="h-16 w-16 text-primary mx-auto mb-4" />
+              <p>Redirecting to login...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-lg shadow-2xl">
-        <CardHeader className="text-center">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-4">
-            <CheetahIcon className="h-12 w-12 text-primary" />
+            <CheetahIcon className="h-16 w-16 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold font-headline">Select Your Company</CardTitle>
+          <CardTitle className="text-2xl font-bold">Select Company</CardTitle>
           <CardDescription>
-            Welcome, {currentUser?.firstName || "User"}! Choose the company profile you want to work with.
+            Choose a company to access Cheetah Payroll
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-6">
-          {isLoadingData || authLoading || !currentUser ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-              <p className="text-muted-foreground">
-                {authLoading ? "Authenticating..." : "Loading user and company data..."}
-              </p>
-            </div>
-          ) : (
-            <>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Available Companies</label>
+            
+            {isLoadingCompanies ? (
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">Loading companies...</span>
+              </div>
+            ) : availableCompanies.length === 0 ? (
+              <div className="text-center p-4">
+                <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No companies available</p>
+                <p className="text-sm text-muted-foreground">
+                  Contact your administrator to get access to a company.
+                </p>
+              </div>
+            ) : (
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between text-base h-auto py-3 px-4"
+                    className="w-full justify-between"
                   >
-                    {selectedCompanyName
-                      ? availableCompanies.find((company) => company.name === selectedCompanyName)?.name
+                    {selectedCompanyId
+                      ? availableCompanies.find((company) => company.id === selectedCompanyId)?.name
                       : "Select company..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[calc(var(--radix-popover-trigger-width)_+_0px)] p-0">
+                <PopoverContent className="w-full p-0">
                   <Command>
-                    <CommandInput placeholder="Search company..." />
+                    <CommandInput placeholder="Search companies..." />
                     <CommandList>
-                      <CommandEmpty>No company found.</CommandEmpty>
+                      <CommandEmpty>No companies found.</CommandEmpty>
                       <CommandGroup>
                         {availableCompanies.map((company) => (
                           <CommandItem
                             key={company.id}
                             value={company.name}
-                            onSelect={(currentValue) => {
-                               const companyMatch = availableCompanies.find(c => c.name.toLowerCase() === currentValue.toLowerCase());
-                               if(companyMatch) {
-                                setSelectedCompanyId(companyMatch.id);
-                                setSelectedCompanyName(companyMatch.name);
-                               } else {
-                                setSelectedCompanyId(null);
-                                setSelectedCompanyName(null);
-                               }
+                            onSelect={() => {
+                              setSelectedCompanyId(company.id);
+                              setSelectedCompanyName(company.name);
                               setOpen(false);
                             }}
-                            className="text-base py-2 px-3"
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                selectedCompanyName === company.name ? "opacity-100" : "opacity-0"
+                                selectedCompanyId === company.id ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            <Briefcase className="mr-2 h-5 w-5 text-muted-foreground" />
-                            {company.name}
+                            <div className="flex flex-col">
+                              <span>{company.name}</span>
+                              {company.primaryBusiness && (
+                                <span className="text-xs text-muted-foreground">
+                                  {company.primaryBusiness}
+                                </span>
+                              )}
+                            </div>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -217,36 +264,48 @@ export default function SelectCompanyPage() {
                   </Command>
                 </PopoverContent>
               </Popover>
-
-              <Button
-                onClick={handleGoToCompany}
-                disabled={!selectedCompanyId}
-                className="w-full text-lg py-3"
-              >
-                Go to Company
-              </Button>
-
-              {canAccessApplicationSettings && (
-                 <div className="flex justify-center">
-                    <Button
-                        variant="outline"
-                        className="h-auto py-3 px-4 border-dashed border-primary/70 hover:bg-accent/60"
-                        asChild
-                    >
-                        <Link href="/settings/application">
-                        <Settings className="mr-3 h-5 w-5 text-primary" />
-                        <span className="text-base">Application Settings</span>
-                        </Link>
-                    </Button>
-                </div>
-              )}
-            </>
-          )}
+            )}
+          </div>
         </CardContent>
-        <CardFooter className="mt-6">
-          <Button variant="ghost" className="w-full text-destructive hover:text-destructive" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Logout
+
+        <CardFooter className="flex flex-col gap-4">
+          <Button
+            onClick={() => selectedCompanyId && handleCompanySelect(availableCompanies.find(c => c.id === selectedCompanyId)!)}
+            className="w-full"
+            disabled={!selectedCompanyId || isLoadingCompanies}
+          >
+            {selectedCompanyId ? "Access Company" : "Select a Company"}
           </Button>
+          
+          <div className="flex w-full gap-2">
+            {(user.role === 'Primary Admin' || user.role === 'App Admin') && (
+              <Button variant="outline" className="flex-1" asChild>
+                <Link href="/manual-setup">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Company
+                </Link>
+              </Button>
+            )}
+            
+            <Button 
+              variant="outline" 
+              className="flex-1"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </Button>
+          </div>
+          
+          <div className="flex justify-center">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/settings">
+                <Settings className="w-4 h-4 mr-2" />
+                Account Settings
+              </Link>
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     </div>

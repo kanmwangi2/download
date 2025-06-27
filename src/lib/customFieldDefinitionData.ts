@@ -7,50 +7,46 @@ export interface CustomFieldDefinition {
   isDeletable: boolean;// Can this definition be deleted? (e.g., not if in use)
 }
 
-// Example custom field definitions for Umoja Tech Solutions (co_001)
-export const exampleCustomFieldDefinitionsForUmoja: Omit<CustomFieldDefinition, 'companyId'>[] = [
+// Example custom field definitions for companies
+export const exampleCustomFieldDefinitions: Omit<CustomFieldDefinition, 'companyId'>[] = [
   {
-    id: "cf_tshirt_size_co001",
+    id: "cf_tshirt_size",
     name: "T-Shirt Size",
     type: "Text",
     orderNumber: 1,
     isDeletable: true,
   },
   {
-    id: "cf_laptop_asset_co001",
+    id: "cf_laptop_asset",
     name: "Laptop Asset Tag",
     type: "Text",
     orderNumber: 2,
     isDeletable: true,
   },
-];
-
-// Example custom field definitions for Isoko Trading Co. (co_002)
-export const exampleCustomFieldDefinitionsForIsoko: Omit<CustomFieldDefinition, 'companyId'>[] = [
   {
-    id: "cf_transport_route_co002",
+    id: "cf_transport_route",
     name: "Transport Route",
     type: "Text",
-    orderNumber: 1,
+    orderNumber: 3,
     isDeletable: true,
   },
   {
-    id: "cf_uniform_issued_co002",
+    id: "cf_uniform_issued",
     name: "Uniform Issued Date",
-    type: "Date", // Example of a different type
-    orderNumber: 2,
+    type: "Date",
+    orderNumber: 4,
     isDeletable: true,
   },
 ];
 
 export const initialCustomFieldDefinitionsForCompanySeed = (companyId: string): CustomFieldDefinition[] => {
-    if (companyId === "co_001") {
-        return exampleCustomFieldDefinitionsForUmoja.map(cf => ({ ...cf, companyId }));
-    }
-    if (companyId === "co_002") {
-        return exampleCustomFieldDefinitionsForIsoko.map(cf => ({ ...cf, companyId }));
-    }
-    return [];
+    // Return a basic set of example custom fields for any new company
+    // Users can modify or delete these as needed
+    return exampleCustomFieldDefinitions.map(cf => ({ 
+        ...cf, 
+        companyId, 
+        id: `${cf.id}_${companyId}` // Make IDs unique per company
+    }));
 };
 
 // --- Mapping utilities for frontend/backend case conversion ---

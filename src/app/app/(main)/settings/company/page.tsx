@@ -37,12 +37,11 @@ export interface Department {
 
 const initialDepartments: Omit<Department, 'companyId'>[] = [
   { id: "dept_eng_co001", name: "Engineering", description: "Software development and R&D" },
-  { id: "dept_mkt_co001", name: "Marketing", description: "Product promotion and sales strategy" },
-  { id: "dept_hr_co001", name: "Human Resources", description: "Employee management and relations" },
-  { id: "dept_fin_co001", name: "Finance", description: "Financial planning and accounting" },
-  { id: "dept_ops_co001", name: "Operations", description: "Day-to-day business activities" },
-  { id: "dept_sales_co002", name: "Sales & Marketing (Isoko)", description: "Isoko sales and promotion" },
-  { id: "dept_log_co002", name: "Logistics (Isoko)", description: "Isoko warehousing and distribution" },
+  // Example departments - companies can customize these as needed
+  { id: "dept_hr", name: "Human Resources", description: "Employee management and relations" },
+  { id: "dept_fin", name: "Finance", description: "Financial planning and accounting" },
+  { id: "dept_ops", name: "Operations", description: "Day-to-day business activities" },
+  { id: "dept_sales", name: "Sales & Marketing", description: "Sales and promotion activities" },
 ];
 
 const defaultDepartmentFormData = { name: "", description: "" };

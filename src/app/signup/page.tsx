@@ -26,11 +26,22 @@ export default function SignUpPage() {
     try {
       console.log('🔄 Starting sign-up process...')
       
-      // Step 1: Create auth user
+      // Check if this will be the first user
+      const { data: existingProfiles } = await fetch('/api/check-first-user').then(res => res.json())
+      const isFirstUser = !existingProfiles || existingProfiles.length === 0
+      const userRole = isFirstUser ? 'Primary Admin' : 'Company Admin'
+      
+      console.log(`🔄 User will be assigned role: ${userRole} (first user: ${isFirstUser})`)
+      
+      // Step 1: Create auth user with role in metadata
       const { data: authData, error: authError } = await signUp(
         email, 
         password, 
-        { first_name: firstName, last_name: lastName }
+        { 
+          first_name: firstName, 
+          last_name: lastName,
+          role: userRole
+        }
       )
 
       if (authError) {
@@ -40,8 +51,7 @@ export default function SignUpPage() {
       console.log('✅ Auth user created:', {
         userId: authData.user?.id,
         email: authData.user?.email,
-        emailConfirmed: authData.user?.email_confirmed_at,
-        userMetadata: authData.user?.user_metadata
+        role: userRole
       })
 
       // Step 2: Create user profile via API endpoint
@@ -57,7 +67,8 @@ export default function SignUpPage() {
             userId: authData.user.id,
             firstName,
             lastName,
-            email
+            email,
+            role: userRole
           })
         })
 
@@ -72,7 +83,7 @@ export default function SignUpPage() {
 
       setMessage({
         type: 'success',
-        text: `✅ Account created successfully! You can now sign in with your credentials.`
+        text: `✅ Account created successfully as ${userRole}! You can now sign in.`
       })
 
       // Clear form
@@ -81,10 +92,10 @@ export default function SignUpPage() {
       setFirstName('')
       setLastName('')
 
-      // Auto-redirect to sign in after 2 seconds
+      // Auto-redirect to sign in after 3 seconds
       setTimeout(() => {
         window.location.href = '/signin'
-      }, 2000)
+      }, 3000)
 
     } catch (error: any) {
       console.error('❌ Sign-up error:', error)

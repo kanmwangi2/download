@@ -1,10 +1,11 @@
 -- =====================================================
 -- CHEETAH PAYROLL DATABASE SCHEMA
--- Migration from IndexedDB to Supabase PostgreSQL
+-- Clean, production-ready schema for fresh installations
+-- Reset for clean slate deployment - all demo data removed
 -- 
 -- IMPORTANT: After creating this schema, you MUST apply the RLS policies
 -- from rls-policies.sql to ensure proper data security and access control.
--- The policies include special handling for first-time company creation.
+-- The policies support secure multi-tenant architecture with first-user setup.
 -- =====================================================
 
 -- Enable necessary extensions
@@ -281,28 +282,8 @@ CREATE TABLE public.custom_field_definitions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- TABLE: users
--- Comprehensive user management table
--- =====================================================
-CREATE TABLE public.users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email TEXT UNIQUE NOT NULL,
-  first_name TEXT,
-  last_name TEXT,
-  phone TEXT,
-  role TEXT DEFAULT 'Payroll Preparer' CHECK (role IN (
-    'Primary Admin', 
-    'App Admin', 
-    'Company Admin', 
-    'Payroll Approver', 
-    'Payroll Preparer'
-  )),
-  assigned_company_ids TEXT[] DEFAULT '{}',
-  status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Note: The 'users' table functionality is handled by 'user_profiles' 
+-- linked to Supabase Auth, and 'user_company_assignments' for role management.
 
 -- =====================================================
 -- INDEXES FOR PERFORMANCE
@@ -350,11 +331,6 @@ CREATE INDEX idx_user_avatars_user_id ON user_avatars(user_id);
 CREATE INDEX idx_custom_field_definitions_company_id ON custom_field_definitions(company_id);
 CREATE INDEX idx_custom_field_definitions_order ON custom_field_definitions(company_id, order_index);
 
--- Users table
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_status ON users(status);
-
 -- =====================================================
 -- FUNCTIONS AND TRIGGERS
 -- =====================================================
@@ -378,7 +354,6 @@ CREATE TRIGGER update_tax_settings_updated_at BEFORE UPDATE ON tax_settings FOR 
 CREATE TRIGGER update_payroll_runs_updated_at BEFORE UPDATE ON payroll_runs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_avatars_updated_at BEFORE UPDATE ON user_avatars FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_custom_field_definitions_updated_at BEFORE UPDATE ON custom_field_definitions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- TABLE ALIASES/VIEWS FOR NAMING CONSISTENCY
@@ -388,48 +363,24 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECU
 CREATE OR REPLACE VIEW public.staff AS SELECT * FROM public.staff_members;
 
 -- =====================================================
--- SAMPLE DATA INITIALIZATION
--- =====================================================
-
--- Insert default custom field definitions for demo companies
-INSERT INTO public.custom_field_definitions (company_id, name, type, order_index, is_deletable)
-SELECT 
-    c.id,
-    'T-Shirt Size',
-    'text',
-    1,
-    true
-FROM public.companies c
-WHERE c.name LIKE '%Umoja Tech%'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO public.custom_field_definitions (company_id, name, type, order_index, is_deletable)
-SELECT 
-    c.id,
-    'Transport Route',
-    'text',
-    1,
-    true
-FROM public.companies c
-WHERE c.name LIKE '%Isoko Trading%'
-ON CONFLICT DO NOTHING;
-
--- =====================================================
 -- NEXT STEPS AFTER SCHEMA CREATION
 -- =====================================================
 -- 
 -- 1. APPLY RLS POLICIES: Run the SQL from rls-policies.sql
 --    This is CRITICAL for proper security and access control.
 --    
--- 2. The RLS policies include special handling for:
---    - New users creating their first company
---    - Multi-tenant data isolation
+-- 2. The RLS policies provide:
+--    - Secure multi-tenant data isolation
+--    - First-user setup support (Primary Admin assignment)
 --    - Role-based access control
+--    - Company creation and assignment flows
 --
--- 3. Without RLS policies, users may experience 500 errors
+-- 3. Without RLS policies, users may experience errors
 --    when trying to create companies or access data.
 --
--- Files to apply in order:
--- 1. database-schema.sql (this file)
--- 2. rls-policies.sql (security policies)
+-- Usage:
+-- 1. Create fresh Supabase project
+-- 2. Run this schema file in SQL Editor
+-- 3. Apply rls-policies.sql for security
+-- 4. Start using the application with clean state
 -- =====================================================

@@ -1,199 +1,284 @@
 # **App Name**: Cheetah Payroll
 
-## Core Features:
+## Core Features & Current Implementation:
 
-- Login Page: Login page with email and password fields, including a 'Forgot Password' link.
-- Company Selection: Company selection page displaying a list of companies the user is assigned to, along with a logout button.
-- Main Layout: Main application layout with left navigation (Dashboard, Staff, Payments, Deductions, Payroll, Payslips, Utilities), top header (user avatar, company settings, switch company, logout, light/dark mode toggle), and central content area.
-- Dashboard: Dashboard landing page for displaying key metrics and summaries.
-- Staff Management: Staff page to manage employee records including first name, last name, email, phone number, department, bank details and status.
-- Payment Details: Payments page for editing individual staff payment details, including basic pay, allowances, and payment type (Gross or Net).
-- Payroll Processing: Payroll page to create and manage payroll runs for a specific month and year. Workflow includes statuses (Draft, To Approve, Rejected, Approved) and payroll calculation columns (Gross Salary, deductions, Net Pay).
+### **Authentication & User Management**
+- **Login System**: Secure authentication with email/password and 'Forgot Password' functionality
+- **Company Selection**: Dynamic company selection based on user role and assignments
+- **Role-Based Access Control**: Five-tier user role system (Primary Admin, App Admin, Company Admin, Payroll Approver, Payroll Preparer)
+- **User Profiles**: Comprehensive user management with profile pictures, contact information, and role assignments
 
-## Architecture & Technology (2025):
+### **Main Application Layout**
+- **Responsive Sidebar Navigation**: Collapsible sidebar with navigation groups (Operations, Utilities)
+- **Dashboard**: Overview metrics showing active employees, next payroll run, total payroll cost, and deductions
+- **Top Header**: User avatar dropdown, company context, theme toggle, and navigation controls
+- **Company Context**: All operations are performed within the context of the selected company
 
-- **Frontend:** Next.js (React, TypeScript)
-- **UI:** ShadCN UI (Radix UI, Tailwind CSS)
-- **Backend:** Supabase (PostgreSQL, Auth, Storage, Functions)
-- **Cloud-Native:** Fully migrated from IndexedDB to Supabase. All data is securely stored in Supabase PostgreSQL and accessible from any device with proper credentials. No data is stored in the browser or local device storage.
-- **Real-time:** Leverages Supabase real-time features for instant data synchronization across all user sessions.
-- **Multi-User:** Supports multiple users, companies, and roles with secure authentication and authorization through Supabase Auth.
-- **Deployment:** Optimized for Vercel with webpack configuration for Supabase dependencies, memory optimization, and build-time safety checks.
-- **Build System:** Enhanced with TypeScript strict mode, environment validation, and production-ready error handling.
-- **Build Safety:** Build-safe Supabase client with lazy initialization, runtime-only database connections, and comprehensive error handling.
+### **Core Operations (Multi-Tabbed Interfaces)**
+
+#### **Staff Management**
+- **Staff Tab**: Complete employee records with personal details, employment information, bank details, emergency contacts, and custom fields
+- **Custom Fields Tab**: Company-specific custom field definitions with ordering and type management
+- **Advanced Features**: Import/export (CSV, Excel, PDF), bulk operations, search/filter, pagination
+
+#### **Payment Management**
+- **Payment Types Tab**: Configurable payment categories (Gross/Net) with tax and pension settings
+- **Staff Payments Tab**: Individual payment configurations with basic pay and allowances per employee
+- **Payment Calculation**: Support for both Gross and Net payment types with automatic grossing-up
+
+#### **Deduction Management**
+- **Deduction Types Tab**: Company-specific deduction categories (loans, advances, etc.)
+- **Staff Deductions Tab**: Individual deduction assignments with amounts, balances, and active status
+- **Deduction Processing**: Automatic balance tracking and application during payroll runs
+
+#### **Payroll Processing**
+- **Payroll Runs**: Monthly payroll creation with comprehensive calculation engine
+- **Workflow Management**: Status tracking (Draft → To Approve → Rejected/Approved)
+- **Calculation Engine**: Advanced tax calculations including PAYE, RSSB (Pension/Maternity), RAMA, and CBHI
+- **Payroll Detail View**: Employee-level breakdown with statutory and custom deductions
+- **Export Capabilities**: Detailed payroll reports and payslips
+
+### **Settings & Configuration**
+
+#### **User Profile Settings**
+- **Profile Picture**: Upload and crop functionality
+- **Personal Information**: Name, email, phone management
+- **Password Management**: Secure password change functionality
+
+#### **Company Settings (Context-Specific)**
+- **Company Profile**: Basic company information, registration details, contact information
+- **Tax Exemptions**: Toggle individual tax components (PAYE, Pension, Maternity, RAMA, CBHI)
+- **Departments**: Company department management with import/export
+- **Company Users**: User management specific to the selected company
+
+#### **Application Settings (Global - Admin Only)**
+- **Company Management**: System-wide company management for Primary/App Admins
+- **User Management**: Global user management with role assignments and company access
+- **Global Tax Settings**: System-wide tax rates and calculation parameters
+
+### **Utilities & Support**
+- **Audit Log**: Comprehensive activity tracking with filtering, pagination, and export
+- **FAQ**: Interactive FAQ system with expandable sections and PDF export
+- **Documentation**: Complete system documentation with detailed usage guides
+- **Support**: Contact information and help resources with Primary Admin details
+- **Reports**: Professional report generation interface (framework ready)
+
+## Architecture & Technology Stack (2025):
+
+- **Frontend Framework:** Next.js 15+ with App Router
+- **Language:** TypeScript (strict mode) with comprehensive type safety
+- **UI Framework:** ShadCN UI components built on Radix UI primitives
+- **Styling:** Tailwind CSS with custom design system
+- **Backend Services:** Supabase (PostgreSQL, Auth, Storage, Real-time)
+- **Authentication:** Supabase Auth with Row Level Security (RLS)
+- **Database:** PostgreSQL with comprehensive schema and audit trails
+- **Real-time Features:** Supabase real-time subscriptions for live data updates
+- **File Handling:** Advanced import/export (CSV, Excel, PDF) with validation
+- **Deployment:** Vercel-optimized with build safety and memory management
+
+## Database Architecture:
+
+### **Core Tables**
+- **companies**: Multi-tenant company management with business information
+- **user_profiles**: User account information linked to Supabase Auth
+- **user_company_assignments**: Many-to-many relationship with role-based access
+- **staff_members**: Comprehensive employee records with custom fields support
+- **departments**: Company-specific organizational structure
+
+### **Financial & Payroll Tables**
+- **payment_types**: Configurable payment categories per company
+- **staff_payment_configs**: Individual employee payment configurations
+- **deduction_types**: Company-specific deduction categories
+- **staff_deductions**: Individual deduction records with balance tracking
+- **tax_settings**: Company-specific tax configuration and exemptions
+- **payroll_runs**: Payroll run summaries with status tracking
+- **payroll_run_details**: Detailed payroll calculations per employee
+
+### **System Tables**
+- **audit_logs**: Comprehensive activity tracking and compliance
+- **user_avatars**: Profile picture management
+- **custom_field_definitions**: Company-specific custom field schemas
+
+### **Security & Access Control**
+- **Row Level Security (RLS)**: Comprehensive data isolation per company
+- **Role-Based Permissions**: Granular access control based on user roles
+- **Multi-Company Support**: Secure data separation with shared user accounts
+
+## Service Architecture:
+
+### **Object-Oriented Service Layer**
+- **ServiceRegistry**: Centralized service management and dependency injection
+- **BaseService**: Common functionality for all data services
+- **Specialized Services**: StaffService, PayrollService, CompanyService, UserService, TaxService, etc.
+- **Type-Safe Operations**: Comprehensive TypeScript interfaces for all data operations
+
+### **Business Logic Services**
+- **PayrollCalculationService**: Advanced payroll calculation engine with tax handling
+- **PayrollValidationService**: Business rule validation for payroll operations
+- **PayrollPermissionService**: Role-based access control for payroll features
+- **Import/Export Services**: Data validation and transformation utilities
+
+### **Utility Classes**
+- **Case Conversion**: Seamless snake_case ↔ camelCase transformation
+- **Error Handling**: Comprehensive error management with user-friendly messages
+- **Data Validation**: Input validation and business rule enforcement
+
+## User Interface Design:
+
+### **Design System**
+- **Primary Color**: Soft indigo (#667EEA) for professional appearance
+- **Background**: Dark indigo (#2D3748) for default dark mode
+- **Accent Color**: Pale blue (#A3BFFA) for interactive elements
+- **Typography**: Inter font family for clean, modern readability
+- **Responsive Design**: Mobile-first approach with adaptive layouts
+
+### **Component Architecture**
+- **ShadCN UI**: Professional component library built on Radix UI
+- **Consistent Patterns**: Standardized layouts, forms, tables, and dialogs
+- **Accessibility**: WCAG compliance with keyboard navigation and screen reader support
+- **Dark/Light Mode**: System-aware theme switching with user preference persistence
+
+### **Data Presentation**
+- **Advanced Tables**: Sorting, filtering, pagination, and bulk operations
+- **Professional Forms**: Validation, error handling, and user feedback
+- **Interactive Dashboards**: Real-time metrics and status indicators
+- **Export Capabilities**: CSV, Excel, and PDF generation with customizable templates
 
 ## Deployment & Build Configuration:
 
-- **Vercel Optimized:** Custom webpack configuration handles Supabase dependencies and WebSocket fallbacks
-- **Memory Management:** Configured with 4GB memory allocation for successful builds
-- **Environment Safety:** Build-time validation prevents deployment failures while maintaining security
-- **Real-time Optimization:** Production builds include optimized Supabase real-time client configuration
-- **Type Safety:** Full TypeScript strict mode compliance with comprehensive error handling
-- **Build-Safe Client:** Supabase client with lazy initialization, async-only operations, and runtime safety checks
-- **Error Handling:** Comprehensive error messages for missing environment variables and connection issues
+### **Vercel Optimization**
+- **Custom Webpack Configuration**: Optimized for Supabase dependencies and WebSocket handling
+- **Memory Management**: 4GB allocation for successful builds with large dependency trees
+- **Environment Safety**: Build-time validation prevents deployment failures
+- **Real-time Support**: Production-optimized real-time client configuration
 
-### Environment Variables & Setup
+### **Build Safety Features**
+- **Lazy Initialization**: Supabase client created only at runtime
+- **Environment Validation**: Comprehensive checks for required environment variables
+- **Error Handling**: Graceful degradation and user-friendly error messages
+- **Type Safety**: Full TypeScript strict mode compliance
 
-#### Required Variables (Vercel Dashboard)
+### **Performance Optimization**
+- **Code Splitting**: Optimized bundle sizes with dynamic imports
+- **Tree Shaking**: Elimination of unused code and dependencies
+- **Image Optimization**: Next.js automatic image optimization
+- **Caching Strategy**: Efficient caching for static assets and API responses
 
+## Development Workflow:
+
+### **Environment Setup**
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Configure Supabase credentials in .env.local
+
+# Run development server
+npm run dev
+```
+
+### **Required Environment Variables**
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-#### Optional Variables
+### **Database Setup**
+1. Create Supabase project
+2. Run `docs/database-schema.sql` to create tables
+3. Apply `docs/rls-policies.sql` for security policies
+4. Verify setup with sample data
 
-```env
-NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
-NODE_ENV=production
+### **Development Commands**
+```bash
+npm run dev          # Development server (port 9002)
+npm run build        # Production build
+npm run typecheck    # TypeScript validation
+npm run lint         # Code linting
+npm run build:vercel # Vercel deployment build
 ```
 
-#### Setup Instructions
+## Production Features:
 
-##### 1. Create a Supabase Project
+### **Multi-Company Management**
+- **Company Isolation**: Complete data separation between companies
+- **Shared User Accounts**: Users can access multiple companies based on assignments
+- **Role-Based Access**: Different permission levels per company per user
+- **Company-Specific Configuration**: Tax settings, payment types, deduction types per company
 
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Sign in or create an account
-3. Click "New Project"
-4. Fill in your project details and create the project
-5. Wait for the project to be set up (usually takes a few minutes)
+### **Advanced Payroll Engine**
+- **Tax Calculations**: PAYE (4-tier progressive), RSSB Pension, RSSB Maternity, RAMA, CBHI
+- **Payment Types**: Support for both Gross and Net payment categories with automatic grossing-up
+- **Deduction Management**: Loan tracking, advance payments, custom deductions with balance management
+- **Status Workflow**: Draft → To Approve → Rejected/Approved with role-based transitions
 
-##### 2. Get Your Environment Variables
+### **Import/Export Capabilities**
+- **Multiple Formats**: CSV, Excel (XLSX), and PDF export for all major data types
+- **Data Validation**: Comprehensive validation during import with detailed error reporting
+- **Template Generation**: Downloadable templates for bulk data import
+- **Audit Trail**: Complete tracking of all import/export operations
 
-1. In your Supabase project dashboard, go to **Settings > General**
-2. Copy the **Project URL** (it looks like `https://your-project-id.supabase.co`)
-3. Go to **Settings > API**
-4. Copy the **anon/public** key from the "Project API keys" section
+### **Compliance & Audit**
+- **Comprehensive Logging**: All user actions tracked with timestamps, IP addresses, and details
+- **Data Integrity**: Database constraints and validation ensure data consistency
+- **Role-Based Security**: Granular permissions based on user roles and company assignments
+- **Export Controls**: Role-based restrictions on data export capabilities
 
-##### 3. Set Up Your Local Environment
+### **User Experience Features**
+- **Real-time Updates**: Live data synchronization across user sessions
+- **Progressive Enhancement**: Works with JavaScript disabled (forms still function)
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+- **Accessibility**: WCAG-compliant with keyboard navigation and screen reader support
 
-1. Copy the `.env.example` file to `.env.local`:
+### **Performance & Scalability**
+- **Optimized Queries**: Efficient database queries with proper indexing
+- **Pagination**: All large data sets paginated for performance
+- **Caching Strategy**: Strategic caching of frequently accessed data
+- **Build Optimization**: Tree-shaking, code splitting, and bundle optimization
 
-   ```bash
-   cp .env.example .env.local
-   ```
+## Security Implementation:
 
-2. Edit `.env.local` and replace the placeholder values:
+### **Authentication & Authorization**
+- **Supabase Auth**: Industry-standard authentication with JWT tokens
+- **Row Level Security**: Database-level access control ensuring data isolation
+- **Session Management**: Secure session handling with automatic token refresh
+- **Password Security**: Encrypted password storage and secure reset functionality
 
-   ```bash
-   NEXT_PUBLIC_SUPABASE_URL=https://your-actual-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_actual_anon_key_here
-   ```
+### **Data Protection**
+- **Multi-Tenant Security**: Complete data isolation between companies
+- **Input Validation**: Comprehensive validation on both client and server
+- **SQL Injection Prevention**: Parameterized queries and ORM protection
+- **XSS Protection**: Input sanitization and output encoding
 
-3. Restart your development server:
-   ```bash
-   npm run dev
-   ```
+### **Privacy & Compliance**
+- **Data Minimization**: Only collect and store necessary data
+- **Audit Trails**: Complete logging for compliance requirements
+- **Data Export**: User-controlled data export for compliance
+- **Secure Transmission**: HTTPS encryption for all data transmission
 
-##### 4. Verify the Setup
+## Support & Documentation:
 
-1. Open your browser's developer console
-2. Look for Supabase connection logs that should show successful client creation
-3. Try saving a company - it should now work instead of showing "Unknown error"
+### **In-Application Help**
+- **Interactive Documentation**: Complete system guide accessible within the app
+- **FAQ System**: Searchable frequently asked questions with categorization
+- **Context-Sensitive Help**: Role-based help content and guidance
+- **Support Contact**: Direct contact information for technical support
 
-##### Database Schema
+### **Developer Resources**
+- **Code Documentation**: Comprehensive inline documentation and TypeScript types
+- **API Reference**: Complete service layer documentation
+- **Database Schema**: Detailed table structure and relationship documentation
+- **Deployment Guide**: Step-by-step deployment instructions
 
-Make sure your Supabase database has the required tables. You can run the SQL scripts in the `docs/` folder:
+### **Training & Onboarding**
+- **User Guides**: Role-specific user guides and walkthroughs
+- **Video Tutorials**: Visual guides for complex operations
+- **Best Practices**: Recommended workflows and configurations
+- **Troubleshooting**: Common issues and resolution steps
 
-- `docs/database-schema.sql` - Creates all required tables
-- `docs/rls-policies.sql` - Sets up row-level security policies
+---
 
-##### Troubleshooting
-
-###### "Save Failed - Could not save company. Unknown error"
-
-This error typically means:
-
-1. Environment variables are not set correctly
-2. Supabase client cannot connect to the database
-3. Database tables are missing
-
-Check the browser console for detailed error messages and Supabase connection logs.
-
-###### Environment Variables Not Working
-
-1. Ensure variable names start with `NEXT_PUBLIC_` for client-side access
-2. Restart the development server after changing environment variables
-3. Check that `.env.local` is in the project root directory
-4. Verify the variables are not commented out or malformed
-
-###### Database Connection Issues
-
-1. Verify your Supabase project URL and API key are correct
-2. Check that your Supabase project is active and not paused
-3. Ensure your database has the required tables and policies
-4. Check Supabase project logs for any access issues
-
-##### Security Notes
-
-- Never commit `.env.local` or real environment variables to version control
-- The `NEXT_PUBLIC_` prefix makes variables available in the browser
-- For server-side operations, use `SUPABASE_SERVICE_ROLE_KEY` (keep this secret!)
-- Set up proper Row Level Security (RLS) policies in your Supabase database
-
-## Deployment Instructions
-
-### Vercel Deployment
-
-The application is optimized for deployment on Vercel with the following configuration:
-
-#### Prerequisites
-
-- Supabase project with database schema and RLS policies applied
-- Environment variables configured
-- All dependencies installed and tested locally
-
-#### Deployment Steps
-
-1. **Connect Repository to Vercel**
-
-   - Import your GitHub repository to Vercel
-   - Select the appropriate framework preset (Next.js)
-
-2. **Configure Environment Variables**
-
-   - Add all required environment variables in Vercel dashboard
-   - Ensure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set
-   - Add `SUPABASE_SERVICE_ROLE_KEY` for server-side operations
-
-3. **Build Configuration**
-
-   - Memory allocation: 4GB (set in Vercel dashboard)
-   - Node.js version: Latest LTS
-   - Build command: `npm run build`
-   - Install command: `npm install`
-
-4. **Production Verification**
-   - Test authentication flow
-   - Verify database connectivity
-   - Check real-time features
-   - Validate company creation and user management
-
-#### Build Optimization Features
-
-- **Webpack Configuration**: Custom configuration handles Supabase dependencies
-- **Memory Management**: Optimized for large TypeScript builds
-- **Environment Safety**: Build-time validation prevents deployment failures
-- **Type Safety**: Full TypeScript strict mode compliance
-- **Real-time Support**: Optimized Supabase real-time client configuration
-
-#### Post-Deployment Checklist
-
-- [ ] Authentication works correctly
-- [ ] Database operations function properly
-- [ ] Company creation and user assignments work
-- [ ] Real-time features are active
-- [ ] All environment variables are properly configured
-- [ ] SSL certificates are valid
-- [ ] Performance metrics are acceptable
-
-## Style Guidelines:
-
-- Primary color: Soft indigo (#667EEA) for a calm and professional feel. This hue aligns with feelings of security, intelligence, and order. While dark blue can sometimes feel cold, indigo contains some red to create a balance.
-- Background color: Dark, desaturated indigo (#2D3748) for the default dark mode. This works well with the primary indigo for a high-contrast yet professional scheme.
-- Accent color: Pale blue (#A3BFFA) for interactive elements. This works because it is 30 degrees to the 'left' of indigo in hue; in addition, it contrasts the background color strongly, due to being lighter and more saturated.
-- Body and headline font: 'Inter' (sans-serif) for a clean, modern, and readable interface.
-- Use consistent, professional-looking icons for navigation and actions.
-- Maintain a consistent three-part layout with left navigation, top header, and central content area for all pages.
-- Incorporate subtle transitions and animations for a smooth user experience when navigating and performing actions.
+**Built with modern web technologies for enterprise-grade payroll management**

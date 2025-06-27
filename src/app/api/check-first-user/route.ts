@@ -6,6 +6,12 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+    console.log('check-first-user API called:', {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      environment: process.env.NODE_ENV
+    });
+
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase configuration:', {
         hasUrl: !!supabaseUrl,
@@ -14,10 +20,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Missing Supabase configuration',
-          details: 'Please check your environment variables. See docs/blueprint.md for setup instructions.',
+          details: 'Please configure environment variables in Vercel dashboard',
           isFirstUser: true // Default to true for safety
         },
-        { status: 500 }
+        { status: 200 } // Return 200 to avoid HTML error pages
       );
     }
 
@@ -30,19 +36,22 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     if (error) {
-      console.error('Error checking user profiles:', error);
+      console.error('Database error checking user profiles:', error);
       return NextResponse.json(
         { 
           error: 'Database error', 
           details: error.message,
           isFirstUser: true // Default to true for safety
         },
-        { status: 500 }
+        { status: 200 } // Return 200 to avoid HTML error pages
       );
     }
 
+    const isFirstUser = !profiles || profiles.length === 0;
+    console.log('First user check result:', { isFirstUser, profileCount: profiles?.length || 0 });
+
     return NextResponse.json({ 
-      isFirstUser: !profiles || profiles.length === 0,
+      isFirstUser,
       existingProfiles: profiles || []
     });
 
@@ -54,7 +63,7 @@ export async function GET(request: NextRequest) {
         details: error instanceof Error ? error.message : 'Unknown error',
         isFirstUser: true // Default to true for safety
       },
-      { status: 500 }
+      { status: 200 } // Return 200 to avoid HTML error pages
     );
   }
 }

@@ -41,10 +41,10 @@ export function LoginForm() {
     setIsClient(true);
   }, []);
 
-  // Simple redirect logic - if user is authenticated, redirect immediately
+  // Only redirect if already authenticated on initial load
   useEffect(() => {
     if (!authLoading && user) {
-      console.log("🚀 User authenticated, redirecting to /select-company");
+      console.log("🚀 User already authenticated, redirecting to /select-company");
       router.replace("/select-company");
     }
   }, [user, authLoading, router]);
@@ -77,13 +77,16 @@ export function LoginForm() {
         });
         setIsLoading(false);
       } else if (data.user) {
-        console.log("✅ Login successful");
+        console.log("✅ Login successful, redirecting immediately");
         setFeedback({ 
           type: 'success', 
           message: "Login Successful", 
           details: "Redirecting..." 
         });
-        // The AuthContext will handle the redirect via useEffect above
+        // Give a brief moment for the feedback to show, then redirect
+        setTimeout(() => {
+          router.replace("/select-company");
+        }, 500);
       }
     } catch (error) {
       console.error("Login error:", error);

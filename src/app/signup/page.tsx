@@ -54,33 +54,6 @@ export default function SignUpPage() {
         role: userRole
       })
 
-      // Step 2: Create user profile via API endpoint
-      if (authData.user) {
-        console.log('🔄 Creating user profile via API...')
-        
-        const profileResponse = await fetch('/api/create-profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: authData.user.id,
-            firstName,
-            lastName,
-            email,
-            role: userRole
-          })
-        })
-
-        const profileResult = await profileResponse.json()
-
-        if (!profileResponse.ok || profileResult.error) {
-          throw new Error(`Profile creation failed: ${profileResult.message} ${profileResult.details ? '- ' + profileResult.details : ''}`)
-        }
-
-        console.log('✅ User profile created:', profileResult.profile)
-      }
-
       setMessage({
         type: 'success',
         text: `✅ Account created successfully as ${userRole}! You can now sign in.`

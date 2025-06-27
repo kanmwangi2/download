@@ -1,5 +1,5 @@
-import { createServiceRoleClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,16 +11,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { userId, firstName, lastName, email } = await request.json()
+    const { userId, firstName, lastName, email, role } = await request.json()
 
     console.log('🔄 Creating user profile via API:', {
       userId,
       firstName,
       lastName,
-      email
+      email,
+      role
     })
 
-    const supabaseAdmin = createServiceRoleClient()
+    // Create admin client with service role key
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     // Create user profile using admin client
     const { data: profileData, error: profileError } = await supabaseAdmin
@@ -29,7 +40,8 @@ export async function POST(request: NextRequest) {
         id: userId,
         first_name: firstName,
         last_name: lastName,
-        email: email
+        email: email,
+        phone: ''
       })
       .select()
       .single()

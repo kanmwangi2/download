@@ -67,14 +67,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSupabaseUser(authUser);
 
       // Get user profile from database
-      const { data: profile, error: profileError } = await supabase
+      let profile = null;
+      const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', authUser.id)
         .single();
 
-      if (profileError || !profile) {
-        console.warn('❌ AuthContext: No user profile found');
+      if (profileError && profileError.code !== 'PGRST116') {
+        // PGRST116 is "not found" error, which is expected for new users
+        console.warn('❌ AuthContext: Error fetching user profile:', profileError);
+        setUser(null);
+        return;
+      }
+
+      if (existingProfile) {
+        profile = existingProfile;
+      } else {
+        // Create user profile for new user
+        console.log('🔄 AuthContext: Creating user profile for new user');
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: authUser.id,
+            email: authUser.email,
+            first_name: authUser.user_metadata?.first_name || authUser.email?.split('@')[0] || '',
+            last_name: authUser.user_metadata?.last_name || '',
+            phone: authUser.user_metadata?.phone || '',
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ AuthContext: Error creating user profile:', createError);
+          setUser(null);
+          return;
+        }
+
+        profile = newProfile;
+        console.log('✅ AuthContext: Created user profile');
+      }
+
+      if (!profile) {
+        console.warn('❌ AuthContext: No user profile available');
         setUser(null);
         return;
       }

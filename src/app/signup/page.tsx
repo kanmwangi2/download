@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signUp } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useRouter } from 'next/navigation'
 
 export default function SignUpPage() {
   const [email, setEmail] = useState('')
@@ -15,11 +16,49 @@ export default function SignUpPage() {
   const [lastName, setLastName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const response = await fetch('/api/check-configuration')
+        const data = await response.json()
+        setIsConfigured(data.isConfigured)
+        
+        if (!data.isConfigured) {
+          setMessage({
+            type: 'error',
+            text: '⚠️ Environment not configured. Please complete setup first.'
+          })
+        }
+      } catch (error) {
+        console.error('Configuration check failed:', error)
+        setIsConfigured(false)
+        setMessage({
+          type: 'error',
+          text: '⚠️ Unable to verify configuration. Please check your setup.'
+        })
+      }
+    }
+
+    checkConfig()
+  }, [])
 
 
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Check configuration before proceeding
+    if (isConfigured === false) {
+      setMessage({
+        type: 'error',
+        text: '⚠️ Please complete environment setup before creating accounts. Go to /setup for instructions.'
+      })
+      return
+    }
+    
     setIsLoading(true)
     setMessage(null)
 
@@ -27,9 +66,25 @@ export default function SignUpPage() {
       console.log('🔄 Starting sign-up process...')
       
       // Check if this will be the first user
-      const { data: existingProfiles } = await fetch('/api/check-first-user').then(res => res.json())
-      const isFirstUser = !existingProfiles || existingProfiles.length === 0
-      const userRole = isFirstUser ? 'Primary Admin' : 'Company Admin'
+      let isFirstUser = true // Default to first user if API fails
+      let userRole = 'Primary Admin'
+      
+      try {
+        const response = await fetch('/api/check-first-user')
+        if (!response.ok) {
+          console.warn(`⚠️ API check failed with status ${response.status}`)
+          const errorData = await response.json()
+          console.warn('⚠️ Error details:', errorData)
+          isFirstUser = errorData.isFirstUser !== undefined ? errorData.isFirstUser : true
+        } else {
+          const result = await response.json()
+          isFirstUser = result.isFirstUser
+        }
+        userRole = isFirstUser ? 'Primary Admin' : 'Company Admin'
+      } catch (apiError) {
+        console.warn('⚠️ Failed to check first user status, defaulting to first user:', apiError)
+        // Continue with defaults
+      }
       
       console.log(`🔄 User will be assigned role: ${userRole} (first user: ${isFirstUser})`)
       
@@ -162,6 +217,17 @@ export default function SignUpPage() {
                     variant="outline"
                   >
                     🔐 Go to Sign In
+                  </Button>
+                </div>
+              )}
+              {message.type === 'error' && message.text.includes('environment') && (
+                <div className="mt-3">
+                  <Button 
+                    onClick={() => router.push('/setup')}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    🔧 Go to Setup
                   </Button>
                 </div>
               )}

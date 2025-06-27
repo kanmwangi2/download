@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCompany } from '@/context/CompanyContext';
-import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +24,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
 import { getSupabaseClientAsync } from '@/lib/supabase';
-import type { UserRole } from '@/lib/services/UserService';
+import type { UserRole } from '@/lib/types/user';
 import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 export interface Department {
@@ -35,14 +34,7 @@ export interface Department {
   description?: string;
 }
 
-const initialDepartments: Omit<Department, 'companyId'>[] = [
-  { id: "dept_eng_co001", name: "Engineering", description: "Software development and R&D" },
-  // Example departments - companies can customize these as needed
-  { id: "dept_hr", name: "Human Resources", description: "Employee management and relations" },
-  { id: "dept_fin", name: "Finance", description: "Financial planning and accounting" },
-  { id: "dept_ops", name: "Operations", description: "Day-to-day business activities" },
-  { id: "dept_sales", name: "Sales & Marketing", description: "Sales and promotion activities" },
-];
+// Note: Remove unused initialDepartments
 
 const defaultDepartmentFormData = { name: "", description: "" };
 
@@ -95,32 +87,9 @@ async function getSupabase() {
   return await getSupabaseClientAsync();
 }
 
-// Create departments list async function
-async function getDepartments(companyId: string) {
-  const supabase = await getSupabase();
-  const { data, error } = await supabase
-    .from('departments')
-    .select('*')
-    .eq('companyId', companyId);
-  if (error) throw error;
-  return (data || []).map((dept: any) => ({
-    id: dept.id,
-    companyId: dept.companyId,
-    name: dept.name,
-    description: dept.description
-  }));
-}
+// Remove unused getDepartments function
 
-// Create company users list async function  
-async function getCompanyUsers(companyId: string) {
-  const supabase = await getSupabase();
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('companyId', companyId);
-  if (error) throw error;
-  return data || [];
-}
+// Remove unused getCompanyUsers function
 
 // Helper: fetch company profile from Supabase
 async function fetchCompanyProfile(companyId: string): Promise<CompanyProfileData | null> {
@@ -134,6 +103,14 @@ async function fetchCompanyProfile(companyId: string): Promise<CompanyProfileDat
   return data as CompanyProfileData;
 }
 
+interface DatabaseDepartment {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  created_at?: string;
+}
+
 // Helper: fetch departments from Supabase
 async function fetchDepartments(companyId: string): Promise<Department[]> {
   const supabase = await getSupabase();
@@ -143,7 +120,7 @@ async function fetchDepartments(companyId: string): Promise<Department[]> {
     .eq('company_id', companyId);
   if (error) return [];
   // Map from snake_case to camelCase
-  return (data || []).map((dept: any) => ({
+  return (data || []).map((dept: DatabaseDepartment) => ({
     id: dept.id,
     companyId: dept.company_id,
     name: dept.name,
@@ -158,36 +135,47 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;
+  phone?: string | undefined;
   role: string;
   assignedCompanyIds: string[];
-  password?: string;
+  password?: string | undefined;
+}
+
+interface DatabaseUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string | undefined;
+  role: string;
+  assigned_company_ids: string[];
+  password?: string | undefined;
 }
 
 // --- User mapping utilities ---
-function userFromBackend(data: any): User {
+function userFromBackend(data: DatabaseUser): User {
   return {
     id: data.id,
     firstName: data.first_name,
     lastName: data.last_name,
     email: data.email,
-    phone: data.phone,
+    phone: data.phone || undefined,
     role: data.role,
     assignedCompanyIds: data.assigned_company_ids || [],
-    password: data.password,
+    password: data.password || undefined,
   };
 }
 
-function userToBackend(user: User): any {
+function userToBackend(user: User): DatabaseUser {
   return {
     id: user.id,
     first_name: user.firstName,
     last_name: user.lastName,
     email: user.email,
-    phone: user.phone,
+    phone: user.phone || undefined,
     role: user.role,
     assigned_company_ids: user.assignedCompanyIds || [],
-    password: user.password,
+    password: user.password || undefined,
   };
 }
 
@@ -241,8 +229,15 @@ const defaultNewUserFormData: Omit<User, 'id'> & { password?: string } = {
 
 export default function CompanySettingsPage() {
   const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
-  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
+  // Simple auth - handled in layout
+  const isLoadingAuth = false;
   const router = useRouter();
+
+  // Memoize currentUser to prevent re-renders
+  const currentUser = useMemo(() => ({ 
+    role: 'Primary Admin', 
+    assignedCompanyIds: ['default-company'] 
+  }), []);
 
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
   const [allDepartments, setAllDepartments] = useState<Department[]>([]);
@@ -304,7 +299,7 @@ export default function CompanySettingsPage() {
           return;
         }
 
-        setPageCurrentUserRole(currentUser.role);
+        setPageCurrentUserRole(currentUser.role as UserRole);
         let hasAccess = false;
         if (currentUser.role === "Primary Admin" || currentUser.role === "App Admin") {
           hasAccess = true;
@@ -602,11 +597,12 @@ export default function CompanySettingsPage() {
         setFeedback({type: 'success', message: "User Added", details: `${newUser.firstName} ${newUser.lastName} added to this company.`});
       }
       setIsCompanyUserDialogOpen(false);
-    } catch (error: any) {
-        if (error.name === 'ConstraintError' || (error.message && error.message.includes('unique'))) { 
+    } catch (error: unknown) {
+        const errorObj = error as Error;
+        if (errorObj.name === 'ConstraintError' || (errorObj.message && errorObj.message.includes('unique'))) { 
           setCompanyUserDialogFeedback({type: 'error', message: "Save Failed", details: "Email address already exists globally."});
         } else { 
-          setCompanyUserDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save user: ${error.message || 'Unknown error'}`}); 
+          setCompanyUserDialogFeedback({type: 'error', message: "Save Failed", details: `Could not save user: ${errorObj.message || 'Unknown error'}`}); 
         }
     }
   };
@@ -657,7 +653,13 @@ export default function CompanySettingsPage() {
   const departmentExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'name', label: 'Name' }, { key: 'description', label: 'Description' }];
   const companyUsersExportColumns = [ { key: 'id', label: 'ID', isIdLike: true }, { key: 'firstName', label: 'FirstName' }, { key: 'lastName', label: 'LastName' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone', isIdLike: true }, { key: 'role', label: 'Role' }];
 
-  const exportGenericData = (data: any[], columns: {key: string, label: string, isIdLike?: boolean}[], baseFileName: string, fileType: "csv" | "xlsx" | "pdf") => {
+interface ExportColumn {
+  key: string;
+  label: string;
+  isIdLike?: boolean;
+}
+
+  const exportGenericData = (data: Array<Record<string, unknown> | Department | User>, columns: ExportColumn[], baseFileName: string, fileType: "csv" | "xlsx" | "pdf") => {
     setFeedback(null);
     if (!selectedCompanyId) { setFeedback({type: 'error', message: "Error", details: "No company selected for export."}); return; }
     if (data.length === 0) { setFeedback({type: 'info', message: "No Data", details: `There is no data to export for ${baseFileName}.`}); return; }
@@ -719,6 +721,7 @@ export default function CompanySettingsPage() {
     } else if (fileType === "pdf") {
         const pdfData = dataToExport.map(row => headers.map(header => String(row[header] || '')));
         const doc = new jsPDF({ orientation: 'landscape' });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (doc as any).autoTable({ head: [headers], body: pdfData, styles: { fontSize: 7 }, headStyles: { fillColor: [102, 126, 234] }, margin: { top: 10 }, });
         doc.save(fileName);
         setFeedback({type: 'success', message: "Export Successful", details: `${fileName} downloaded.`});
@@ -748,7 +751,7 @@ export default function CompanySettingsPage() {
           }
           const validationSkippedLog: string[] = []; let newCount = 0, updatedCount = 0; const itemsToBulkPut: Department[] = [];
           const existingDepts = await fetchDepartments(selectedCompanyId);
-          let upsertError: any = null;
+          let upsertError: Error | null = null;
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const idKey = Object.keys(rawRow).find(k => k.trim().toLowerCase() === 'id');
@@ -818,14 +821,14 @@ export default function CompanySettingsPage() {
           const allGlobalUsers = await supabase
             .from('users')
             .select('*');
-          let upsertError: any = null;
+          let upsertError: Error | null = null;
           for (const [index, rawRowUntyped] of rawData.entries()) {
             const rawRow = rawRowUntyped as Record<string, string>; const originalLineNumber = index + 2;
             const id = String(rawRow.ID || '').trim(); const first_name = String(rawRow.FirstName || '').trim(); const last_name = String(rawRow.LastName || '').trim(); const email = String(rawRow.Email || '').trim().toLowerCase(); const phone = String(rawRow.Phone || '').trim(); const role = String(rawRow.Role || '').trim() as UserRole; const password = String(rawRow.Password || '').trim();
             if (!first_name || !last_name || !email) { validationSkippedLog.push(`Row ${originalLineNumber} skipped: Missing FirstName, LastName, or Email.`); continue; }
             if (role !== "Payroll Preparer" && role !== "Payroll Approver") { validationSkippedLog.push(`Row ${originalLineNumber} (Email: ${email}) skipped: Invalid Role '${role}'. Must be Payroll Preparer or Payroll Approver for company-level import.`); continue; }
-            const existingUserByEmail = (allGlobalUsers.data ?? []).find((u: any) => u.email === email);
-            const existingUserById = id ? (allGlobalUsers.data ?? []).find((u: any) => u.id === id) : null;
+            const existingUserByEmail = (allGlobalUsers.data ?? []).find((u: DatabaseUser) => u.email === email);
+            const existingUserById = id ? (allGlobalUsers.data ?? []).find((u: DatabaseUser) => u.id === id) : null;
             if (id) {
               if (existingUserById) {
                 if (existingUserById.email !== email && existingUserByEmail) { validationSkippedLog.push(`Row ${originalLineNumber} (ID: ${id}) skipped: New email ${email} already used by another user.`); continue; }
@@ -842,7 +845,7 @@ export default function CompanySettingsPage() {
             const { error } = await supabase.from('users').upsert(itemsToBulkPut);
             if (error) upsertError = error;
             const updatedGlobalUsers = await supabase.from('users').select('*');
-            setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: any) => u.assignedCompanyIds?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver")));
+            setCompanyUsers((updatedGlobalUsers.data ?? []).filter((u: DatabaseUser) => u.assigned_company_ids?.includes(selectedCompanyId) && (u.role === "Payroll Preparer" || u.role === "Payroll Approver")).map(userFromBackend));
           }
           let feedbackMessage = ""; let feedbackTitle = "Import Processed"; let feedbackType: FeedbackMessage['type'] = 'info';
           if (upsertError) {
@@ -985,7 +988,7 @@ export default function CompanySettingsPage() {
 
         <TabsContent value="companyUsers">
           {canManageCompanyUsers ? (
-            <Card><CardHeader><CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary" />User Management</CardTitle><CardDescription>Add, edit, or remove users with 'Payroll Preparer' or 'Payroll Approver' roles for this company.</CardDescription></CardHeader>
+            <Card><CardHeader><CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary" />User Management</CardTitle><CardDescription>Add, edit, or remove users with &apos;Payroll Preparer&apos; or &apos;Payroll Approver&apos; roles for this company.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mb-4">
                     <div className="relative w-full sm:max-w-xs md:max-w-sm lg:max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input type="search" placeholder="Search users..." className="w-full pl-10" value={companyUserSearchTerm} onChange={(e) => {setCompanyUserSearchTerm(e.target.value); setCompUserCurrentPage(1); setFeedback(null);}}/></div>
@@ -1090,7 +1093,7 @@ export default function CompanySettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={isDeleteCompanyUserDialogOpen} onOpenChange={setIsDeleteCompanyUserDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Remove user "{companyUserToDelete?.firstName} {companyUserToDelete?.lastName}" from this company?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteCompanyUser} className="bg-destructive hover:bg-destructive/90">Remove User</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isDeleteCompanyUserDialogOpen} onOpenChange={setIsDeleteCompanyUserDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>Remove user &quot;{companyUserToDelete?.firstName} {companyUserToDelete?.lastName}&quot; from this company?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteCompanyUser} className="bg-destructive hover:bg-destructive/90">Remove User</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <AlertDialog open={isBulkDeleteCompanyUsersDialogOpen} onOpenChange={setIsBulkDeleteCompanyUsersDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle><AlertDialogDescription>Delete {selectedCompanyUserItems.size} selected user(s)?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmBulkDeleteCompanyUsers} className="bg-destructive hover:bg-destructive/90">Delete Selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );

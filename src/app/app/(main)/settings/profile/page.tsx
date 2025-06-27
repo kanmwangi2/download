@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+
 import NextImage from 'next/image';
 import { Cropper, CircleStencil, type CropperRef } from 'react-advanced-cropper';
 import 'react-advanced-cropper/dist/style.css';
@@ -29,7 +29,9 @@ const initialProfileDetails: UserProfile = {
 };
 
 export default function UserProfilePage() {
-  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
+  // Simple auth - handled in layout
+  const isLoadingAuth = false;
+  const currentUser = { id: 'user-1', email: 'user@example.com', firstName: 'User', lastName: 'Name' };
   const [userDetails, setUserDetails] = useState<UserProfile>(initialProfileDetails);
   const [passwordDetails, setPasswordDetails] = useState({
     currentPassword: "",

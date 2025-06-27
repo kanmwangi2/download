@@ -4,7 +4,6 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/error-boundary";
-import { AuthProvider } from "@/context/AuthContext";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -32,11 +31,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
-          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

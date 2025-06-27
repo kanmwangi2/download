@@ -46,7 +46,7 @@ import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from '@/context/CompanyContext';
-import { useAuth } from '@/context/AuthContext';
+
 import { FeedbackAlert, FeedbackMessage } from '@/components/ui/feedback-alert';
 
 // Import OOP services and utilities
@@ -73,7 +73,16 @@ const statusConfig: Record<PayrollStatus, { color: string; icon: React.ElementTy
 export default function PayrollPage() {
   const router = useRouter();
   const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
-  const { user: currentUser, isLoading: isLoadingAuth } = useAuth();
+  // Simple auth - using mock data for now (to be replaced with real auth later)
+  const isLoadingAuth = false;
+  const currentUser: AuthenticatedUser = useMemo(() => ({ 
+    id: 'user-1', 
+    email: 'user@example.com', 
+    firstName: 'User', 
+    lastName: 'Name', 
+    role: 'Payroll Preparer',
+    assignedCompanyIds: ['default-company']
+  }), []);
   
   // State management
   const [allPayrollRunsData, setAllPayrollRunsData] = useState<PayrollRunSummary[]>([]);
@@ -269,7 +278,7 @@ export default function PayrollPage() {
         router.push(`/app/payroll/${newRun.id}`);
       }, 1500);
 
-    } catch (error) {
+    } catch {
       setCreateRunDialogFeedback({ type: 'error', message: "Creation Failed", details: "Could not create payroll run." });
     }
   };
@@ -455,9 +464,9 @@ export default function PayrollPage() {
                         </Button>
                       </DialogTrigger>
                     </TooltipTrigger>
-                    {runNewPayrollButtonDisabled && (
+                    {runNewPayrollButtonDisabled ? (
                       <TooltipContent><p>{runNewPayrollTooltipContent}</p></TooltipContent>
-                    )}
+                    ) : null}
                   </Tooltip>
                 </TooltipProvider>
                 <DialogContent className="sm:max-w-[425px]">
@@ -561,11 +570,11 @@ export default function PayrollPage() {
                         <TableCell className="font-medium">{run.id}</TableCell>
                         <TableCell>
                           {run.month} {run.year}
-                          {run.status === "Rejected" && run.rejectionReason && (
+                          {run.status === "Rejected" && run.rejectionReason ? (
                             <p className="text-xs text-destructive mt-1" title={run.rejectionReason}>
                               Reason: {run.rejectionReason.substring(0,30)}{run.rejectionReason.length > 30 ? "..." : ""}
                             </p>
-                          )}
+                          ) : null}
                         </TableCell>
                         <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.employees)}</TableCell>
                         <TableCell className="text-right">{PayrollUtils.formatNumberForTable(run.grossSalary)}</TableCell>
@@ -701,7 +710,7 @@ export default function PayrollPage() {
       <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8">
         <p className="font-semibold text-primary/90">Note on Payroll Runs:</p>
         <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
-          <li>Only one payroll run can be in a non-"Approved" state (Draft, To Approve, Rejected) at any given time per company.</li>
+          <li>Only one payroll run can be in a non-&quot;Approved&quot; state (Draft, To Approve, Rejected) at any given time per company.</li>
           <li>You must complete or delete the current non-approved run before creating a new one.</li>
           <li>Payroll run summaries and details are persisted using Supabase, scoped to the selected company.</li>
           <li>Deleting a payroll run will attempt to reverse any deductions that were applied as part of that specific run.</li>

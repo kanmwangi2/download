@@ -166,13 +166,14 @@ DECLARE
     table_name TEXT;
     policy_name TEXT;
 BEGIN
-    -- List of tables that have company_id column
+    -- List of tables that have company_id column (exclude views and already handled tables)
     FOR table_name IN 
         SELECT t.table_name 
         FROM information_schema.tables t
         JOIN information_schema.columns c ON t.table_name = c.table_name
         WHERE t.table_schema = 'public' 
           AND c.column_name = 'company_id'
+          AND t.table_type = 'BASE TABLE'
           AND t.table_name NOT IN ('companies', 'user_company_assignments')
     LOOP
         -- Enable RLS
@@ -181,14 +182,14 @@ BEGIN
         -- Create read policy
         policy_name := format('Company scoped read access for %s', table_name);
         EXECUTE format('
-            CREATE POLICY %L ON public.%I FOR SELECT
+            CREATE POLICY %I ON public.%I FOR SELECT
             USING (user_can_access_company(company_id))
         ', policy_name, table_name);
         
         -- Create write policies
         policy_name := format('Company scoped write access for %s', table_name);
         EXECUTE format('
-            CREATE POLICY %L ON public.%I FOR ALL
+            CREATE POLICY %I ON public.%I FOR ALL
             USING (user_can_access_company(company_id))
             WITH CHECK (user_can_access_company(company_id))
         ', policy_name, table_name);

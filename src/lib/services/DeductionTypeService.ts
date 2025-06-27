@@ -1,5 +1,5 @@
 import { BaseService } from './BaseService';
-import { DeductionType } from '../types/deductions';
+import { DeductionType } from '../types/deductionTypes';
 
 export type { DeductionType };
 
@@ -123,7 +123,10 @@ export class DeductionTypeService extends BaseService {
       companyId: dbRow.company_id,
       name: dbRow.name,
       description: dbRow.description,
-      isDefault: dbRow.is_default
+      orderNumber: dbRow.order_number || 0,
+      isFixedName: dbRow.is_fixed_name || false,
+      isDeletable: dbRow.is_deletable || true,
+      isDefault: dbRow.is_default || false
     };
   }
 
@@ -132,6 +135,9 @@ export class DeductionTypeService extends BaseService {
       company_id: deductionType.companyId,
       name: deductionType.name,
       description: deductionType.description,
+      order_number: deductionType.orderNumber,
+      is_fixed_name: deductionType.isFixedName,
+      is_deletable: deductionType.isDeletable,
       is_default: deductionType.isDefault
     };
   }

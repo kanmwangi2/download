@@ -97,7 +97,8 @@ export class DeductionDAO extends BaseDAO<Deduction> {
    * Find deductions with balance remaining
    */
   async findWithBalance(companyId: string): Promise<Deduction[]> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
       .eq('company_id', companyId)
@@ -107,14 +108,15 @@ export class DeductionDAO extends BaseDAO<Deduction> {
       throw new Error(`Failed to fetch deductions with balance: ${error.message}`);
     }
 
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 
   /**
    * Get deductions with staff and deduction type details
    */
   async findWithDetails(companyId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select(`
         *,
@@ -132,7 +134,7 @@ export class DeductionDAO extends BaseDAO<Deduction> {
       throw new Error(`Failed to fetch deductions with details: ${error.message}`);
     }
 
-    return (data || []).map(record => ({
+    return (data || []).map((record: any) => ({
       ...this.fromDatabase(record),
       staffFullName: record.staff_members ? 
         `${record.staff_members.first_name} ${record.staff_members.last_name}` : 
@@ -183,7 +185,8 @@ export class DeductionDAO extends BaseDAO<Deduction> {
    * Get total deduction amount for a staff member
    */
   async getTotalDeductionsByStaff(staffId: string, companyId: string): Promise<number> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('balance')
       .eq('company_id', companyId)
@@ -194,14 +197,15 @@ export class DeductionDAO extends BaseDAO<Deduction> {
       throw new Error(`Failed to get total deductions: ${error.message}`);
     }
 
-    return (data || []).reduce((total, record) => total + (record.balance || 0), 0);
+    return (data || []).reduce((total: number, record: any) => total + (record.balance || 0), 0);
   }
 
   /**
    * Get recurring deductions due for processing
    */
   async getRecurringDeductionsDue(companyId: string, currentDate: string): Promise<Deduction[]> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
       .eq('company_id', companyId)
@@ -214,7 +218,7 @@ export class DeductionDAO extends BaseDAO<Deduction> {
       throw new Error(`Failed to fetch recurring deductions: ${error.message}`);
     }
 
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 }
 

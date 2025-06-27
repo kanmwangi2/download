@@ -699,7 +699,7 @@ export default function StaffPage() {
     setBulkDeleteStaffDialogFeedback(null);
 
     try {
-        await services.staffService.deleteMany(Array.from(selectedStaffItems));
+        await services.staffService.bulkDelete(Array.from(selectedStaffItems));
         setFeedback({ type: 'success', message: `${selectedStaffItems.size} staff member(s) deleted.` });
         
         const staffData = await services.staffService.getStaffByCompany(selectedCompanyId);

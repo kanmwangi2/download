@@ -33,9 +33,41 @@ export interface Deduction {
   monthlyDeduction: number;
   startDate: string;
   isActive: boolean;
+  deductedSoFar?: number; // Amount deducted so far
+  originalAmount?: number; // Original deduction amount
+  staffName?: string; // Staff member name (for joined queries)
+  deductionTypeName?: string; // Deduction type name (for joined queries)
 }
 
 /**
  * Deduction statuses
  */
 export type DeductionStatus = 'active' | 'paused' | 'completed';
+
+/**
+ * Represents a deduction type
+ */
+export interface DeductionType {
+  id: string;
+  companyId: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isPercentage: boolean;
+  defaultAmount?: number;
+  maxAmount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Represents a deduction record
+ */
+export interface DeductionRecord {
+  id: string;
+  deductionId: string;
+  payrollRunId: string;
+  amount: number;
+  appliedDate: string;
+  notes?: string;
+}

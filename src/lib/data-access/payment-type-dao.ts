@@ -62,7 +62,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
    * Get payment types ordered by order number
    */
   async findAllOrdered(companyId: string): Promise<PaymentType[]> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
       .eq('company_id', companyId)
@@ -72,7 +73,7 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
       throw new Error(`Failed to fetch ordered payment types: ${error.message}`);
     }
 
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 
   /**
@@ -91,7 +92,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
       order_number: update.orderNumber
     }));
 
-    const { error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { error } = await supabase
       .from(this.tableName)
       .upsert(updates);
 
@@ -104,7 +106,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
    * Get next order number for a company
    */
   async getNextOrderNumber(companyId: string): Promise<number> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('order_number')
       .eq('company_id', companyId)

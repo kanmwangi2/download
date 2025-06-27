@@ -30,7 +30,7 @@ export interface AuthenticatedUser {
   email: string;
   firstName: string;
   lastName: string;
-  phone: string; // Added phone
+  phone?: string; // Made optional to match AuthContext
   role: UserRole;
   assignedCompanyIds: string[];
 }

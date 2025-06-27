@@ -1,4 +1,5 @@
-import { PaymentType, StaffPaymentConfig } from "@/lib/types";
+import { PaymentType } from "@/lib/types";
+import { StaffPaymentConfig } from "@/lib/types/staff";
 
 export function paymentTypeToBackend(paymentType: PaymentType | Omit<PaymentType, 'id'>): Record<string, unknown> {
   return {
@@ -31,22 +32,22 @@ export function paymentTypeFromBackend(paymentType: Record<string, any>): Paymen
 export function staffPaymentConfigToBackend(config: StaffPaymentConfig | Omit<StaffPaymentConfig, 'id'>): Record<string, unknown> {
     return {
         ...(('id' in config) && { id: config.id }),
-        company_id: config.companyId,
         staff_id: config.staffId,
-        basic_pay: config.basicPay,
-        payment_type: config.paymentType,
-        allowances: config.allowances,
+        payment_type_id: config.paymentTypeId,
+        amount: config.amount,
+        is_active: config.isActive,
+        effective_date: config.effectiveDate,
     };
 }
 
 export function staffPaymentConfigFromBackend(config: Record<string, any>): StaffPaymentConfig {
     return {
         id: config.id,
-        companyId: config.company_id,
         staffId: config.staff_id,
-        basicPay: config.basic_pay,
-        paymentType: config.payment_type,
-        allowances: config.allowances,
+        paymentTypeId: config.payment_type_id,
+        amount: config.amount,
+        isActive: config.is_active,
+        effectiveDate: config.effective_date,
     };
 }
 

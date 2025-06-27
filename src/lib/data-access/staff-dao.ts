@@ -142,7 +142,8 @@ export class StaffDAO extends BaseDAO<Staff> {
    * Search staff by name or staff number
    */
   async searchByNameOrStaffNumber(searchTerm: string, companyId: string): Promise<Staff[]> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
       .eq('company_id', companyId)
@@ -152,14 +153,15 @@ export class StaffDAO extends BaseDAO<Staff> {
       throw new Error(`Failed to search staff: ${error.message}`);
     }
 
-    return (data || []).map(record => this.fromDatabase(record));
+    return (data || []).map((record: any) => this.fromDatabase(record));
   }
 
   /**
    * Get active staff count for a company
    */
   async getActiveStaffCount(companyId: string): Promise<number> {
-    const { count, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { count, error } = await supabase
       .from(this.tableName)
       .select('*', { count: 'exact', head: true })
       .eq('company_id', companyId)
@@ -176,7 +178,8 @@ export class StaffDAO extends BaseDAO<Staff> {
    * Get staff with their payment configurations
    */
   async getStaffWithPaymentConfigs(companyId: string): Promise<Array<Staff & { paymentConfig?: any }>> {
-    const { data, error } = await this.supabase
+    const supabase = await this.getSupabase();
+    const { data, error } = await supabase
       .from(this.tableName)
       .select(`
         *,
@@ -188,7 +191,7 @@ export class StaffDAO extends BaseDAO<Staff> {
       throw new Error(`Failed to fetch staff with payment configs: ${error.message}`);
     }
 
-    return (data || []).map(record => ({
+    return (data || []).map((record: any) => ({
       ...this.fromDatabase(record),
       paymentConfig: record.staff_payment_configs?.[0] || null
     }));

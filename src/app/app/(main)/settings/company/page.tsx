@@ -62,7 +62,7 @@ export interface CompanyProfileData {
   primaryBusiness?: string | undefined;
 }
 
-export const defaultInitialCompanyProfile: CompanyProfileData = {
+const defaultInitialCompanyProfile: CompanyProfileData = {
   name: "Default Company Name",
   address: "",
   registrationNumber: "",

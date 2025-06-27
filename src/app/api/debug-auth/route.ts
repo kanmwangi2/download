@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authError.message }, { status: 500 })
     }
 
-    const user = authUsers.users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    const user = authUsers.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase())
     
     if (!user) {
       return NextResponse.json({

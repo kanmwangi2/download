@@ -80,6 +80,7 @@ export function createServiceRoleClient() {
 
   try {
     // Dynamic import for service role client
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createClient } = require('@supabase/supabase-js')
     
     const client = createClient(

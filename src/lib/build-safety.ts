@@ -24,6 +24,7 @@ export function createSafeSupabaseClient() {
   }
   
   // Only import and create client if safe to do so
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { getSupabaseClient } = require('@/lib/supabase')
   return getSupabaseClient()
 }

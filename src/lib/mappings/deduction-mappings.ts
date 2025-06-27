@@ -1,4 +1,7 @@
-import { DeductionType, StaffDeduction } from "@/lib/types";
+import { DeductionTypeDef, StaffDeduction } from "@/lib/types";
+
+// Type alias for backward compatibility
+type DeductionType = DeductionTypeDef;
 
 export function deductionTypeToBackend(deductionType: DeductionType | Omit<DeductionType, 'id'>): Record<string, unknown> {
   return {

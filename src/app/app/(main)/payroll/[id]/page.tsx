@@ -56,9 +56,11 @@ import { DeductionTypeService } from '@/lib/services/DeductionTypeService';
 // Centralized Types
 import { CompanyProfileData, GlobalApplicationCompany } from '@/lib/types/company';
 import { PayrollRunDetail, PayrollRunSummary, PayrollStatus, EmployeePayrollRecord } from '@/lib/types/payroll';
-import { StaffMember, StaffPaymentConfig, StaffPaymentDetails } from '@/lib/types/staff';
+import { StaffMember, StaffPaymentConfig } from '@/lib/types/staff';
+import { StaffPaymentDetails } from '@/lib/types/payments';
 import { TaxSettingsData } from '@/lib/types/tax';
 import { Deduction, DeductionRecord } from '@/lib/types/deductions';
+import { DeductionType as DeductionTypeDef } from '@/lib/types/deductionTypes';
 import { PaymentType } from '@/lib/types/payments';
 import { DeductionType } from '@/lib/types/deductionTypes';
 
@@ -110,9 +112,9 @@ export default function PayrollRunDetailPage() {
   const [allDeductions, setAllDeductions] = useState<Deduction[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileData | null>(null);
   const [companyPaymentTypes, setCompanyPaymentTypes] = useState<PaymentType[]>([]);
-  const [companyDeductionTypes, setCompanyDeductionTypes] = useState<DeductionType[]>([]);
+  const [companyDeductionTypes, setCompanyDeductionTypes] = useState<DeductionTypeDef[]>([]);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
-  const [activeDeductionTypeColumns, setActiveDeductionTypeColumns] = useState<DeductionType[]>([]);
+  const [activeDeductionTypeColumns, setActiveDeductionTypeColumns] = useState<DeductionTypeDef[]>([]);
   const [activePaymentTypeColumns, setActivePaymentTypeColumns] = useState<PaymentType[]>([]);
   const [activeStatutoryColumns, setActiveStatutoryColumns] = useState<string[]>([]);
   const [pageFeedback, setPageFeedback] = useState<FeedbackMessage | null>(null);
@@ -168,7 +170,7 @@ export default function PayrollRunDetailPage() {
   const dialogTotalItems = payrollRun?.employees?.length || 0;
   const dialogTotalPages = Math.ceil(dialogTotalItems / (dialogRowsPerPage || 1));
   
-  const setDynamicColumnsBasedOnRun = (run: PayrollRunDetail, cDeductionTypes: DeductionType[], cPaymentTypes: PaymentType[]) => {
+  const setDynamicColumnsBasedOnRun = (run: PayrollRunDetail, cDeductionTypes: DeductionTypeDef[], cPaymentTypes: PaymentType[]) => {
     if (!run || !run.employees || run.employees.length === 0) {
         setActiveDeductionTypeColumns([]);
         setActivePaymentTypeColumns([]);
@@ -245,9 +247,9 @@ export default function PayrollRunDetailPage() {
                 name: selectedCompanyName || currentGlobalCompany?.name || `Company ${selectedCompanyId}`,
                 address: currentGlobalCompany?.address || "",
                 registrationNumber: "",
-                taxId: currentGlobalCompany?.tinNumber || "",
-                contactEmail: currentGlobalCompany?.email || "",
-                contactPhone: currentGlobalCompany?.phone || "",
+                tinNumber: currentGlobalCompany?.tinNumber || "",
+                email: currentGlobalCompany?.email || "",
+                phone: currentGlobalCompany?.phone || "",
                 currency: "RWF",
                 isPayeActive: true, isPensionActive: true, isMaternityActive: true, isCbhiActive: true, isRamaActive: true,
                 primaryBusiness: currentGlobalCompany?.primaryBusiness || "",

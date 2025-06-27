@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShell } from "@/components/layout/app-shell-simple";
 
 interface MainLayoutProps {
   children: React.ReactNode;

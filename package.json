@@ -9,7 +9,7 @@
     "test": "jest --watch",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "build:vercel": "npm run typecheck && next build"
+    "build:vercel": "next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

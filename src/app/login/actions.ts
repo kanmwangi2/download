@@ -4,7 +4,7 @@
 import { getServerSupabaseClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 
-export async function login(formData: FormData) {
+export async function login(formData: FormData): Promise<{ error: string } | { message: string } | never> {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const supabase = getServerSupabaseClient();
@@ -23,7 +23,7 @@ export async function login(formData: FormData) {
   redirect('/app/dashboard');
 }
 
-export async function signup(formData: FormData) {
+export async function signup(formData: FormData): Promise<{ error: string } | { message: string }> {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const supabase = getServerSupabaseClient();

@@ -17,6 +17,7 @@ import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-al
 
 // Import services
 import { ServiceRegistry } from '@/lib/services/ServiceRegistry';
+import { PaymentType } from '@/lib/types';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 

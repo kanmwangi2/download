@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       profileError: profileError?.message || null
     })
 
-  } catch (error: Error) {
+  } catch (error: any) {
     console.error('❌ Debug API error:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

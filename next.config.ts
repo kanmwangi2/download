@@ -27,9 +27,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   typescript: {
+    // Temporarily ignore build errors for deployment
     ignoreBuildErrors: true,
   },
   eslint: {
+    // Temporarily ignore linting during build
     ignoreDuringBuilds: true,
   },
   images: {

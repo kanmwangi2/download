@@ -116,5 +116,4 @@ export class PaymentTypeService extends BaseService {
       this.handleError(error, 'delete payment type');
     }
   }
-
-  
+}

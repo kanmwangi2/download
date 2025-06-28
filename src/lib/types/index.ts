@@ -7,7 +7,7 @@ export * from './department';
 export type { StaffMember, StaffStatus, EmployeeCategory } from './staff';
 
 // Export payment types explicitly to avoid conflicts  
-export type { PaymentType } from './payments';
+export type { PaymentType, StaffPaymentConfig } from './payments';
 
 // Export deduction-related types explicitly to avoid conflicts
 export type { DeductionType, Deduction, DeductionRecord, DeductionStatus, StaffDeduction } from './deductions';

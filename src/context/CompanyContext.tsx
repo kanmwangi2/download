@@ -8,7 +8,6 @@ import React, {
   ReactNode,
   useCallback,
 } from 'react';
-import { getUserProfile } from '@/lib/auth-utils';
 import { UserProfile } from '@/lib/types/user';
 
 interface CompanyContextType {
@@ -32,7 +31,11 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const fetchProfileAndSetCompany = useCallback(async () => {
     setIsLoadingCompanyContext(true);
     try {
-      const profile = await getUserProfile();
+      const response = await fetch('/api/user-profile');
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      const profile = await response.json();
       setUserProfile(profile as any);
 
       if (profile && profile.companies && profile.companies.length > 0) {

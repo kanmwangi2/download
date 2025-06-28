@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Calendar, Filter, Download, Search, RefreshCw, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 
+// Force dynamic rendering to avoid build-time prerendering issues
+export const dynamic = 'force-dynamic';
+
 interface AuditLogEntry {
   id: string;
   timestamp: Date;

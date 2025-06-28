@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCompany } from '@/context/CompanyContext';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
 
 // Import services

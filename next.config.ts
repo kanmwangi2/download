@@ -1,20 +1,12 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['@supabase/supabase-js'],
-  webpack: (config, { isServer, dev }) => {
-    if (isServer) {
-      // Prevent bundling of certain modules on the server side
-      config.externals = config.externals || []
-      config.externals.push({
-        '@supabase/realtime-js': '@supabase/realtime-js',
-        '@supabase/auth-js': '@supabase/auth-js',
-        '@supabase/gotrue-js': '@supabase/gotrue-js',
-        'ws': 'ws',
-        'utf-8-validate': 'utf-8-validate',
-        'bufferutil': 'bufferutil'
-      })
-    }
+  webpack: (config, { isServer }) => {
+    // Fix for Supabase realtime-js module issue
+    config.externals = config.externals || [];
+    config.externals.push({
+      '@supabase/realtime-js': 'commonjs @supabase/realtime-js',
+    });
     
     // Handle WebSocket and other browser-specific modules
     config.resolve.fallback = {
@@ -23,18 +15,9 @@ const nextConfig: NextConfig = {
       net: false,
       tls: false,
       crypto: false,
-    }
+    };
 
-    // Prevent problematic modules from being processed during static generation
-    if (!dev && isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@supabase/auth-js': false,
-        '@supabase/gotrue-js': false,
-      }
-    }
-    
-    return config
+    return config;
   },
   // Experimental features to help with build stability
   experimental: {

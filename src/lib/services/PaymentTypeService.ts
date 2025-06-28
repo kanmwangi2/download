@@ -3,13 +3,12 @@
  * Handles all payment type and staff payment configuration operations.
  */
 import { BaseService } from './BaseService';
-import { PaymentType } from '../types';
-import { StaffPayment } from '../types/staff';
-import { paymentTypeFromBackend, paymentTypeToBackend, staffPaymentFromBackend, staffPaymentToBackend } from '../mappings/payment-mappings';
+import { PaymentType, StaffPaymentConfig } from '../types';
+import { paymentTypeFromBackend, paymentTypeToBackend } from '../mappings/payment-mappings';
 
 export class PaymentTypeService extends BaseService {
   private readonly paymentTypeTableName = 'payment_types';
-  private readonly staffPaymentTableName = 'staff_payments';
+  
 
   // --- Payment Type Methods ---
 
@@ -118,84 +117,4 @@ export class PaymentTypeService extends BaseService {
     }
   }
 
-  // --- Staff Payment Methods ---
-
-  async getStaffPayments(staffId: string): Promise<StaffPayment[]> {
-    try {
-      const { data, error } = await this.supabase
-        .from(this.staffPaymentTableName)
-        .select('*')
-        .eq('staff_id', staffId);
-
-      if (error) {
-        this.handleError(error, 'fetch staff payments');
-      }
-
-      return (data || []).map(staffPaymentFromBackend);
-    } catch (error) {
-      this.handleError(error, 'fetch staff payments');
-      return [];
-    }
-  }
-
-  async addStaffPayment(data: Omit<StaffPayment, 'id'>): Promise<StaffPayment> {
-    try {
-      this.validateRequired(data, ['staffId', 'paymentTypeId', 'amount', 'effectiveDate']);
-      const backendData = staffPaymentToBackend(data);
-
-      const { data: result, error } = await this.supabase
-        .from(this.staffPaymentTableName)
-        .insert(backendData)
-        .select()
-        .single();
-
-      if (error) {
-        this.handleError(error, 'add staff payment');
-        throw error;
-      }
-
-      return staffPaymentFromBackend(result);
-    } catch (error) {
-      this.handleError(error, 'add staff payment');
-      throw error;
-    }
-  }
-
-  async updateStaffPayment(id: string, data: Partial<Omit<StaffPayment, 'id' | 'staffId'>>): Promise<StaffPayment> {
-    try {
-      const backendData = staffPaymentToBackend(data as StaffPayment);
-
-      const { data: result, error } = await this.supabase
-        .from(this.staffPaymentTableName)
-        .update(backendData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        this.handleError(error, 'update staff payment');
-        throw error;
-      }
-
-      return staffPaymentFromBackend(result);
-    } catch (error) {
-      this.handleError(error, 'update staff payment');
-      throw error;
-    }
-  }
-
-  async removeStaffPayment(id: string): Promise<void> {
-    try {
-      const { error } = await this.supabase
-        .from(this.staffPaymentTableName)
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        this.handleError(error, 'remove staff payment');
-      }
-    } catch (error) {
-      this.handleError(error, 'remove staff payment');
-    }
-  }
-}
+  

@@ -1,7 +1,7 @@
-import { type User, type UserProfile, type UserCompanyAssignment, type UserUI } from '@/lib/types/user';
+import { type UserProfile, type UserCompanyAssignment, type User } from '@/lib/types/user';
 
 // Main user mappings (snake_case ↔ camelCase)
-export function userToBackend(user: UserUI | Omit<UserUI, 'id'>): User {
+export function userToBackend(user: User | Omit<User, 'id'>): Record<string, unknown> {
     return {
         ...(('id' in user) && { id: user.id! }),
         first_name: user.firstName,
@@ -9,13 +9,11 @@ export function userToBackend(user: UserUI | Omit<UserUI, 'id'>): User {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        assigned_company_ids: user.assignedCompanyIds,
-        ...(user.password && { password: user.password }),
         status: user.status || 'Active',
-    } as User;
+    };
 }
 
-export function userFromBackend(user: Record<string, any>): UserUI {
+export function userFromBackend(user: Record<string, any>): User {
     return {
         id: user.id,
         firstName: user.first_name || '',
@@ -23,15 +21,13 @@ export function userFromBackend(user: Record<string, any>): UserUI {
         email: user.email || '',
         phone: user.phone,
         role: user.role,
-        assignedCompanyIds: user.assigned_company_ids || [],
         status: user.status || 'Active',
     };
 }
 
 // User profile mappings
-export function userProfileToBackend(profile: UserProfile | Omit<UserProfile, 'id'>): Record<string, unknown> {
+export function userProfileToBackend(profile: UserProfile): Record<string, unknown> {
     return {
-        ...(('id' in profile) && { id: profile.id }),
         first_name: profile.firstName,
         last_name: profile.lastName,
         email: profile.email,
@@ -41,7 +37,6 @@ export function userProfileToBackend(profile: UserProfile | Omit<UserProfile, 'i
 
 export function userProfileFromBackend(profile: Record<string, any>): UserProfile {
     return {
-        id: profile.id,
         firstName: profile.first_name,
         lastName: profile.last_name,
         email: profile.email,

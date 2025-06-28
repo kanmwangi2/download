@@ -2,7 +2,7 @@ export interface CustomFieldDefinition {
   id: string;
   companyId: string;
   name: string;
-  type: 'Text' | 'Number' | 'Date';
-  orderNumber: number;
+  type: 'text' | 'number' | 'date';
+  orderIndex: number;
   isDeletable: boolean;
 }

@@ -39,14 +39,10 @@ export interface EmployeePayrollRecord {
   companyId: string;
 }
 
-export interface PayrollRunDetail {
+export interface PayrollRunReport {
   id: string; 
   companyId: string;
-  month: string; 
-  year: number; 
-  status: PayrollStatus; 
-  rejectionReason?: string;
-  employees: EmployeePayrollRecord[];
+  staffPayrollRecords: EmployeePayrollRecord[];
   totalEmployees?: number;
   dynamicTotalDeductionAmounts?: Record<string, number>;
   dynamicTotalGrossEarnings?: Record<string, number>;
@@ -70,14 +66,28 @@ export interface PayrollRunDetail {
   totalFinalNetPay?: number;
 }
 
+export interface StaffPayrollRunDetail {
+  id: string;
+  companyId: string;
+  payrollRunId: string;
+  staffId: string;
+  basicPay: number;
+  allowances: Record<string, number>;
+  grossSalary: number;
+  deductions: Record<string, number>;
+  totalDeductions: number;
+  netPay: number;
+}
+
 export interface PayrollRunSummary {
   id: string;
   companyId: string;
+  runId: string;
   month: string;
   year: number;
-  employees: number;
+  employeesCount: number;
   grossSalary: number;
-  deductions: number;
+  totalDeductions: number;
   netPay: number;
   status: PayrollStatus;
   rejectionReason?: string;

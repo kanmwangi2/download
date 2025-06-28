@@ -24,13 +24,11 @@ export class DeductionTypeService extends BaseService {
             company_id: companyId,
             name: 'Loan',
             description: 'Employee loan deduction',
-            is_default: true
           },
           {
             company_id: companyId,
             name: 'Advance',
             description: 'Salary advance deduction',
-            is_default: true
           }
         ];
 
@@ -126,7 +124,6 @@ export class DeductionTypeService extends BaseService {
       orderNumber: dbRow.order_number || 0,
       isFixedName: dbRow.is_fixed_name || false,
       isDeletable: dbRow.is_deletable || true,
-      isDefault: dbRow.is_default || false
     };
   }
 
@@ -138,7 +135,6 @@ export class DeductionTypeService extends BaseService {
       order_number: deductionType.orderNumber,
       is_fixed_name: deductionType.isFixedName,
       is_deletable: deductionType.isDeletable,
-      is_default: deductionType.isDefault
     };
   }
 }

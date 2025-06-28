@@ -4,33 +4,22 @@
  */
 import { BaseService } from './BaseService';
 
-export type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Payroll Preparer' | 'Payroll Approver' | 'Employee';
-
-export interface User {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  role: UserRole;
-  assigned_company_ids: string[];
-  created_at?: string;
-  updated_at?: string;
-}
+export type UserRole = 'Primary Admin' | 'App Admin' | 'Company Admin' | 'Payroll Preparer' | 'Payroll Approver';
 
 export interface UserProfile {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
+  id: string; // UUID referencing auth.users(id)
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string; // Made optional to match AuthContext
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
   role: UserRole;
   assignedCompanyIds: string[];
 }
@@ -197,7 +186,7 @@ export class UserService extends BaseService {
   /**
    * Get user by ID
    */
-  async getById(userId: string): Promise<User | null> {
+  async getById(userId: string): Promise<UserProfile | null> {
     try {
       await this.ensureInitialized();
       const { data, error } = await this.supabase

@@ -3,21 +3,21 @@
  * Handles all payroll run-related operations.
  */
 import { BaseService } from './BaseService';
-import { PayrollRunDetail, PayrollRunSummary } from '../types/payroll';
+import { PayrollRunReport, PayrollRunSummary, StaffPayrollRunDetail } from '../types/payroll';
 import { objectToCamelCase, objectToSnakeCase } from '../case-conversion';
 
 export class PayrollService extends BaseService {
-  private readonly payrollRunDetailsTable = 'payroll_run_details';
+  private readonly staffPayrollRunDetailsTable = 'payroll_run_details';
   private readonly payrollRunsTable = 'payroll_runs';
 
   /**
    * Get a single payroll run's detailed data.
    */
-  async getPayrollRunDetail(id: string, companyId: string): Promise<PayrollRunDetail | null> {
+  async getPayrollRunDetail(id: string, companyId: string): Promise<StaffPayrollRunDetail | null> {
     try {
       await this.ensureInitialized();
       const { data, error } = await this.supabase
-        .from(this.payrollRunDetailsTable)
+        .from(this.staffPayrollRunDetailsTable)
         .select('*')
         .eq('id', id)
         .eq('company_id', companyId)
@@ -29,7 +29,7 @@ export class PayrollService extends BaseService {
         return null;
       }
       
-      return data ? objectToCamelCase<PayrollRunDetail>(data) : null;
+      return data ? objectToCamelCase<StaffPayrollRunDetail>(data) : null;
     } catch (error) {
       this.handleError(error, 'fetch payroll run detail');
       return null;
@@ -89,12 +89,12 @@ export class PayrollService extends BaseService {
   /**
    * Update or create payroll run details.
    */
-  async updatePayrollRunDetail(detail: PayrollRunDetail): Promise<void> {
+  async updatePayrollRunDetail(detail: StaffPayrollRunDetail): Promise<void> {
     try {
       await this.ensureInitialized();
       const detailSnake = objectToSnakeCase(detail);
       const { error } = await this.supabase
-        .from(this.payrollRunDetailsTable)
+        .from(this.staffPayrollRunDetailsTable)
         .upsert(detailSnake);
 
       if (error) {
@@ -127,7 +127,7 @@ export class PayrollService extends BaseService {
   /**
    * Update or create both payroll run details and summary.
    */
-  async updatePayrollRun(detail: PayrollRunDetail, summary: PayrollRunSummary): Promise<void> {
+  async updatePayrollRun(detail: StaffPayrollRunDetail, summary: PayrollRunSummary): Promise<void> {
     try {
       await this.updatePayrollRunDetail(detail);
       await this.updatePayrollRunSummary(summary);

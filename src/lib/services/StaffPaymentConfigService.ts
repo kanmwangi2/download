@@ -2,31 +2,25 @@ import { BaseService } from './BaseService';
 
 export interface StaffPaymentConfig {
   id: string;
+  companyId: string;
   staffId: string;
-  paymentTypeId: string;
-  amount: number;
-  currency: string;
-  isActive: boolean;
-  effectiveDate: string;
-  endDate?: string;
+  basicPay: number;
+  paymentType: 'Gross' | 'Net';
+  allowances: Record<string, number>;
 }
 
 export interface CreateStaffPaymentConfigData {
+  companyId: string;
   staffId: string;
-  paymentTypeId: string;
-  amount: number;
-  currency?: string;
-  isActive?: boolean;
-  effectiveDate: string;
-  endDate?: string;
+  basicPay: number;
+  paymentType: 'Gross' | 'Net';
+  allowances?: Record<string, number>;
 }
 
 export interface UpdateStaffPaymentConfigData {
-  amount?: number;
-  currency?: string;
-  isActive?: boolean;
-  effectiveDate?: string;
-  endDate?: string;
+  basicPay?: number;
+  paymentType?: 'Gross' | 'Net';
+  allowances?: Record<string, number>;
 }
 
 export class StaffPaymentConfigService extends BaseService {
@@ -36,16 +30,7 @@ export class StaffPaymentConfigService extends BaseService {
     try {
       const { data, error } = await this.supabase
         .from(this.tableName)
-        .select(`
-          id,
-          staff_id,
-          payment_type_id,
-          amount,
-          currency,
-          is_active,
-          effective_date,
-          end_date
-        `)
+        .select('*')
         .eq('company_id', companyId);
 
       if (error) {
@@ -62,13 +47,11 @@ export class StaffPaymentConfigService extends BaseService {
   async create(data: CreateStaffPaymentConfigData): Promise<StaffPaymentConfig> {
     try {
       const dbData = {
+        company_id: data.companyId,
         staff_id: data.staffId,
-        payment_type_id: data.paymentTypeId,
-        amount: data.amount,
-        currency: data.currency || 'RWF',
-        is_active: data.isActive ?? true,
-        effective_date: data.effectiveDate,
-        end_date: data.endDate
+        basic_pay: data.basicPay,
+        payment_type: data.paymentType,
+        allowances: data.allowances || {},
       };
 
       const { data: result, error } = await this.supabase
@@ -91,11 +74,9 @@ export class StaffPaymentConfigService extends BaseService {
   async update(id: string, data: UpdateStaffPaymentConfigData): Promise<StaffPaymentConfig> {
     try {
       const dbData: any = {};
-      if (data.amount !== undefined) dbData.amount = data.amount;
-      if (data.currency !== undefined) dbData.currency = data.currency;
-      if (data.isActive !== undefined) dbData.is_active = data.isActive;
-      if (data.effectiveDate !== undefined) dbData.effective_date = data.effectiveDate;
-      if (data.endDate !== undefined) dbData.end_date = data.endDate;
+      if (data.basicPay !== undefined) dbData.basic_pay = data.basicPay;
+      if (data.paymentType !== undefined) dbData.payment_type = data.paymentType;
+      if (data.allowances !== undefined) dbData.allowances = data.allowances;
 
       const { data: result, error } = await this.supabase
         .from(this.tableName)
@@ -150,13 +131,11 @@ export class StaffPaymentConfigService extends BaseService {
   private mapFromDatabase(dbRow: any): StaffPaymentConfig {
     return {
       id: dbRow.id,
+      companyId: dbRow.company_id,
       staffId: dbRow.staff_id,
-      paymentTypeId: dbRow.payment_type_id,
-      amount: dbRow.amount,
-      currency: dbRow.currency,
-      isActive: dbRow.is_active,
-      effectiveDate: dbRow.effective_date,
-      endDate: dbRow.end_date
+      basicPay: dbRow.basic_pay,
+      paymentType: dbRow.payment_type,
+      allowances: dbRow.allowances || {},
     };
   }
 }

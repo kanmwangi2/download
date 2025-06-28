@@ -1,4 +1,4 @@
-import { Deduction, DeductionType, DeductionRecord } from '../types/deductions';
+import { Deduction, DeductionType } from '../types/deductions';
 import { objectToCamelCase, objectToSnakeCase } from '../case-conversion';
 import { BaseService } from './BaseService';
 
@@ -7,29 +7,33 @@ export class DeductionService extends BaseService {
   private readonly deductionTypesTable = 'deduction_types';
 
   private mapDeductionFromSupabase(d: any): Deduction {
-    const camelCaseDeduction = objectToCamelCase(d);
     return {
-      ...camelCaseDeduction,
-      staffName: `${d.staff.first_name} ${d.staff.last_name}`,
-      deductionTypeName: d.deduction_type.name,
-      balance: (camelCaseDeduction.originalAmount || 0) - (camelCaseDeduction.deductedSoFar || 0),
-    } as Deduction;
+      id: d.id,
+      companyId: d.company_id,
+      staffId: d.staff_id,
+      deductionType: d.deduction_type,
+      amount: d.amount,
+      isPercentage: d.is_percentage,
+      isActive: d.is_active,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+    };
   }
 
-  async createDeduction(deduction: Omit<Deduction, 'id'>): Promise<Deduction> {
+  async createDeduction(deduction: Omit<Deduction, 'id' | 'createdAt' | 'updatedAt'>): Promise<Deduction> {
     try {
-      const { staffName, deductionTypeName, balance, ...rest } = deduction as any;
-      const backendDeduction = objectToSnakeCase(rest);
+      const backendDeduction = objectToSnakeCase(deduction);
       const { data, error } = await this.supabase
         .from(this.staffDeductionsTable)
         .insert(backendDeduction)
-        .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)')
+        .select()
         .single();
 
       if (error) throw error;
       return this.mapDeductionFromSupabase(data);
     } catch (error) {
       this.handleError(error, 'create deduction');
+      throw error;
     }
   }
 
@@ -37,7 +41,7 @@ export class DeductionService extends BaseService {
     try {
       const { data, error } = await this.supabase
         .from(this.staffDeductionsTable)
-        .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)')
+        .select('*')
         .eq('id', id)
         .single();
       if (error) {
@@ -47,6 +51,7 @@ export class DeductionService extends BaseService {
       return data ? this.mapDeductionFromSupabase(data) : null;
     } catch (error) {
       this.handleError(error, 'fetch deduction by id');
+      throw error;
     }
   }
 
@@ -54,13 +59,14 @@ export class DeductionService extends BaseService {
     try {
       const { data, error } = await this.supabase
         .from(this.staffDeductionsTable)
-        .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)')
+        .select('*')
         .eq('company_id', companyId);
 
       if (error) throw error;
       return data.map(d => this.mapDeductionFromSupabase(d));
     } catch (error) {
       this.handleError(error, 'fetch deductions');
+      throw error;
     }
   }
 
@@ -68,48 +74,36 @@ export class DeductionService extends BaseService {
     try {
         const { data, error } = await this.supabase
             .from(this.staffDeductionsTable)
-            .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)')
+            .select('*')
             .eq('staff_id', staffId)
-            .gt('balance', 0);
+            .eq('is_active', true);
 
         if (error) throw error;
         return data.map(d => this.mapDeductionFromSupabase(d));
     } catch (error) {
         this.handleError(error, 'fetch active deductions for staff');
+        throw error;
     }
   }
 
   async updateDeduction(deduction: Deduction): Promise<Deduction> {
     try {
-      const { staffName, deductionTypeName, balance, ...rest } = deduction;
-      const backendUpdates = objectToSnakeCase(rest);
+      const backendUpdates = objectToSnakeCase(deduction);
       const { data, error } = await this.supabase
         .from(this.staffDeductionsTable)
         .update(backendUpdates)
         .eq('id', deduction.id)
-        .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)')
+        .select()
         .single();
       if (error) throw error;
       return this.mapDeductionFromSupabase(data);
     } catch (error) {
       this.handleError(error, 'update deduction');
+      throw error;
     }
   }
 
-  async updateDeductionRecords(deductions: Partial<DeductionRecord>[]): Promise<DeductionRecord[]> {
-    try {
-      const snakeCaseDeductions = deductions.map(d => objectToSnakeCase(d));
-      const { data, error } = await this.supabase
-        .from('staff_deduction_records') 
-        .upsert(snakeCaseDeductions)
-        .select();
-
-      if (error) throw error;
-      return data.map(d => objectToCamelCase(d));
-    } catch (error) {
-      this.handleError(error, 'bulk updating deduction records');
-    }
-  }
+  
 
   async deleteDeductions(ids: string[]): Promise<void> {
     try {
@@ -185,20 +179,18 @@ export class DeductionService extends BaseService {
 
   async bulkUpsertDeductions(deductions: Deduction[]): Promise<Deduction[]> {
     try {
-      const snakeCaseDeductions = deductions.map(d => {
-        const { staffName, deductionTypeName, balance, ...rest } = d;
-        return objectToSnakeCase(rest);
-      });
+      const snakeCaseDeductions = deductions.map(d => objectToSnakeCase(d));
       
       const { data, error } = await this.supabase
         .from('staff_deductions')
         .upsert(snakeCaseDeductions, { onConflict: 'id' })
-        .select('*, staff:staff!inner(first_name, last_name), deduction_type:deduction_types!inner(name)');
+        .select();
 
       if (error) throw error;
       return data.map(d => this.mapDeductionFromSupabase(d));
     } catch (error) {
       this.handleError(error, 'bulk-upsert deductions');
+      throw error;
     }
   }
 }

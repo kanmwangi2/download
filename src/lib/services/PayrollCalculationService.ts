@@ -251,15 +251,14 @@ export class PayrollCalculationService {
 
         for (const dedType of sortedDeductionTypes) {
             const typeSpecificStaffDeductions = activeDeductionsForStaff
-                .filter(d => d.deductionTypeId === dedType.id && (d.balance || 0) > 0 && d.companyId === companyId)
-                .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+                .filter(d => d.deductionType === dedType.name && d.isActive && d.companyId === companyId);
 
             let cumulativeDeductedForThisType = 0;
 
             for (const staffDed of typeSpecificStaffDeductions) {
                 if (remainingNetPayForDeductions <= 0) break;
 
-                const potentialDeductionAmount = Math.min(staffDed.monthlyDeduction || 0, staffDed.balance || 0);
+                const potentialDeductionAmount = staffDed.isPercentage ? (staffDed.amount / 100) * finalTotalGrossSalary : staffDed.amount;
                 const actualAmountApplied = Math.min(potentialDeductionAmount, remainingNetPayForDeductions);
 
                 if (actualAmountApplied > 0) {
@@ -315,7 +314,7 @@ export class PayrollCalculationService {
         employees: EmployeePayrollRecord[],
         companyPaymentTypes: PaymentType[],
         companyDeductionTypes: DeductionType[]
-    ): Partial<PayrollRunDetail> {
+    ): Partial<PayrollRunReport> {
         const dynamicTotalDeductionAmounts: Record<string, number> = {};
         companyDeductionTypes.forEach(dt => dynamicTotalDeductionAmounts[dt.id] = 0);
         employees.forEach(emp => {

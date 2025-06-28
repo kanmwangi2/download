@@ -26,8 +26,8 @@ export class CustomFieldDefinitionService extends BaseService {
         id: cfd.id,
         companyId: cfd.company_id,
         name: cfd.name,
-        type: cfd.type,
-        orderNumber: cfd.order_index,
+        type: cfd.type.charAt(0).toUpperCase() + cfd.type.slice(1) as 'Text' | 'Number' | 'Date',
+        orderIndex: cfd.order_index,
         isDeletable: cfd.is_deletable ?? true
       }));
     } catch (error) {
@@ -56,8 +56,8 @@ export class CustomFieldDefinitionService extends BaseService {
         id: data.id,
         companyId: data.company_id,
         name: data.name,
-        type: data.type,
-        orderNumber: data.order_index,
+        type: data.type.charAt(0).toUpperCase() + data.type.slice(1) as 'Text' | 'Number' | 'Date',
+        orderIndex: data.order_index,
         isDeletable: data.is_deletable ?? true
       };
     } catch (error) {
@@ -76,8 +76,8 @@ export class CustomFieldDefinitionService extends BaseService {
         .insert({
           company_id: customFieldDefinition.companyId,
           name: customFieldDefinition.name,
-          type: customFieldDefinition.type,
-          order_index: customFieldDefinition.orderNumber,
+          type: customFieldDefinition.type.toLowerCase(),
+          order_index: customFieldDefinition.orderIndex,
           is_deletable: customFieldDefinition.isDeletable
         })
         .select()
@@ -90,8 +90,8 @@ export class CustomFieldDefinitionService extends BaseService {
         id: data.id,
         companyId: data.company_id,
         name: data.name,
-        type: data.type,
-        orderNumber: data.order_index,
+        type: data.type.charAt(0).toUpperCase() + data.type.slice(1) as 'Text' | 'Number' | 'Date',
+        orderIndex: data.order_index,
         isDeletable: data.is_deletable ?? true
       };
     } catch (error) {
@@ -109,8 +109,8 @@ export class CustomFieldDefinitionService extends BaseService {
       
       if (updates.companyId !== undefined) updateData.company_id = updates.companyId;
       if (updates.name !== undefined) updateData.name = updates.name;
-      if (updates.type !== undefined) updateData.type = updates.type;
-      if (updates.orderNumber !== undefined) updateData.order_index = updates.orderNumber;
+      if (updates.type !== undefined) updateData.type = updates.type.toLowerCase();
+      if (updates.orderIndex !== undefined) updateData.order_index = updates.orderIndex;
       if (updates.isDeletable !== undefined) updateData.is_deletable = updates.isDeletable;
 
       const { data, error } = await this.supabase
@@ -127,8 +127,8 @@ export class CustomFieldDefinitionService extends BaseService {
         id: data.id,
         companyId: data.company_id,
         name: data.name,
-        type: data.type,
-        orderNumber: data.order_index,
+        type: data.type.charAt(0).toUpperCase() + data.type.slice(1) as 'Text' | 'Number' | 'Date',
+        orderIndex: data.order_index,
         isDeletable: data.is_deletable ?? true
       };
     } catch (error) {

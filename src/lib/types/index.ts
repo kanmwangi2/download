@@ -10,5 +10,4 @@ export type { StaffMember, StaffStatus, EmployeeCategory } from './staff';
 export type { PaymentType } from './payments';
 
 // Export deduction-related types explicitly to avoid conflicts
-export type { DeductionType as DeductionTypeDef } from './deductionTypes';
-export type { Deduction, DeductionRecord, DeductionStatus, StaffDeduction } from './deductions';
+export type { DeductionType, Deduction, DeductionRecord, DeductionStatus, StaffDeduction } from './deductions';

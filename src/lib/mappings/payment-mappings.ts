@@ -1,5 +1,4 @@
-import { PaymentType } from "@/lib/types";
-import { StaffPaymentConfig } from "@/lib/types/staff";
+import { PaymentType, StaffPaymentConfig } from "@/lib/types";
 
 export function paymentTypeToBackend(paymentType: PaymentType | Omit<PaymentType, 'id'>): Record<string, unknown> {
   return {
@@ -32,44 +31,21 @@ export function paymentTypeFromBackend(paymentType: Record<string, any>): Paymen
 export function staffPaymentConfigToBackend(config: StaffPaymentConfig | Omit<StaffPaymentConfig, 'id'>): Record<string, unknown> {
     return {
         ...(('id' in config) && { id: config.id }),
+        company_id: config.companyId,
         staff_id: config.staffId,
-        payment_type_id: config.paymentTypeId,
-        amount: config.amount,
-        is_active: config.isActive,
-        effective_date: config.effectiveDate,
+        basic_pay: config.basicPay,
+        payment_type: config.paymentType,
+        allowances: config.allowances,
     };
 }
 
 export function staffPaymentConfigFromBackend(config: Record<string, any>): StaffPaymentConfig {
     return {
         id: config.id,
+        companyId: config.company_id,
         staffId: config.staff_id,
-        paymentTypeId: config.payment_type_id,
-        amount: config.amount,
-        isActive: config.is_active,
-        effectiveDate: config.effective_date,
-    };
-}
-
-// Legacy compatibility functions for existing services
-export function staffPaymentFromBackend(payment: Record<string, any>): any {
-    return {
-        id: payment.id,
-        staffId: payment.staff_id,
-        paymentTypeId: payment.payment_type_id,
-        amount: payment.amount,
-        effectiveDate: payment.effective_date,
-        endDate: payment.end_date,
-    };
-}
-
-export function staffPaymentToBackend(payment: any): Record<string, unknown> {
-    return {
-        id: payment.id,
-        staff_id: payment.staffId,
-        payment_type_id: payment.paymentTypeId,
-        amount: payment.amount,
-        effective_date: payment.effectiveDate,
-        end_date: payment.endDate,
+        basicPay: config.basic_pay,
+        paymentType: config.payment_type,
+        allowances: config.allowances,
     };
 }

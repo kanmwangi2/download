@@ -51,11 +51,10 @@ export interface DeductionType {
   id: string;
   companyId: string;
   name: string;
+  orderNumber: number;
+  isFixedName: boolean;
+  isDeletable: boolean;
   description?: string;
-  isActive: boolean;
-  isPercentage: boolean;
-  defaultAmount?: number;
-  maxAmount?: number;
   createdAt: string;
   updatedAt: string;
 }

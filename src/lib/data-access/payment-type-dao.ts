@@ -13,6 +13,8 @@ export interface PaymentType extends BaseEntity {
   orderNumber: number;
   isFixedName: boolean;
   isDeletable: boolean;
+  isTaxable: boolean;
+  isPensionable: boolean;
   description?: string;
   createdAt: string;
   updatedAt: string;
@@ -32,6 +34,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
       orderNumber: record.order_number || 0,
       isFixedName: record.is_fixed_name || false,
       isDeletable: record.is_deletable || true,
+      isTaxable: record.is_taxable || true,
+      isPensionable: record.is_pensionable || true,
       description: record.description,
       createdAt: record.created_at,
       updatedAt: record.updated_at,
@@ -47,6 +51,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
       ...(entity.orderNumber !== undefined && { order_number: entity.orderNumber }),
       ...(entity.isFixedName !== undefined && { is_fixed_name: entity.isFixedName }),
       ...(entity.isDeletable !== undefined && { is_deletable: entity.isDeletable }),
+      ...(entity.isTaxable !== undefined && { is_taxable: entity.isTaxable }),
+      ...(entity.isPensionable !== undefined && { is_pensionable: entity.isPensionable }),
       ...(entity.description !== undefined && { description: entity.description }),
     };
   }
@@ -133,6 +139,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
         orderNumber: 1,
         isFixedName: true,
         isDeletable: false,
+        isTaxable: true,
+        isPensionable: true,
         description: 'Base salary amount'
       },
       {
@@ -142,6 +150,8 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
         orderNumber: 2,
         isFixedName: true,
         isDeletable: false,
+        isTaxable: true,
+        isPensionable: true,
         description: 'Transportation allowance'
       }
     ];

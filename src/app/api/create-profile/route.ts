@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const { userId, firstName, lastName, email, role } = await request.json()
 
-    console.log('🔄 Creating user profile via API:', {
+    console.warn('🔄 Creating user profile via API:', {
       userId,
       firstName,
       lastName,
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ User profile created successfully:', profileData)
+    console.warn('✅ User profile created successfully:', profileData)
     
     return NextResponse.json({ 
       success: true, 

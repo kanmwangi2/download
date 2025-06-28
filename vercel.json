@@ -1,14 +1,26 @@
 {
-  "buildCommand": "npm run build",
-  "framework": "nextjs",
-  "installCommand": "npm install",
-  "env": {
-    "NODE_OPTIONS": "--max-old-space-size=4096 --stack-size=4096",
-    "NEXT_PRIVATE_STANDALONE": "true"
-  },
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "probes": [
+    {
+      "path": "/api/debug-auth",
+      "mustContain": "Cheetah Payroll API is running"
+    }
+  ],
   "functions": {
-    "app/api/**/*.ts": {
+    "src/app/**/*.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/sync-data",
+      "schedule": "0 5 * * *"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/docs",
+      "destination": "/documentation"
+    }
+  ]
 }

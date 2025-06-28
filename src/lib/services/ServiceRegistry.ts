@@ -2,6 +2,11 @@
  * Service Registry
  * Central registry for all services following the Singleton pattern
  * Provides a single point of access to all application services
+ * 
+ * ARCHITECTURAL NOTE: This registry uses the Service Locator pattern. While this is effective
+ * for managing dependencies in a monolithic structure, it's crucial to avoid over-reliance on it.
+ * Services should remain as decoupled as possible. Avoid creating a "god object" where all
+ * services depend on the registry for all other services. Pass dependencies explicitly when possible.
  */
 import { PaymentTypeService } from './PaymentTypeService';
 import { StaffService } from './StaffService';

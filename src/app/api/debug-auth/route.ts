@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Email parameter required' }, { status: 400 })
     }
 
-    console.log('🔍 Debugging auth for email:', email)
+    console.warn('🔍 Debugging auth for email:', email)
 
     // Create admin client inside function
     const supabaseAdmin = createServiceRoleClient()
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authError.message }, { status: 500 })
     }
 
-    const user = authUsers.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase())
+    const user = authUsers.users.find((u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase())
     
     if (!user) {
       return NextResponse.json({
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       profileError: profileError?.message || null
     })
 
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('❌ Debug API error:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

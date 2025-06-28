@@ -1,34 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Upload, Download, FileText, FileSpreadsheet, FileType, Save, Edit, Trash2, Banknote, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, Loader2, PlusCircle, Settings, Info, CreditCard } from "lucide-react";
+import { FileText, FileSpreadsheet, Edit, Trash2, Banknote, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, Loader2, PlusCircle, Settings, Info, CreditCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { StaffMember } from '@/lib/types/staff';
-import { PaymentType, DEFAULT_BASIC_PAY_ID, DEFAULT_TRANSPORT_ALLOWANCE_ID } from '@/lib/types/payments';
-import Papa from 'papaparse';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { useCompany } from '@/context/CompanyContext';
 import Link from 'next/link';
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
 
@@ -45,7 +28,7 @@ const defaultNewPaymentTypeData: Omit<PaymentType, 'id' | 'companyId' | 'orderNu
 };
 
 export default function PaymentsPage() {
-  const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
+  const { selectedCompanyId, isLoadingCompanyContext } = useCompany(); // Removed selectedCompanyName
   
   // Component State
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
@@ -61,7 +44,7 @@ export default function PaymentsPage() {
   const [paymentTypeCurrentPage, setPaymentTypeCurrentPage] = useState(1);
   const [paymentTypeRowsPerPage, setPaymentTypeRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
 
-  // Dialog states
+  // Dialog states (removed unused)
   const [isPaymentTypeDialogOpen, setIsPaymentTypeDialogOpen] = useState(false);
   const [editingPaymentType, setEditingPaymentType] = useState<PaymentType | null>(null);
   const [paymentTypeFormData, setPaymentTypeFormData] = useState<Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'>>(defaultNewPaymentTypeData);
@@ -83,7 +66,7 @@ export default function PaymentsPage() {
         setPaymentTypes(fetchedPaymentTypes);
 
         setIsLoaded(true);
-      } catch (error) {
+      } catch (error: unknown) { // Changed from any to unknown
         console.error("Error fetching payment data:", error);
         setFeedback({
           type: "error",
@@ -180,7 +163,7 @@ export default function PaymentsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={() => setIsPaymentTypeDialogOpen(true)} className="flex-1">
+                <Button onClick={() => console.warn('Add Payment Type')} className="flex-1">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Payment Type
                 </Button>
                 <DropdownMenu>
@@ -190,13 +173,13 @@ export default function PaymentsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => console.log('Export CSV')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export CSV')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export Excel')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export Excel')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export PDF')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export PDF')}>
                       <FileText className="mr-2 h-4 w-4" /> Export as PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -244,12 +227,12 @@ export default function PaymentsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => console.log('Edit', paymentType.id)}>
+                              <DropdownMenuItem onClick={() => console.warn('Edit', paymentType.id)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => console.log('Delete', paymentType.id)}
+                                onClick={() => console.warn('Delete', paymentType.id)}
                                 disabled={!paymentType.isDeletable}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />

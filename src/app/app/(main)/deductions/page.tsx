@@ -7,13 +7,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { PlusCircle, Edit, Trash2, Upload, Download, FileText, FileSpreadsheet, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, BadgeMinus, Settings } from "lucide-react";
+import { PlusCircle, Edit, Trash2, FileText, FileSpreadsheet, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, BadgeMinus, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useCompany } from '@/context/CompanyContext';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select';
 import { FeedbackAlert, type FeedbackMessage } from '@/components/ui/feedback-alert';
 
 // Import services
@@ -21,13 +21,12 @@ import { ServiceRegistry } from '@/lib/services/ServiceRegistry';
 
 // Import proper types
 import { DeductionType } from '@/lib/types/deductionTypes';
-import { StaffDeduction, Deduction } from '@/lib/types/deductions';
-import { StaffMember } from '@/lib/types/staff';
+import { StaffDeduction } from '@/lib/types/deductions';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500, 1000];
 
 export default function DeductionsPage() {
-  const { selectedCompanyId, selectedCompanyName, isLoadingCompanyContext } = useCompany();
+  const { selectedCompanyId, isLoadingCompanyContext } = useCompany();
   
   // Component State
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
@@ -65,7 +64,7 @@ export default function DeductionsPage() {
         setDeductionTypes([]);
         setStaffDeductions([]);
         setIsLoaded(true);
-      } catch (error) {
+      } catch (error: unknown) { // Changed from any to unknown
         console.error("Error fetching deduction data:", error);
         setFeedback({
           type: "error",
@@ -176,7 +175,7 @@ export default function DeductionsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={() => console.log('Add Deduction Type')} className="flex-1">
+                <Button onClick={() => console.warn('Add Deduction Type')} className="flex-1">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Deduction Type
                 </Button>
                 <DropdownMenu>
@@ -186,13 +185,13 @@ export default function DeductionsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => console.log('Export CSV')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export CSV')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export Excel')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export Excel')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export PDF')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export PDF')}>
                       <FileText className="mr-2 h-4 w-4" /> Export as PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -238,12 +237,12 @@ export default function DeductionsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => console.log('Edit', deductionType.id)}>
+                              <DropdownMenuItem onClick={() => console.warn('Edit', deductionType.id)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => console.log('Delete', deductionType.id)}
+                                onClick={() => console.warn('Delete', deductionType.id)}
                                 disabled={!deductionType.isDeletable}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -351,7 +350,7 @@ export default function DeductionsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={() => console.log('Add Staff Deduction')} className="flex-1">
+                <Button onClick={() => console.warn('Add Staff Deduction')} className="flex-1">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Staff Deduction
                 </Button>
                 <DropdownMenu>
@@ -361,13 +360,13 @@ export default function DeductionsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => console.log('Export CSV')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export CSV')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export Excel')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export Excel')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log('Export PDF')}>
+                    <DropdownMenuItem onClick={() => console.warn('Export PDF')}>
                       <FileText className="mr-2 h-4 w-4" /> Export as PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -421,11 +420,11 @@ export default function DeductionsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => console.log('Edit', deduction.id)}>
+                              <DropdownMenuItem onClick={() => console.warn('Edit', deduction.id)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => console.log('Delete', deduction.id)}>
+                              <DropdownMenuItem onClick={() => console.warn('Delete', deduction.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
                               </DropdownMenuItem>

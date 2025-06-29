@@ -246,7 +246,6 @@ export default function StaffDetailPage() {
             </CardContent>
           </Card>
           
-          {/* Custom Information Card - New */}
           {companyCustomFields.length > 0 && (
             <Card>
                 <CardHeader><CardTitle className="flex items-center"><User className="mr-2 h-5 w-5 text-primary" />Custom Information</CardTitle></CardHeader>

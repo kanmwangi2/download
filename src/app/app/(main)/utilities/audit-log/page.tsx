@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar, Filter, Download, Search, RefreshCw, ClipboardList } from "lucide-react";
+import { Filter, Download, Search, RefreshCw, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 
 // Force dynamic rendering to avoid build-time prerendering issues
@@ -100,7 +100,7 @@ const mockAuditLogs: AuditLogEntry[] = [
 ];
 
 export default function AuditLogPage() {
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(mockAuditLogs);
+  const [_auditLogs, _setAuditLogs] = useState<AuditLogEntry[]>(mockAuditLogs);
   const [filteredLogs, setFilteredLogs] = useState<AuditLogEntry[]>(mockAuditLogs);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,11 +109,11 @@ export default function AuditLogPage() {
   const [dateFilter, setDateFilter] = useState<string>('all');
 
   // Unique actions and severities for filter dropdowns
-  const uniqueActions = Array.from(new Set(auditLogs.map(log => log.action)));
-  const uniqueSeverities = Array.from(new Set(auditLogs.map(log => log.severity)));
+  const uniqueActions = Array.from(new Set(_auditLogs.map(log => log.action)));
+  const uniqueSeverities = Array.from(new Set(_auditLogs.map(log => log.severity)));
 
   useEffect(() => {
-    let filtered = auditLogs;
+    let filtered = _auditLogs;
 
     // Apply search filter
     if (searchTerm) {
@@ -160,7 +160,7 @@ export default function AuditLogPage() {
     filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
     setFilteredLogs(filtered);
-  }, [auditLogs, searchTerm, actionFilter, severityFilter, dateFilter]);
+  }, [_auditLogs, searchTerm, actionFilter, severityFilter, dateFilter]);
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -172,7 +172,7 @@ export default function AuditLogPage() {
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    console.log('Exporting audit logs...');
+    // console.log('Exporting audit logs...');
   };
 
   const getSeverityColor = (severity: string) => {
@@ -282,7 +282,7 @@ export default function AuditLogPage() {
           {(searchTerm || actionFilter !== 'all' || severityFilter !== 'all' || dateFilter !== 'all') && (
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing {filteredLogs.length} of {auditLogs.length} entries
+                Showing {filteredLogs.length} of {_auditLogs.length} entries
               </p>
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 Clear Filters

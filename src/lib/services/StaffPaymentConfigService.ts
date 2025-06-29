@@ -73,7 +73,7 @@ export class StaffPaymentConfigService extends BaseService {
 
   async update(id: string, data: UpdateStaffPaymentConfigData): Promise<StaffPaymentConfig> {
     try {
-      const dbData: any = {};
+      const dbData: Partial<Record<string, unknown>> = {};
       if (data.basicPay !== undefined) dbData.basic_pay = data.basicPay;
       if (data.paymentType !== undefined) dbData.payment_type = data.paymentType;
       if (data.allowances !== undefined) dbData.allowances = data.allowances;
@@ -128,7 +128,7 @@ export class StaffPaymentConfigService extends BaseService {
     }
   }
 
-  private mapFromDatabase(dbRow: any): StaffPaymentConfig {
+  private mapFromDatabase(dbRow: unknown): StaffPaymentConfig {
     return {
       id: dbRow.id,
       companyId: dbRow.company_id,

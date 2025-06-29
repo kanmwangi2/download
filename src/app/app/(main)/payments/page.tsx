@@ -46,9 +46,9 @@ export default function PaymentsPage() {
   const [paymentTypeRowsPerPage, setPaymentTypeRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[1]);
 
   // Dialog states (removed unused)
-  const [isPaymentTypeDialogOpen, setIsPaymentTypeDialogOpen] = useState(false);
-  const [editingPaymentType, setEditingPaymentType] = useState<PaymentType | null>(null);
-  const [paymentTypeFormData, setPaymentTypeFormData] = useState<Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'>>(defaultNewPaymentTypeData);
+  const [_isPaymentTypeDialogOpen, _setIsPaymentTypeDialogOpen] = useState(false);
+  const [_editingPaymentType, _setEditingPaymentType] = useState<PaymentType | null>(null);
+  const [_paymentTypeFormData, _setPaymentTypeFormData] = useState<Omit<PaymentType, 'id' | 'companyId' | 'orderNumber' | 'isFixedName' | 'isDeletable'>>(defaultNewPaymentTypeData);
 
   useEffect(() => {
     setServices(ServiceRegistry.getInstance());

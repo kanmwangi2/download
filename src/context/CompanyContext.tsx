@@ -36,7 +36,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Failed to fetch user profile');
       }
       const profile = await response.json();
-      setUserProfile(profile as any);
+      setUserProfile(profile as UserProfile);
 
       if (profile && profile.companies && profile.companies.length > 0) {
         const firstCompany = profile.companies[0];

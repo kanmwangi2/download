@@ -68,6 +68,28 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       // Default error UI
+      let devErrorDetails = null;
+      if (process.env.NODE_ENV === 'development' && this.state.error) {
+        devErrorDetails = (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Error Details (Development Only):</h3>
+            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">
+              {this.state.error!.message}
+              {'\n\n'}
+              {this.state.error!.stack}
+            </pre>
+            {this.state.errorInfo ? (
+              <>
+                <h3 className="text-sm font-semibold">Component Stack:</h3>
+                <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">
+                  {this.state.errorInfo.componentStack}
+                </pre>
+              </>
+            ) : null}
+          </div>
+        );
+      }
+
       return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-background">
           <Card className="w-full max-w-2xl">
@@ -86,24 +108,7 @@ class ErrorBoundary extends Component<Props, State> {
                 </AlertDescription>
               </Alert>
 
-              {process.env.NODE_ENV === 'development' && this.state.error && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Error Details (Development Only):</h3>
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">
-                    {this.state.error.message}
-                    {'\n\n'}
-                    {this.state.error.stack}
-                  </pre>
-                  {this.state.errorInfo && (
-                    <>
-                      <h3 className="text-sm font-semibold">Component Stack:</h3>
-                      <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">
-                        {this.state.errorInfo.componentStack}
-                      </pre>
-                    </>
-                  )}
-                </div>
-              )}
+              {devErrorDetails}
 
               <div className="flex gap-2 pt-4">
                 <Button onClick={this.handleReset} variant="outline">

@@ -25,5 +25,5 @@ export interface GlobalApplicationCompany {
   id: string;
   name: string;
   isDefault: boolean;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }

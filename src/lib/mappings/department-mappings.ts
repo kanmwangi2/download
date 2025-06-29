@@ -9,7 +9,7 @@ export function departmentToBackend(department: Department | Omit<Department, 'i
   };
 }
 
-export function departmentFromBackend(department: Record<string, any>): Department {
+export function departmentFromBackend(department: Record<string, unknown>): Department {
   return {
     id: department.id,
     companyId: department.company_id,

@@ -76,7 +76,7 @@ export async function ensureUserProfile() {
       if (insertError) {
         console.error('Error creating user profile:', insertError);
       } else {
-        console.log('✅ User profile created successfully');
+        // console.log('✅ User profile created successfully');
       }
     }
   } catch (error) {

@@ -35,7 +35,7 @@ export function staffToBackend(staff: StaffMember | Omit<StaffMember, 'id'>): Re
   };
 }
 
-export function staffFromBackend(staff: Record<string, any>): StaffMember {
+export function staffFromBackend(staff: Record<string, unknown>): StaffMember {
   return {
     id: staff.id,
     companyId: staff.company_id,

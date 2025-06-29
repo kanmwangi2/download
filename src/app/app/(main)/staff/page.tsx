@@ -68,7 +68,7 @@ export default function StaffPage() {
   
   // Component State
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [_isLoaded, _setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("staff");
   const [customFieldDialogFeedback, setCustomFieldDialogFeedback] = useState<FeedbackMessage | null>(null);
   const [deleteCustomFieldDialogFeedback, setDeleteCustomFieldDialogFeedback] = useState<FeedbackMessage | null>(null);
@@ -115,7 +115,7 @@ export default function StaffPage() {
         }
         return;
       }
-      setIsLoaded(false);
+      _setIsLoaded(false);
       setFeedback(null);
       
       try {
@@ -208,12 +208,12 @@ export default function StaffPage() {
     const dataToExport = allStaffForCompanyUI.map(staff => {
         const row: Record<string, string | number> = {};
         staffDataColumnsForExport.forEach(col => {
-            let value: any;
+            let value: unknown;
             if (col.key.startsWith('custom_')) {
                 const cfdId = col.key.substring(7);
                 value = staff.customFields?.[cfdId];
             } else {
-                value = (staff as any)[col.key];
+                value = staff[col.key as keyof StaffMember];
             }
 
             if (col.isIdLike) {
@@ -298,9 +298,9 @@ export default function StaffPage() {
             const parsedData: StaffMember[] = []; const validationSkippedLog: string[] = []; let processedDataRowCount = 0;
             const headerToStaffKeyMap: Record<string, keyof StaffMember | `custom_${string}`> = {};
             staffDataColumnsForExport.forEach(col => { headerToStaffKeyMap[col.label.toLowerCase().replace(/\s+/g, '')] = col.key as keyof StaffMember | `custom_${string}`; });
-            results.data.forEach((rawRow: any, index: number) => {
+            results.data.forEach((rawRow: Record<string, unknown>, index: number) => {
               processedDataRowCount++; const originalLineNumber = index + 2;
-              const staffObject: any = { companyId: currentCompanyId, customFields: {} };
+              const staffObject: Record<string, unknown> = { companyId: currentCompanyId, customFields: {} };
               let rowParseError = false;
               for (const csvHeader in rawRow) {
                 const normalizedCsvHeader = csvHeader.trim().toLowerCase().replace(/\s+/g, '');

@@ -105,7 +105,7 @@ export const logConfig = () => {
     hasEncryptionKey: !!config.encryptionKey,
   };
 
-  console.log('Environment Configuration:', safeConfig);
+  // console.log('Environment Configuration:', safeConfig);
 };
 
 // Runtime configuration validation

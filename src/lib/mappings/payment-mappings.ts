@@ -14,7 +14,7 @@ export function paymentTypeToBackend(paymentType: PaymentType | Omit<PaymentType
   };
 }
 
-export function paymentTypeFromBackend(paymentType: Record<string, any>): PaymentType {
+export function paymentTypeFromBackend(paymentType: Record<string, unknown>): PaymentType {
   return {
     id: paymentType.id,
     companyId: paymentType.company_id,
@@ -39,7 +39,7 @@ export function staffPaymentConfigToBackend(config: StaffPaymentConfig | Omit<St
     };
 }
 
-export function staffPaymentConfigFromBackend(config: Record<string, any>): StaffPaymentConfig {
+export function staffPaymentConfigFromBackend(config: Record<string, unknown>): StaffPaymentConfig {
     return {
         id: config.id,
         companyId: config.company_id,

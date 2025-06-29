@@ -72,13 +72,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {message && (
+          {message ? (
             <Alert className={`mt-4 ${message.type === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
               <AlertDescription className={message.type === 'error' ? 'text-red-800' : 'text-green-800'}>
                 {message.text}
               </AlertDescription>
             </Alert>
-          )}
+          ) : null}
 
           <div className="mt-6 text-center">
             <button

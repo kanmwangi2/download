@@ -25,7 +25,7 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
     super('payment_types', true); // Company-scoped table
   }
 
-  protected fromDatabase(record: any): PaymentType {
+  protected fromDatabase(record: unknown): PaymentType {
     return {
       id: record.id,
       companyId: record.company_id,
@@ -42,7 +42,7 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
     };
   }
 
-  protected toDatabase(entity: Partial<PaymentType>): any {
+  protected toDatabase(entity: Partial<PaymentType>): unknown {
     return {
       ...(entity.id && { id: entity.id }),
       ...(entity.companyId && { company_id: entity.companyId }),
@@ -79,7 +79,7 @@ export class PaymentTypeDAO extends BaseDAO<PaymentType> {
       throw new Error(`Failed to fetch ordered payment types: ${error.message}`);
     }
 
-    return (data || []).map((record: any) => this.fromDatabase(record));
+    return (data || []).map((record: unknown) => this.fromDatabase(record));
   }
 
   /**

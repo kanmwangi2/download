@@ -50,7 +50,7 @@ export class CurrencyFormatter {
   /**
    * Validate currency amount
    */
-  static isValidAmount(amount: any): boolean {
+  static isValidAmount(amount: unknown): boolean {
     return typeof amount === 'number' && !isNaN(amount) && isFinite(amount) && amount >= 0;
   }
 }
@@ -144,14 +144,14 @@ export class Validator {
   /**
    * Validate required string field
    */
-  static isValidString(value: any, minLength: number = 1): boolean {
+  static isValidString(value: unknown, minLength: number = 1): boolean {
     return typeof value === 'string' && value.trim().length >= minLength;
   }
 
   /**
    * Validate numeric field
    */
-  static isValidNumber(value: any, min?: number, max?: number): boolean {
+  static isValidNumber(value: unknown, min?: number, max?: number): boolean {
     if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
       return false;
     }
@@ -176,7 +176,7 @@ export class FileExporter {
   /**
    * Convert array of objects to CSV
    */
-  static arrayToCSV(data: any[], headers?: string[]): string {
+  static arrayToCSV(data: unknown[], headers?: string[]): string {
     if (data.length === 0) return '';
 
     // Use provided headers or extract from first object
@@ -197,7 +197,7 @@ export class FileExporter {
    * Escape CSV field (handle commas, quotes, newlines)
    */
   private static escapeCSVField(field: any): string {
-    const stringField = String(field);
+    const stringField = String(field || '');
     if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
       return `"${stringField.replace(/"/g, '""')}"`;
     }
@@ -207,7 +207,7 @@ export class FileExporter {
   /**
    * Download data as CSV file
    */
-  static downloadCSV(data: any[], filename: string, headers?: string[]): void {
+  static downloadCSV(data: unknown[], filename: string, headers?: string[]): void {
     const csv = this.arrayToCSV(data, headers);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -227,7 +227,7 @@ export class FileExporter {
   /**
    * Download data as JSON file
    */
-  static downloadJSON(data: any, filename: string): void {
+  static downloadJSON(data: unknown, filename: string): void {
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
     const link = document.createElement('a');
@@ -253,11 +253,11 @@ export class CSVParser {
   /**
    * Generate CSV string from array of data
    */
-  static generateCSV(data: any[][], headers?: string[]): string {
+  static generateCSV(data: unknown[][], headers?: string[]): string {
     const allRows = headers ? [headers, ...data] : data;
     
     return allRows.map(row => {
-      return row.map((cell: any) => {
+      return row.map((cell: unknown) => {
         const cellStr = String(cell || '');
         // Escape quotes and wrap in quotes if contains comma, quote, or newline
         if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
@@ -271,7 +271,7 @@ export class CSVParser {
   /**
    * Parse CSV string to array of objects
    */
-  static parse(csvString: string, hasHeaders: boolean = true): any[] {
+  static parse(csvString: string, hasHeaders: boolean = true): unknown[] {
     const lines = csvString.trim().split('\n');
     if (lines.length === 0) return [];
 
@@ -282,7 +282,7 @@ export class CSVParser {
       const values = this.parseCSVLine(line);
       
       if (headers) {
-        const obj: any = {};
+        const obj: Record<string, unknown> = {};
         headers.forEach((header, i) => {
           obj[header] = values[i] || '';
         });

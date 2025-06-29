@@ -30,7 +30,7 @@ export const createAppError = (
 });
 
 // Handle Supabase errors consistently
-export const handleSupabaseError = (error: any): AppError => {
+export const handleSupabaseError = (error: unknown): AppError => {
   if (!error) {
     return createAppError('UNKNOWN_ERROR', 'An unknown error occurred');
   }
@@ -150,7 +150,7 @@ export const withErrorHandling = async <T>(
 };
 
 // Validation helper for common form patterns
-export const validateRequired = (value: any, fieldName: string): string | null => {
+export const validateRequired = (value: unknown, fieldName: string): string | null => {
   if (!value || (typeof value === 'string' && value.trim() === '')) {
     return `${fieldName} is required`;
   }
@@ -174,7 +174,7 @@ export const validatePhone = (phone: string): string | null => {
 };
 
 // Form validation helper
-export const validateForm = (data: Record<string, any>, rules: Record<string, (value: any) => string | null>): Record<string, string> => {
+export const validateForm = (data: Record<string, unknown>, rules: Record<string, (value: unknown) => string | null>): Record<string, string> => {
   const errors: Record<string, string> = {};
   
   for (const [field, validator] of Object.entries(rules)) {

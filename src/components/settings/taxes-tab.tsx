@@ -12,24 +12,7 @@ import { getSupabaseClientAsync } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/CompanyContext';
 
-export interface TaxSettingsData {
-  id?: string; // Now optional, as it might not exist for a new company
-  companyId?: string; // Added to explicitly manage company context
-  payeBand1Limit: number;
-  payeBand2Limit: number;
-  payeBand3Limit: number;
-  payeRate1: number;
-  payeRate2: number;
-  payeRate3: number;
-  payeRate4: number;
-  pensionEmployerRate: number;
-  pensionEmployeeRate: number;
-  maternityEmployerRate: number;
-  maternityEmployeeRate: number;
-  cbhiRate: number;
-  ramaEmployerRate: number;
-  ramaEmployeeRate: number;
-}
+
 
 const getDefaultSettings = (companyId: string | null): TaxSettingsData => {
   const defaultValues = {
@@ -59,11 +42,7 @@ const getDefaultSettings = (companyId: string | null): TaxSettingsData => {
   return defaultValues;
 };
 
-type FeedbackMessage = {
-  type: 'success' | 'error' | 'info';
-  message: string;
-  details?: string;
-};
+
 
 import { objectToSnakeCase, objectToCamelCase } from '@/lib/case-conversion';
 

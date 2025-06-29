@@ -22,7 +22,7 @@ export class DeductionDAO extends BaseDAO<Deduction> {
     super('staff_deductions', true); // Company-scoped table
   }
 
-  protected fromDatabase(record: any): Deduction {
+  protected fromDatabase(record: unknown): Deduction {
     return {
       id: record.id,
       companyId: record.company_id,
@@ -36,7 +36,7 @@ export class DeductionDAO extends BaseDAO<Deduction> {
     };
   }
 
-  protected toDatabase(entity: Partial<Deduction>): any {
+  protected toDatabase(entity: Partial<Deduction>): unknown {
     return {
       ...(entity.id && { id: entity.id }),
       ...(entity.companyId && { company_id: entity.companyId }),

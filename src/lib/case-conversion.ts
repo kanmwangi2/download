@@ -28,16 +28,16 @@ export function snakeToCamelCase(str: string): string {
  * @param obj - The object to convert
  * @returns A new object with snake_case keys
  */
-export function objectToSnakeCase<T = any>(obj: any): T {
+export function objectToSnakeCase<T = unknown>(obj: unknown): T {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
-    return obj;
+    return obj as T;
   }
 
   if (Array.isArray(obj)) {
     return obj.map(item => objectToSnakeCase(item)) as T;
   }
 
-  const converted: any = {};
+  const converted: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const snakeKey = camelToSnakeCase(key);
     converted[snakeKey] = typeof value === 'object' && value !== null
@@ -53,16 +53,16 @@ export function objectToSnakeCase<T = any>(obj: any): T {
  * @param obj - The object to convert
  * @returns A new object with camelCase keys
  */
-export function objectToCamelCase<T = any>(obj: any): T {
+export function objectToCamelCase<T = unknown>(obj: unknown): T {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
-    return obj;
+    return obj as T;
   }
 
   if (Array.isArray(obj)) {
     return obj.map(item => objectToCamelCase(item)) as T;
   }
 
-  const converted: any = {};
+  const converted: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const camelKey = snakeToCamelCase(key);
     converted[camelKey] = typeof value === 'object' && value !== null
@@ -87,12 +87,12 @@ export interface FieldMapping {
  * @param mapping - Custom field mapping configuration
  * @returns The backend-formatted object
  */
-export function objectToBackendWithMapping<T = any>(obj: any, mapping: FieldMapping): T {
+export function objectToBackendWithMapping<T = unknown>(obj: unknown, mapping: FieldMapping): T {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
-    return obj;
+    return obj as T;
   }
 
-  const converted: any = { ...obj };
+  const converted: Record<string, unknown> = { ...obj as Record<string, unknown> };
   
   // Apply custom mappings first
   for (const [frontendKey, backendKey] of Object.entries(mapping)) {
@@ -112,13 +112,13 @@ export function objectToBackendWithMapping<T = any>(obj: any, mapping: FieldMapp
  * @param mapping - Custom field mapping configuration (frontend key -> backend key)
  * @returns The frontend-formatted object
  */
-export function objectFromBackendWithMapping<T = any>(obj: any, mapping: FieldMapping): T {
+export function objectFromBackendWithMapping<T = unknown>(obj: unknown, mapping: FieldMapping): T {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
-    return obj;
+    return obj as T;
   }
 
   // First convert all to camelCase
-  const converted: any = objectToCamelCase(obj);
+  const converted: Record<string, unknown> = objectToCamelCase(obj);
   
   // Apply reverse mappings (backend key -> frontend key)
   const reverseMapping: { [backendKey: string]: string } = {};
@@ -205,64 +205,64 @@ export const COMMON_MAPPINGS = {
  */
 
 // User conversions
-export function userToBackend(user: any): any {
+export function userToBackend(user: unknown): unknown {
   return objectToBackendWithMapping(user, COMMON_MAPPINGS.USER);
 }
 
-export function userFromBackend(user: any): any {
+export function userFromBackend(user: unknown): unknown {
   return objectFromBackendWithMapping(user, COMMON_MAPPINGS.USER);
 }
 
 // Company conversions
-export function companyToBackend(company: any): any {
+export function companyToBackend(company: unknown): unknown {
   return objectToBackendWithMapping(company, COMMON_MAPPINGS.COMPANY);
 }
 
-export function companyFromBackend(company: any): any {
+export function companyFromBackend(company: unknown): unknown {
   return objectFromBackendWithMapping(company, COMMON_MAPPINGS.COMPANY);
 }
 
 // Staff conversions
-export function staffToBackend(staff: any): any {
+export function staffToBackend(staff: unknown): unknown {
   return objectToBackendWithMapping(staff, COMMON_MAPPINGS.STAFF);
 }
 
-export function staffFromBackend(staff: any): any {
+export function staffFromBackend(staff: unknown): unknown {
   return objectFromBackendWithMapping(staff, COMMON_MAPPINGS.STAFF);
 }
 
 // Deduction conversions
-export function deductionToBackend(deduction: any): any {
+export function deductionToBackend(deduction: unknown): unknown {
   return objectToBackendWithMapping(deduction, COMMON_MAPPINGS.DEDUCTION);
 }
 
-export function deductionFromBackend(deduction: any): any {
+export function deductionFromBackend(deduction: unknown): unknown {
   return objectFromBackendWithMapping(deduction, COMMON_MAPPINGS.DEDUCTION);
 }
 
 // Payment type conversions
-export function paymentTypeToBackend(paymentType: any): any {
+export function paymentTypeToBackend(paymentType: unknown): unknown {
   return objectToBackendWithMapping(paymentType, COMMON_MAPPINGS.PAYMENT_TYPE);
 }
 
-export function paymentTypeFromBackend(paymentType: any): any {
+export function paymentTypeFromBackend(paymentType: unknown): unknown {
   return objectFromBackendWithMapping(paymentType, COMMON_MAPPINGS.PAYMENT_TYPE);
 }
 
 // Deduction type conversions
-export function deductionTypeToBackend(deductionType: any): any {
+export function deductionTypeToBackend(deductionType: unknown): unknown {
   return objectToBackendWithMapping(deductionType, COMMON_MAPPINGS.DEDUCTION_TYPE);
 }
 
-export function deductionTypeFromBackend(deductionType: any): any {
+export function deductionTypeFromBackend(deductionType: unknown): unknown {
   return objectFromBackendWithMapping(deductionType, COMMON_MAPPINGS.DEDUCTION_TYPE);
 }
 
 // Custom field conversions
-export function customFieldDefinitionToBackend(customField: any): any {
+export function customFieldDefinitionToBackend(customField: unknown): unknown {
   return objectToBackendWithMapping(customField, COMMON_MAPPINGS.CUSTOM_FIELD);
 }
 
-export function customFieldDefinitionFromBackend(customField: any): any {
+export function customFieldDefinitionFromBackend(customField: unknown): unknown {
   return objectFromBackendWithMapping(customField, COMMON_MAPPINGS.CUSTOM_FIELD);
 }

@@ -20,9 +20,9 @@ export abstract class BaseService {
   private async initializeSupabase(): Promise<void> {
     try {
       this._supabase = await getSupabaseClientAsync();
-      console.log(`${this.constructor.name}: Supabase client initialized successfully`);
+      // console.log(`${this.constructor.name}: Supabase client initialized successfully`);
     } catch (error) {
-      console.error(`${this.constructor.name}: Failed to initialize Supabase client:`, error);
+      // console.error(`${this.constructor.name}: Failed to initialize Supabase client:`, error);
       // Create a basic mock client to prevent "undefined" errors
       this._supabase = {
         from: () => ({
@@ -32,7 +32,7 @@ export abstract class BaseService {
           delete: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
           upsert: () => Promise.resolve({ data: null, error: { message: 'Database connection unavailable' } }),
         })
-      } as any;
+      } as SupabaseClient;
     }
   }
 
@@ -65,8 +65,8 @@ export abstract class BaseService {
   /**
    * Handle and format errors consistently across all services
    */
-  protected handleError(error: any, operation: string): never {
-    console.error(`${this.constructor.name} - ${operation}:`, error);
+  protected handleError(error: unknown, operation: string): never {
+    // console.error(`${this.constructor.name} - ${operation}:`, error);
     const message = error?.message || `Failed to ${operation}`;
     throw new Error(message);
   }
@@ -74,7 +74,7 @@ export abstract class BaseService {
   /**
    * Validate required fields
    */
-  protected validateRequired(data: Record<string, any>, requiredFields: string[]): void {
+  protected validateRequired(data: Record<string, unknown>, requiredFields: string[]): void {
     const missing = requiredFields.filter(field => !data[field]);
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);

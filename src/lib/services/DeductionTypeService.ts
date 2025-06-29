@@ -8,7 +8,7 @@ export class DeductionTypeService extends BaseService {
 
   async getDeductionTypesByCompany(companyId: string): Promise<DeductionType[]> {
     try {
-      let { data: dedTypesFromDB, error } = await this.supabase
+      const { data: dedTypesFromDB, error } = await this.supabase
         .from(this.tableName)
         .select('*')
         .eq('company_id', companyId);
@@ -115,7 +115,7 @@ export class DeductionTypeService extends BaseService {
     }
   }
 
-  private mapFromDatabase(dbRow: any): DeductionType {
+  private mapFromDatabase(dbRow: unknown): DeductionType {
     return {
       id: dbRow.id,
       companyId: dbRow.company_id,
@@ -127,7 +127,7 @@ export class DeductionTypeService extends BaseService {
     };
   }
 
-  private mapToDatabase(deductionType: Partial<DeductionType>): any {
+  private mapToDatabase(deductionType: Partial<DeductionType>): unknown {
     return {
       company_id: deductionType.companyId,
       name: deductionType.name,

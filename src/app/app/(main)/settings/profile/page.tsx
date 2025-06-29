@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
+import { UserCircle, Lock, Save, Camera, Trash2, RotateCcw, Crop, Eye, EyeOff, AlertTriangle, _Info, _CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getServices } from '@/lib/oop';
 import { type UserProfile } from '@/lib/services/UserService';
@@ -116,8 +116,8 @@ export default function UserProfilePage() {
       // Use UserService to update profile
       await services.userService.updateProfile(currentUser.id, userDetails);
       setFeedback({ type: 'success', message: "Profile Updated", details: "Your personal information has been saved." });
-    } catch (error: any) {
-      setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error?.message || String(error)) });
+    } catch (error: unknown) {
+      setFeedback({ type: 'error', message: "Save Failed", details: "Could not save personal information. " + (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -155,8 +155,8 @@ export default function UserProfilePage() {
       await services.userService.updatePassword(passwordDetails.newPassword);
       setPasswordFeedback({ type: 'success', message: "Password Updated", details: "Your password has been successfully changed." });
       setPasswordDetails({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
-    } catch (error: any) {
-      setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. " + (error?.message || String(error)) });
+    } catch (error: unknown) {
+      setPasswordFeedback({ type: 'error', message: "Update Failed", details: "Could not update password. " + (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -208,6 +208,28 @@ export default function UserProfilePage() {
     }
     setAvatarFeedback({ type: 'success', message: "Profile Picture Removed", details: "Your profile picture has been reset to default." });
   };
+
+  if (!isLoaded) {
+    if (feedback && feedback.type === 'error' && feedback.message.toLowerCase().includes('user not authenticated')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <Alert variant="destructive" className="max-w-md w-full">
+            <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
+            <div>
+              <AlertTitle>Session Expired</AlertTitle>
+              <AlertDescription>
+                Your session has expired or you are not logged in.<br />
+                <Button className="mt-4" onClick={() => window.location.href = '/signin?returnUrl=' + encodeURIComponent(window.location.pathname)}>
+                  Go to Login
+                </Button>
+              </AlertDescription>
+            </div>
+          </Alert>
+        </div>
+      );
+    }
+    return <div className="flex justify-center items-center h-64">Loading profile...</div>;
+  }
 
   if (!isLoaded) {
     if (feedback && feedback.type === 'error' && feedback.message.toLowerCase().includes('user not authenticated')) {

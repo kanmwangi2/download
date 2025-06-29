@@ -6,7 +6,7 @@ export class DeductionService extends BaseService {
   private readonly staffDeductionsTable = 'staff_deductions';
   private readonly deductionTypesTable = 'deduction_types';
 
-  private mapDeductionFromSupabase(d: any): Deduction {
+  private mapDeductionFromSupabase(d: unknown): Deduction {
     return {
       id: d.id,
       companyId: d.company_id,

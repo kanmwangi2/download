@@ -631,7 +631,7 @@ export default function UserManagementTab() {
                   <SelectItem value="Payroll Approver">Payroll Approver</SelectItem>
                   <SelectItem value="Payroll Preparer">Payroll Preparer</SelectItem>
                 </SelectContent>
-              </Select>              {Boolean(editingUser?.role === "Primary Admin") && (
+              </Select>              {editingUser && Boolean(editingUser.role === "Primary Admin") && (
                 <p className="text-xs text-muted-foreground">The Primary Admin&apos;s role cannot be changed.</p>
               )}
             </div>

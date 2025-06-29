@@ -3,7 +3,7 @@
  * Handles all payment type and staff payment configuration operations.
  */
 import { BaseService } from './BaseService';
-import { PaymentType, StaffPaymentConfig } from '../types';
+import { PaymentType } from '../types';
 import { paymentTypeFromBackend, paymentTypeToBackend } from '../mappings/payment-mappings';
 
 export class PaymentTypeService extends BaseService {

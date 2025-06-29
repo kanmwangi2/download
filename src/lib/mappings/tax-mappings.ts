@@ -21,7 +21,7 @@ export function taxSettingsToBackend(taxSettings: TaxSettingsData | Omit<TaxSett
   };
 }
 
-export function taxSettingsFromBackend(taxSettings: Record<string, any>): TaxSettingsData {
+export function taxSettingsFromBackend(taxSettings: Record<string, unknown>): TaxSettingsData {
   return {
     id: taxSettings.id,
     companyId: taxSettings.company_id,

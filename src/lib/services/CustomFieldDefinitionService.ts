@@ -105,7 +105,7 @@ export class CustomFieldDefinitionService extends BaseService {
    */
   async update(id: string, updates: Partial<Omit<CustomFieldDefinition, 'id'>>): Promise<CustomFieldDefinition | null> {
     try {
-      const updateData: any = {};
+      const updateData: Partial<Record<string, unknown>> = {};
       
       if (updates.companyId !== undefined) updateData.company_id = updates.companyId;
       if (updates.name !== undefined) updateData.name = updates.name;

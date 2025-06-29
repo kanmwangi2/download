@@ -105,7 +105,7 @@ export default function PayrollRunDetailPage() {
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   const [activeDeductionTypeColumns, setActiveDeductionTypeColumns] = useState<DeductionType[]>([]);
   const [activePaymentTypeColumns, setActivePaymentTypeColumns] = useState<PaymentType[]>([]);
-  const [activeStatutoryColumns, setActiveStatutoryColumns] = useState<string[]>([]);
+  const [_activeStatutoryColumns, _setActiveStatutoryColumns] = useState<string[]>([]);
   const [pageFeedback, setPageFeedback] = useState<FeedbackMessage | null>(null);
   const [dialogCurrentPage, setDialogCurrentPage] = useState(1);
   const [dialogRowsPerPage, setDialogRowsPerPage] = useState<number>(DIALOG_ROWS_PER_PAGE_OPTIONS[0] ?? 10);
@@ -246,8 +246,8 @@ export default function PayrollRunDetailPage() {
               await companyService.updateCompanyProfile(newProfileForCompany);
               setCompanyProfile(newProfileForCompany);
             } else {
-                if (profileFromDB && typeof (profileFromDB as Record<string, any>).isRamaActive === 'undefined') {
-                    (profileFromDB as Record<string, any>).isRamaActive = true;
+                if (profileFromDB && typeof (profileFromDB as CompanyProfileData).isRamaActive === 'undefined') {
+                    (profileFromDB as CompanyProfileData).isRamaActive = true;
                 }
                 setCompanyProfile(profileFromDB || null);
             }
@@ -553,14 +553,14 @@ export default function PayrollRunDetailPage() {
 
     const columns = memoizedPayrollDetailColumns;
     const data = payrollRun.employees.map(emp => {
-        const row: Record<string, unknown> = {}; // Changed from any
+        const row: Record<string, unknown> = {};
         columns.forEach(col => {
             row[col.label] = col.accessor(emp);
         });
         return row;
     });
 
-    const totalsRow: Record<string, unknown> = {}; // Changed from any
+    const totalsRow: Record<string, unknown> = {};
     columns.forEach((col, index) => {
         if (index === 0) {
             totalsRow[col.label] = 'Grand Totals';
@@ -724,21 +724,21 @@ export default function PayrollRunDetailPage() {
                             </TableRow>
                         ))}
                         </TableBody>
-                        {payrollRun.employees.length > 0 && (
-                        <ShadTableFooter>
-                          <TableRow className="bg-background">
-                            <TableCell colSpan={totalsLabelColSpanForDialogTable} className="text-right font-bold whitespace-nowrap min-w-[120px]">Grand Totals</TableCell>
-                            {memoizedPayrollDetailColumns.slice(totalsLabelColSpanForDialogTable).map(col => {
-                              let totalValue;
-                              if (col.key.startsWith('dyn_earn_')) { const paymentTypeId = col.key.substring(9); totalValue = (tableTotals as Record<string, number>).dynamicTotalGrossEarnings?.[paymentTypeId] || 0; }
-                              else if (col.key.startsWith('dyn_ded_')) { const deductionTypeId = col.key.substring(8); totalValue = (tableTotals as Record<string, number>).dynamicTotalDeductionAmounts?.[deductionTypeId] || 0; }
-                              else if (col.key === 'totalDeductionsAppliedThisRun') { totalValue = tableTotals.totalTotalDeductionsAppliedThisRun; }
-                              else { const totalKey = `total${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`; totalValue = (tableTotals as Record<string, number>)[totalKey] ?? 0; }
-                              return <TableCell key={`total-${col.key}`} className="text-right font-bold whitespace-nowrap min-w-[120px]">{formatNumberForTable(totalValue)}</TableCell>
-                            })}
-                          </TableRow>
-                        </ShadTableFooter>
-                        )}
+                        {payrollRun && (
+                    <ShadTableFooter>
+                      <TableRow className="bg-background">
+                        <TableCell colSpan={totalsLabelColSpanForDialogTable} className="text-right font-bold whitespace-nowrap min-w-[120px]">Grand Totals</TableCell>
+                        {memoizedPayrollDetailColumns.slice(totalsLabelColSpanForDialogTable).map(col => {
+                          let totalValue;
+                          if (col.key.startsWith('dyn_earn_')) { const paymentTypeId = col.key.substring(9); totalValue = (tableTotals as Record<string, number>).dynamicTotalGrossEarnings?.[paymentTypeId] || 0; }
+                          else if (col.key.startsWith('dyn_ded_')) { const deductionTypeId = col.key.substring(8); totalValue = (tableTotals as Record<string, number>).dynamicTotalDeductionAmounts?.[deductionTypeId] || 0; }
+                          else if (col.key === 'totalDeductionsAppliedThisRun') { totalValue = tableTotals.totalTotalDeductionsAppliedThisRun; }
+                          else { const totalKey = `total${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`; totalValue = (tableTotals as Record<string, number>)[totalKey] ?? 0; }
+                          return <TableCell key={`total-${col.key}`} className="text-right font-bold whitespace-nowrap min-w-[120px]">{formatNumberForTable(totalValue)}</TableCell>
+                        })}
+                      </TableRow>
+                    </ShadTableFooter>
+                    )}
                     </Table>
                 </div>
 
@@ -791,6 +791,7 @@ export default function PayrollRunDetailPage() {
             </div>
 
             <DialogFooter className="border-t pt-4 sm:justify-between mt-auto shrink-0">{/* Dialog Actions Footer */}
+                {payrollRun && (
                 <div className="flex flex-wrap gap-2">
                 { (payrollRun.status === "Draft" || payrollRun.status === "Rejected") && isPayrollProcessed && payrollRun.employees.length > 0 && (
                     <>
@@ -806,6 +807,7 @@ export default function PayrollRunDetailPage() {
                     </>
                 )}
                 </div>
+                )}
                 <div className="flex items-center space-x-2 mt-2 sm:mt-0">
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -824,7 +826,7 @@ export default function PayrollRunDetailPage() {
         </DialogContent>
       </Dialog>
       <Dialog open={isRejectDialogOpen} onOpenChange={(isOpen) => { setIsRejectDialogOpen(isOpen); if (!isOpen) setPageFeedback(null);}}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Reject Payroll Run</DialogTitle><DialogDescription>Provide reason for rejecting {payrollRun?.id}.</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="space-y-2"><Label htmlFor="rejectionReason">Rejection Reason *</Label><Input id="rejectionReason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="e.g., Incorrect overtime"/></div></div><DialogFooter><Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Cancel</Button><Button variant="destructive" onClick={handleConfirmRejectRun}>Confirm Rejection</Button></DialogFooter></DialogContent></Dialog>
-      <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8"><p className="font-semibold text-primary/90">Notes:</p><ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1"><li>Tax settings apply globally unless company-specific exemptions are set. Staff data, payment configs, and deductions are company-specific.</li><li>Payment Types (e.g. Basic Pay, Allowances) defined in 'Payments Configuration' determine earnings. "Net" components are grossed-up sequentially.</li><li>Deductions are applied based on the order of Deduction Types defined in 'Deductions Management', after statutory deductions. Insufficient net pay may result in partial or skipped deductions.</li><li>Saving a draft, approving, or rejecting updates this run in Supabase. Approved runs update staff deduction balances.</li></ul></div>
+      <div className="p-4 border-l-4 border-primary bg-primary/10 rounded-md mt-8"><p className="font-semibold text-primary/90">Notes:</p><ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1"><li>Tax settings apply globally unless company-specific exemptions are set. Staff data, payment configs, and deductions are company-specific.</li><li>Payment Types (e.g. Basic Pay, Allowances) defined in &apos;Payments Configuration&apos; determine earnings. "Net" components are grossed-up sequentially.</li><li>Deductions are applied based on the order of Deduction Types defined in &apos;Deductions Management&apos;, after statutory deductions. Insufficient net pay may result in partial or skipped deductions.</li><li>Saving a draft, approving, or rejecting updates this run in Supabase. Approved runs update staff deduction balances.</li></ul></div>
     </div>
   );
 }

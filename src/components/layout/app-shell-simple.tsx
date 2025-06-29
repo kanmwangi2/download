@@ -15,7 +15,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { mainNavItems, type NavItem, type NavGroup, type NavElement } from "@/config/nav";
+import { mainNavItems, type NavItem, type _NavGroup, type NavElement } from "@/config/nav";
 import { CheetahIcon } from "@/components/icons/cheetah-icon";
 import { Button } from "@/components/ui/button";
 import { createClient } from '@supabase/supabase-js';

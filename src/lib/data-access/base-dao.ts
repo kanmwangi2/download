@@ -50,12 +50,12 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
   /**
    * Transform database record to frontend entity
    */
-  protected abstract fromDatabase(record: any): T;
+  protected abstract fromDatabase(record: unknown): T;
 
   /**
    * Transform frontend entity to database record
    */
-  protected abstract toDatabase(entity: Partial<T>): any;
+  protected abstract toDatabase(entity: Partial<T>): unknown;
 
   /**
    * Build base query with company scoping if needed
@@ -79,7 +79,7 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
       throw new Error(`Failed to fetch ${this.tableName}: ${error.message}`);
     }
     
-    return (data || []).map((record: any) => this.fromDatabase(record));
+    return (data || []).map((record: unknown) => this.fromDatabase(record));
   }
 
   async findById(id: string, companyId?: string): Promise<T | null> {
@@ -212,7 +212,7 @@ export abstract class BaseDAO<T extends BaseEntity> implements CRUDOperations<T>
       throw new Error(`Failed to fetch ${this.tableName} with filters: ${error.message}`);
     }
     
-    return (data || []).map((record: any) => this.fromDatabase(record));
+    return (data || []).map((record: unknown) => this.fromDatabase(record));
   }
 
   /**

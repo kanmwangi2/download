@@ -13,7 +13,7 @@ export function userToBackend(user: User | Omit<User, 'id'>): Record<string, unk
     };
 }
 
-export function userFromBackend(user: Record<string, any>): User {
+export function userFromBackend(user: Record<string, unknown>): User {
     return {
         id: user.id,
         firstName: user.first_name || '',
@@ -35,7 +35,7 @@ export function userProfileToBackend(profile: UserProfile): Record<string, unkno
     };
 }
 
-export function userProfileFromBackend(profile: Record<string, any>): UserProfile {
+export function userProfileFromBackend(profile: Record<string, unknown>): UserProfile {
     return {
         firstName: profile.first_name,
         lastName: profile.last_name,
@@ -54,7 +54,7 @@ export function userCompanyAssignmentToBackend(assignment: UserCompanyAssignment
     };
 }
 
-export function userCompanyAssignmentFromBackend(assignment: Record<string, any>): UserCompanyAssignment {
+export function userCompanyAssignmentFromBackend(assignment: Record<string, unknown>): UserCompanyAssignment {
     return {
         id: assignment.id,
         userId: assignment.user_id,

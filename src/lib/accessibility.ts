@@ -287,7 +287,9 @@ export const useLiveRegion = () => {
     liveRegion.style.overflow = 'hidden';
     
     document.body.appendChild(liveRegion);
-    (liveRegionRef as any).current = liveRegion;
+    if (liveRegionRef.current) {
+      liveRegionRef.current = liveRegion;
+    }
 
     return () => {
       if (liveRegionRef.current && document.body.contains(liveRegionRef.current)) {

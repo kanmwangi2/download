@@ -3,7 +3,7 @@
  * Handles all payroll run-related operations.
  */
 import { BaseService } from './BaseService';
-import { PayrollRunReport, PayrollRunSummary, StaffPayrollRunDetail } from '../types/payroll';
+import { PayrollRunSummary, StaffPayrollRunDetail } from '../types/payroll';
 import { objectToCamelCase, objectToSnakeCase } from '../case-conversion';
 
 export class PayrollService extends BaseService {

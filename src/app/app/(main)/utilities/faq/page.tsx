@@ -124,13 +124,7 @@ export default function FAQPage() {
     }
   };
 
-  const handleAccordionChange = (value: string) => {
-    setExpandedItems(prev => 
-      prev.includes(value) 
-        ? prev.filter(item => item !== value)
-        : [...prev, value]
-    );
-  };
+  
 
   const exportToPDF = () => {
     const doc = new jsPDF();

@@ -5,12 +5,12 @@ import { getSupabaseClientAsync } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function DebugAuthPage() {
-  const [authInfo, setAuthInfo] = useState<any>(null);
+  const [authInfo, setAuthInfo] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [refreshCount, setRefreshCount] = useState(0);
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function DebugAuthPage() {
             .single();
           profile = data;
           profileError = error?.message;
-        } catch (err) {
+        } catch (err: unknown) {
           profileError = 'Profile query failed';
         }
       }
@@ -88,7 +88,7 @@ export default function DebugAuthPage() {
           canAccessApplicationSettings: ['Primary Admin', 'App Admin'].includes(user?.user_metadata?.role),
         }
       });
-    } catch (error) {
+            } catch (err: unknown) {
       console.error('Auth debug error:', error);
       setAuthInfo({
         error: error instanceof Error ? error.message : 'Unknown error',

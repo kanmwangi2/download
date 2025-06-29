@@ -20,21 +20,21 @@ export function getServerSupabaseClient() {
       cookies: {
         get(name: string) {
           try {
-            return (cookieStore as any).get?.(name)?.value;
+            return (cookieStore as { get?: (name: string) => { value: string } | undefined }).get?.(name)?.value;
           } catch {
             return undefined;
           }
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            (cookieStore as any).set?.({ name, value, ...options });
+            (cookieStore as { set?: (options: { name: string; value: string; }) => void }).set?.({ name, value, ...options });
           } catch {
             // Ignore in static generation
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            (cookieStore as any).set?.({ name, value: '', ...options });
+            (cookieStore as { set?: (options: { name: string; value: string; }) => void }).set?.({ name, value: '', ...options });
           } catch {
             // Ignore in static generation
           }

@@ -15,7 +15,7 @@ export function deductionTypeToBackend(deductionType: DeductionType | Omit<Deduc
   };
 }
 
-export function deductionTypeFromBackend(deductionType: Record<string, any>): DeductionType {
+export function deductionTypeFromBackend(deductionType: Record<string, unknown>): DeductionType {
   return {
     id: deductionType.id,
     companyId: deductionType.company_id,
@@ -39,7 +39,7 @@ export function staffDeductionToBackend(deduction: StaffDeduction | Omit<StaffDe
     };
 }
 
-export function staffDeductionFromBackend(deduction: Record<string, any>): StaffDeduction {
+export function staffDeductionFromBackend(deduction: Record<string, unknown>): StaffDeduction {
     return {
         id: deduction.id,
         companyId: deduction.company_id,

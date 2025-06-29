@@ -30,7 +30,7 @@ export interface StaffMember {
   keyContactRelationship?: string;
   keyContactPhone?: string;
   status: StaffStatus;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 /**

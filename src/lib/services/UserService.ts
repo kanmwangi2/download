@@ -33,28 +33,28 @@ export class UserService extends BaseService {
    */
   async getCurrentUser(): Promise<AuthenticatedUser | null> {
     try {
-      console.log('🔄 UserService: Getting current user...');
+      // console.log('🔄 UserService: Getting current user...');
       
       // Ensure Supabase client is initialized first
       await this.ensureInitialized();
       
       // Check if we have a real Supabase client
       const isRealClient = this.supabase && typeof this.supabase.auth?.getUser === 'function';
-      console.log('🔄 UserService: Supabase client status:', { isRealClient, hasAuth: !!this.supabase.auth });
+      // console.log('🔄 UserService: Supabase client status:', { isRealClient, hasAuth: !!this.supabase.auth });
       
       // Get current user from Supabase auth
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
       if (userError || !user) {
-        console.warn('❌ UserService: User not authenticated:', userError?.message);
+        // console.warn('❌ UserService: User not authenticated:', userError?.message);
         return null;
       }
 
-      console.log('🔄 UserService: Got authenticated user:', { userId: user.id, email: user.email });
+      // console.log('🔄 UserService: Got authenticated user:', { userId: user.id, email: user.email });
 
       // Get role from user metadata (this is where it's stored during authentication)
       let role = user.user_metadata?.role as UserRole;
       if (!role) {
-        console.warn('❌ UserService: User has no role assigned in metadata, assigning default role');
+        // console.warn('❌ UserService: User has no role assigned in metadata, assigning default role');
         
         // For now, assign a default role. In production, you might want to:
         // 1. Check if this is the first user (make them Primary Admin)
@@ -72,11 +72,11 @@ export class UserService extends BaseService {
           if (!existingProfiles || existingProfiles.length === 0) {
             // First user - make them Primary Admin
             defaultRole = 'Primary Admin';
-            console.log('🔄 UserService: First user detected, assigning Primary Admin role');
+            // console.log('🔄 UserService: First user detected, assigning Primary Admin role');
           } else {
             // Not first user - assign Company Admin as default
             defaultRole = 'Company Admin';
-            console.log('🔄 UserService: Assigning default Company Admin role');
+            // console.log('🔄 UserService: Assigning default Company Admin role');
           }
           
           // Update user metadata with the role
@@ -89,14 +89,14 @@ export class UserService extends BaseService {
           
           // Use the assigned role
           role = defaultRole;
-          console.log('✅ UserService: Assigned role:', role);
+          // console.log('✅ UserService: Assigned role:', role);
         } catch (error) {
-          console.error('❌ UserService: Error assigning default role:', error);
+          // console.error('❌ UserService: Error assigning default role:', error);
           return null;
         }
       }
 
-      console.log('🔄 UserService: User role:', role);
+      // console.log('🔄 UserService: User role:', role);
 
       // Fetch user profile for additional details
       const { data: userProfile, error: profileError } = await this.supabase
@@ -106,12 +106,12 @@ export class UserService extends BaseService {
         .single();
 
       if (profileError || !userProfile) {
-        console.warn('❌ UserService: Error fetching user profile:', profileError?.message);
+        // console.warn('❌ UserService: Error fetching user profile:', profileError?.message);
         this.handleError(profileError, 'fetch user profile');
         return null;
       }
 
-      console.log('🔄 UserService: Got user profile:', { firstName: userProfile.first_name, lastName: userProfile.last_name });
+      // console.log('🔄 UserService: Got user profile:', { firstName: userProfile.first_name, lastName: userProfile.last_name });
 
       // For Primary Admin and App Admin, they have access to all companies
       let assignedCompanyIds: string[] = [];
@@ -126,12 +126,12 @@ export class UserService extends BaseService {
           // If no companies table or it's empty, still allow admin access
           // Primary Admin should always have access regardless
           if (assignedCompanyIds.length === 0 && role === 'Primary Admin') {
-            console.warn('Primary Admin detected but no companies found in database');
+            // console.warn('Primary Admin detected but no companies found in database');
             // For Primary Admin, return a special marker to indicate universal access
             assignedCompanyIds = ['*']; // Universal access marker
           }
         } catch (error) {
-          console.warn('Error fetching companies for admin user:', error);
+          // console.warn('Error fetching companies for admin user:', error);
           // For Primary Admin, ensure they still get access even if companies table fails
           if (role === 'Primary Admin') {
             assignedCompanyIds = ['*']; // Universal access marker
@@ -152,20 +152,20 @@ export class UserService extends BaseService {
               .eq('user_id', user.id);
             assignedCompanyIds = (assignments || []).map(a => a.company_id);
           } catch (error) {
-            console.warn('Error fetching user company assignments:', error);
+            // console.warn('Error fetching user company assignments:', error);
             assignedCompanyIds = [];
           }
         }
       }
 
-      console.log('✅ UserService: Successfully created user object:', {
-        userId: user.id,
-        email: user.email || userProfile.email,
-        firstName: userProfile.first_name,
-        lastName: userProfile.last_name,
-        role,
-        assignedCompanyCount: assignedCompanyIds.length
-      });
+      // console.log('✅ UserService: Successfully created user object:', {
+      //   userId: user.id,
+      //   email: user.email || userProfile.email,
+      //   firstName: userProfile.first_name,
+      //   lastName: userProfile.last_name,
+      //   role,
+      //   assignedCompanyCount: assignedCompanyIds.length
+      // });
 
       return {
         id: user.id,
@@ -177,7 +177,7 @@ export class UserService extends BaseService {
         assignedCompanyIds: assignedCompanyIds,
       };
     } catch (error) {
-      console.error('❌ UserService: getCurrentUser threw exception:', error);
+      // console.error('❌ UserService: getCurrentUser threw exception:', error);
       this.handleError(error, 'get current user');
       return null;
     }

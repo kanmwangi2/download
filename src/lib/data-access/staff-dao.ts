@@ -35,7 +35,7 @@ export interface Staff extends BaseEntity {
   keyContactRelationship?: string;
   keyContactPhone?: string;
   status: 'Active' | 'Inactive';
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,7 +45,7 @@ export class StaffDAO extends BaseDAO<Staff> {
     super('staff_members', true); // Company-scoped table
   }
 
-  protected fromDatabase(record: any): Staff {
+  protected fromDatabase(record: Record<string, unknown>): Staff {
     return {
       id: record.id,
       companyId: record.company_id,
@@ -82,7 +82,7 @@ export class StaffDAO extends BaseDAO<Staff> {
     };
   }
 
-  protected toDatabase(entity: Partial<Staff>): any {
+  protected toDatabase(entity: Partial<Staff>): Record<string, unknown> {
     return {
       ...(entity.id && { id: entity.id }),
       ...(entity.companyId && { company_id: entity.companyId }),
@@ -153,7 +153,7 @@ export class StaffDAO extends BaseDAO<Staff> {
       throw new Error(`Failed to search staff: ${error.message}`);
     }
 
-    return (data || []).map((record: any) => this.fromDatabase(record));
+    return (data || []).map((record: unknown) => this.fromDatabase(record));
   }
 
   /**
@@ -177,7 +177,7 @@ export class StaffDAO extends BaseDAO<Staff> {
   /**
    * Get staff with their payment configurations
    */
-  async getStaffWithPaymentConfigs(companyId: string): Promise<Array<Staff & { paymentConfig?: any }>> {
+  async getStaffWithPaymentConfigs(companyId: string): Promise<Array<Staff & { paymentConfig?: unknown }>> {
     const supabase = await this.getSupabase();
     const { data, error } = await supabase
       .from(this.tableName)
@@ -191,9 +191,9 @@ export class StaffDAO extends BaseDAO<Staff> {
       throw new Error(`Failed to fetch staff with payment configs: ${error.message}`);
     }
 
-    return (data || []).map((record: any) => ({
+    return (data || []).map((record: unknown) => ({
       ...this.fromDatabase(record),
-      paymentConfig: record.staff_payment_configs?.[0] || null
+      paymentConfig: (record as Record<string, unknown>).staff_payment_configs?.[0] || null
     }));
   }
 }

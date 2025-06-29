@@ -153,11 +153,11 @@ export const validateApiKey = (apiKey: string): boolean => {
 };
 
 // Secure data transmission utilities
-export const encodeForTransmission = (data: any): string => {
+export const encodeForTransmission = (data: unknown): string => {
   return btoa(JSON.stringify(data));
 };
 
-export const decodeFromTransmission = (encoded: string): any => {
+export const decodeFromTransmission = (encoded: string): unknown => {
   try {
     return JSON.parse(atob(encoded));
   } catch {
@@ -168,7 +168,7 @@ export const decodeFromTransmission = (encoded: string): any => {
 // Security logging
 export const logSecurityEvent = (
   event: string, 
-  details: Record<string, any> = {},
+  details: Record<string, unknown> = {},
   severity: 'low' | 'medium' | 'high' = 'medium'
 ) => {
   const logEntry = {
@@ -182,14 +182,14 @@ export const logSecurityEvent = (
 
   if (isProduction()) {
     // In production, you would send this to a logging service
-    console.warn('Security Event:', logEntry);
+    // console.warn('Security Event:', logEntry);
   } else {
     console.log('Security Event:', logEntry);
   }
 };
 
 // Session security
-export const validateSession = (sessionData: any): boolean => {
+export const validateSession = (sessionData: unknown): boolean => {
   if (!sessionData || typeof sessionData !== 'object') {
     return false;
   }

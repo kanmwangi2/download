@@ -1,11 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "probes": [
-    {
-      "path": "/api/debug-auth",
-      "mustContain": "Cheetah Payroll API is running"
-    }
-  ],
+  
   "functions": {
     "src/app/**/*.ts": {
       "maxDuration": 30
